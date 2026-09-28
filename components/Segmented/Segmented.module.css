@@ -1,0 +1,23 @@
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.seg button {
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  padding: 9px 10px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.seg button[aria-pressed='true'] {
+  background: var(--primary-btn);
+  color: var(--on-primary);
+}

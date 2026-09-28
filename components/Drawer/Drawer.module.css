@@ -1,0 +1,142 @@
+/* A right-hand slide-in panel built on <dialog>, so focus trapping, Escape and
+   the inert backdrop come from the browser rather than from our own code. */
+
+.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(440px, 100%);
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--drawer-shadow);
+  display: none;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+  transform: translateX(105%);
+  transition:
+    transform 0.22s ease,
+    overlay 0.22s allow-discrete,
+    display 0.22s allow-discrete;
+}
+
+.drawer[open] {
+  display: flex;
+  transform: none;
+}
+
+@starting-style {
+  .drawer[open] {
+    transform: translateX(105%);
+  }
+}
+
+.drawer::backdrop {
+  background: var(--backdrop);
+  opacity: 0;
+  transition:
+    opacity 0.2s,
+    overlay 0.2s allow-discrete,
+    display 0.2s allow-discrete;
+}
+
+.drawer[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .drawer[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.title {
+  margin: 0;
+  font: 400 24px/1.2 var(--serif);
+  font-variation-settings: 'SOFT' 100, 'WONK' 0;
+  color: var(--heading);
+}
+
+.close {
+  background: none;
+  border: 0;
+  color: var(--text-2);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  padding: 0;
+}
+
+.close:hover {
+  background: var(--surface-2);
+}
+
+.body {
+  padding: 26px 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  --field-label-bg: var(--surface);
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+}
+
+.form {
+  display: contents;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.two:has(> [hidden]) {
+  grid-template-columns: 1fr;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.total .num {
+  font-family: var(--mono);
+  font-size: 18px;
+}
+
+@media (max-width: 460px) {
+  .two {
+    grid-template-columns: 1fr;
+  }
+}

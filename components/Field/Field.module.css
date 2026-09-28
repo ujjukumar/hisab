@@ -1,0 +1,117 @@
+.field {
+  position: relative;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  min-width: 0;
+}
+
+.label {
+  position: absolute;
+  top: -7px;
+  left: 10px;
+  padding: 0 4px;
+  background: var(--field-label-bg, var(--page));
+  font: 600 10px/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-3);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 12px 14px 11px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  border-radius: 5px;
+  min-width: 0;
+}
+
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+}
+
+.select::after {
+  content: '';
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--text-2);
+  border-bottom: 1.6px solid var(--text-2);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.field select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.field:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.field[data-invalid='true'] {
+  border-color: var(--loss);
+}
+
+.range {
+  display: flex;
+  align-items: center;
+}
+
+.range input {
+  flex: 1;
+  padding-right: 6px;
+}
+
+.range .sep {
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 0 2px;
+}
+
+.search svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.search input {
+  padding-left: 38px;
+}
+
+.amount input {
+  font: 500 30px/1.1 var(--mono);
+  padding: 16px 14px 13px 42px;
+}
+
+.amount .currency {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-46%);
+  font: 500 24px/1 var(--mono);
+  color: var(--text-3);
+}
+
+.error {
+  margin: -6px 0 0;
+  color: var(--loss);
+  font-size: 13px;
+  min-height: 1.2em;
+}

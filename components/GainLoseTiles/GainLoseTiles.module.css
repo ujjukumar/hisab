@@ -1,0 +1,72 @@
+.gl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.gl h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--gain);
+}
+
+.list.lose {
+  border-top-color: var(--loss);
+}
+
+.list li {
+  padding: 13px 14px;
+  background: var(--gain-tint);
+  border-bottom: 1px dashed var(--line-strong);
+}
+
+.list li:first-child {
+  background: var(--gain-tint-strong);
+}
+
+.list.lose li {
+  background: var(--loss-tint);
+}
+
+.list.lose li:first-child {
+  background: var(--loss-tint-strong);
+}
+
+.list li:last-child {
+  border-bottom: 0;
+}
+
+.name {
+  display: block;
+  font-weight: 600;
+  color: var(--primary);
+  line-height: 1.3;
+}
+
+.val {
+  display: block;
+  font-weight: 600;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.list li.empty {
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .gl {
+    grid-template-columns: 1fr;
+  }
+}

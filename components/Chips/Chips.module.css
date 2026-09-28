@@ -1,0 +1,30 @@
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.chips button,
+.chips a {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 6px 7px;
+  font: 600 10px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.chips button:hover,
+.chips a:hover {
+  border-color: var(--line-strong);
+}
+
+.chips button[aria-pressed='true'],
+.chips a[aria-current='true'] {
+  border-color: var(--primary);
+  background: var(--surface);
+}

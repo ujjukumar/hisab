@@ -1,0 +1,53 @@
+/* Built on the popover API so dismissal and top-layer stacking come from the browser. */
+
+.menu {
+  position: fixed;
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: var(--pop-shadow);
+  padding: 5px;
+  min-width: 200px;
+  color: var(--text);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 9px 12px;
+  border-radius: 3px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menu button.danger {
+  color: var(--loss);
+}
+
+.trigger {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  margin: -5px 0 -5px auto;
+  padding: 0;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  background: var(--surface-2);
+}

@@ -1,0 +1,59 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  --field-label-bg: var(--surface);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font: 400 21px/1.2 var(--serif);
+  font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 24;
+  color: var(--heading);
+}
+
+.sub {
+  margin: 5px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.foot {
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.moreLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.moreLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  .card {
+    padding: 22px 20px;
+  }
+}

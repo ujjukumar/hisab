@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+data/
+*.db
+*.db-wal
+*.db-shm
+
+.env*
+!.env.example
+
+# Saved pages from other people's sites, kept locally as design reference only.
+# Not ours to redistribute — see PLAN section 2.1.
+Inspiration-Sources/
+
+.DS_Store
+Thumbs.db

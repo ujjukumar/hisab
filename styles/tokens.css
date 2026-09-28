@@ -1,0 +1,187 @@
+/* Design tokens, ported from docs/mockup.html. That file is the source of truth for the look. */
+
+:root {
+  --page: #fef1e8;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --line: rgba(0, 0, 0, 0.1);
+  --line-strong: rgba(0, 0, 0, 0.24);
+  --zebra: #f5f5f5;
+  --heading: #000000;
+  --text: #212529;
+  --text-2: rgba(0, 0, 0, 0.8);
+  --text-3: rgba(0, 0, 0, 0.6);
+  --text-4: rgba(0, 0, 0, 0.4);
+  --primary: #1c509d;
+  --primary-btn: #1c4da0;
+  --on-primary: #ffffff;
+  --primary-glow: rgba(28, 80, 157, 0.32);
+  --gain: #12783c;
+  --loss: #b91014;
+  --gain-tint: rgba(28, 160, 81, 0.1);
+  --gain-tint-strong: rgba(28, 160, 81, 0.2);
+  --loss-tint: rgba(185, 16, 20, 0.08);
+  --loss-tint-strong: rgba(185, 16, 20, 0.17);
+  --accent: #ffa500;
+  --avatar: #fdc9a8;
+  --avatar-fg: #7a3e17;
+  --grid: #e6e6e6;
+  --track: #eee8e3;
+  --c1: #3e6298;
+  --c2: #669c72;
+  --c3: #976550;
+  --c4: #a7749c;
+  --c5: #bec37a;
+  --c6: #66729f;
+  --c7: #c9885a;
+  --c8: #8fa9c9;
+  --c-muted: #a9a9a9;
+  --bar-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.15);
+  --pop-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --drawer-shadow: -4px 0 8px rgba(0, 0, 0, 0.25);
+  --backdrop: rgba(0, 0, 0, 0.35);
+  --toast-bg: #212529;
+  --toast-fg: #ffffff;
+
+  --sans: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --serif: var(--font-serif), Georgia, 'Times New Roman', serif;
+
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --page: #17120f;
+    --surface: #221c18;
+    --surface-2: #2e2722;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-strong: rgba(255, 255, 255, 0.24);
+    --zebra: rgba(255, 255, 255, 0.035);
+    --heading: #ffffff;
+    --text: #ece6e1;
+    --text-2: rgba(255, 255, 255, 0.8);
+    --text-3: rgba(255, 255, 255, 0.6);
+    --text-4: rgba(255, 255, 255, 0.38);
+    --primary: #8cb0ec;
+    --primary-btn: #2f63b8;
+    --primary-glow: rgba(120, 160, 230, 0.28);
+    --gain: #5ccb8a;
+    --loss: #ff7b73;
+    --gain-tint: rgba(92, 203, 138, 0.1);
+    --gain-tint-strong: rgba(92, 203, 138, 0.19);
+    --loss-tint: rgba(255, 123, 115, 0.09);
+    --loss-tint-strong: rgba(255, 123, 115, 0.17);
+    --avatar: #6b4028;
+    --avatar-fg: #ffd9c2;
+    --grid: rgba(255, 255, 255, 0.09);
+    --track: rgba(255, 255, 255, 0.1);
+    --c1: #7d9dd2;
+    --c2: #86bc91;
+    --c3: #c39079;
+    --c4: #c99cbf;
+    --c5: #cdd28e;
+    --c6: #97a1ce;
+    --c7: #dda77a;
+    --c8: #a9c1de;
+    --c-muted: #7e7e7e;
+    --bar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+    --pop-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    --drawer-shadow: -6px 0 18px rgba(0, 0, 0, 0.5);
+    --backdrop: rgba(0, 0, 0, 0.55);
+    --toast-bg: #ece6e1;
+    --toast-fg: #17120f;
+    color-scheme: dark;
+  }
+}
+
+/* Explicit override, used by the /dev/ui dark panel and any future theme switch. */
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --page: #17120f;
+  --surface: #221c18;
+  --surface-2: #2e2722;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.24);
+  --zebra: rgba(255, 255, 255, 0.035);
+  --heading: #ffffff;
+  --text: #ece6e1;
+  --text-2: rgba(255, 255, 255, 0.8);
+  --text-3: rgba(255, 255, 255, 0.6);
+  --text-4: rgba(255, 255, 255, 0.38);
+  --primary: #8cb0ec;
+  --primary-btn: #2f63b8;
+  --primary-glow: rgba(120, 160, 230, 0.28);
+  --gain: #5ccb8a;
+  --loss: #ff7b73;
+  --gain-tint: rgba(92, 203, 138, 0.1);
+  --gain-tint-strong: rgba(92, 203, 138, 0.19);
+  --loss-tint: rgba(255, 123, 115, 0.09);
+  --loss-tint-strong: rgba(255, 123, 115, 0.17);
+  --avatar: #6b4028;
+  --avatar-fg: #ffd9c2;
+  --grid: rgba(255, 255, 255, 0.09);
+  --track: rgba(255, 255, 255, 0.1);
+  --c1: #7d9dd2;
+  --c2: #86bc91;
+  --c3: #c39079;
+  --c4: #c99cbf;
+  --c5: #cdd28e;
+  --c6: #97a1ce;
+  --c7: #dda77a;
+  --c8: #a9c1de;
+  --c-muted: #7e7e7e;
+  --bar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+  --pop-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --drawer-shadow: -6px 0 18px rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --toast-bg: #ece6e1;
+  --toast-fg: #17120f;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --page: #fef1e8;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --line: rgba(0, 0, 0, 0.1);
+  --line-strong: rgba(0, 0, 0, 0.24);
+  --zebra: #f5f5f5;
+  --heading: #000000;
+  --text: #212529;
+  --text-2: rgba(0, 0, 0, 0.8);
+  --text-3: rgba(0, 0, 0, 0.6);
+  --text-4: rgba(0, 0, 0, 0.4);
+  --primary: #1c509d;
+  --primary-btn: #1c4da0;
+  --primary-glow: rgba(28, 80, 157, 0.32);
+  --gain: #12783c;
+  --loss: #b91014;
+  --gain-tint: rgba(28, 160, 81, 0.1);
+  --gain-tint-strong: rgba(28, 160, 81, 0.2);
+  --loss-tint: rgba(185, 16, 20, 0.08);
+  --loss-tint-strong: rgba(185, 16, 20, 0.17);
+  --avatar: #fdc9a8;
+  --avatar-fg: #7a3e17;
+  --grid: #e6e6e6;
+  --track: #eee8e3;
+  --c1: #3e6298;
+  --c2: #669c72;
+  --c3: #976550;
+  --c4: #a7749c;
+  --c5: #bec37a;
+  --c6: #66729f;
+  --c7: #c9885a;
+  --c8: #8fa9c9;
+  --c-muted: #a9a9a9;
+  --bar-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.15);
+  --pop-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --drawer-shadow: -4px 0 8px rgba(0, 0, 0, 0.25);
+  --backdrop: rgba(0, 0, 0, 0.35);
+  --toast-bg: #212529;
+  --toast-fg: #ffffff;
+  color-scheme: light;
+}

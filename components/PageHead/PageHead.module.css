@@ -1,0 +1,51 @@
+.head {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 28px;
+}
+
+.noStrip .row {
+  padding-bottom: 30px;
+}
+
+.title {
+  margin: 0;
+  font: 400 36px/1.15 var(--sans);
+  color: var(--heading);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title button {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .row {
+    flex-wrap: wrap;
+    padding-top: 22px;
+  }
+  .title {
+    font-size: 28px;
+  }
+}

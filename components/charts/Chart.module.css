@@ -1,0 +1,154 @@
+.chart {
+  position: relative;
+  margin-top: 8px;
+  min-height: 250px;
+}
+
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart text {
+  font-family: var(--sans);
+  font-size: 11px;
+  fill: var(--text-3);
+}
+
+.group {
+  transition: opacity 0.12s;
+}
+
+.tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: var(--pop-shadow);
+  padding: 9px 11px;
+  font-size: 12px;
+  min-width: 170px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 2;
+}
+
+.tip.show {
+  opacity: 1;
+}
+
+.tip b {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--heading);
+}
+
+.tipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 3px;
+  color: var(--text-2);
+}
+
+.tipRow span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tipRow :global(.dot) {
+  width: 8px;
+  height: 8px;
+}
+
+.tipRow .v {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--heading);
+}
+
+.tipRow .v:global(.pos) {
+  color: var(--gain);
+}
+.tipRow .v:global(.neg) {
+  color: var(--loss);
+}
+
+/* ---------- donut and its legend ---------- */
+.split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.legendList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.legendList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.legendList .nm {
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.legendList .pc {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+
+.donut {
+  flex: none;
+  display: block;
+}
+
+.legendInline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  justify-content: flex-end;
+  font: 600 12px/1.2 var(--sans);
+  color: var(--text-2);
+  margin: 14px 0 2px;
+}
+
+.legendInline span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  min-height: 250px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+@media (max-width: 460px) {
+  .split {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+}
