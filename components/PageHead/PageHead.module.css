@@ -24,6 +24,12 @@
   gap: 8px;
 }
 
+.sub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
 .title button {
   background: none;
   border: 0;

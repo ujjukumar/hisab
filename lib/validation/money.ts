@@ -28,9 +28,12 @@ export function failed(message: string, field?: string): ActionResult {
 export const idSchema = z.coerce.number().int().positive();
 
 /** '' and missing both mean "not chosen". */
-const optionalId = z.preprocess((v) => (v === '' || v == null ? null : v), idSchema.nullable());
+export const optionalId = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  idSchema.nullable(),
+);
 
-const optionalText = (max: number) =>
+export const optionalText = (max: number) =>
   z.preprocess(
     (v) => v ?? '',
     z
@@ -40,7 +43,7 @@ const optionalText = (max: number) =>
       .transform((s) => s || null),
   );
 
-const requiredText = (max: number, message: string) =>
+export const requiredText = (max: number, message: string) =>
   z.string().trim().min(1, message).max(max, `Keep this under ${max} characters.`);
 
 const amount = (parse: typeof parsePaise, emptyMessage: string, emptyValue?: number) =>

@@ -48,7 +48,7 @@ const columns: Column<TxnRow>[] = [
         desc={
           <>
             {t.description}
-            {t.assetId && <span className={tableStyles.tag}>Linked</span>}
+            {t.investmentTxnId && <span className={tableStyles.tag}>Linked</span>}
           </>
         }
         note={t.note}

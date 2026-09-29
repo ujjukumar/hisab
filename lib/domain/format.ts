@@ -1,5 +1,6 @@
 import type { Paise } from './money';
 import { parts, SHORT_MONTHS, type IsoDate } from './dates';
+import type { Return } from './xirr';
 
 /** U+2212, the proper minus sign. Never use a hyphen for a negative figure. */
 export const MINUS = '−';
@@ -65,13 +66,17 @@ export function formatShortINRSigned(paise: Paise): string {
 /** '+14.80%' / '−6.10%' / '0.00%'. Never '−0.00%'. */
 export function formatPercent(value: number, decimals = 2): string {
   const zero = round(value, decimals) === 0;
-  return (zero ? '' : signOf(value, decimals)) + Math.abs(round(value, decimals)).toFixed(decimals) + '%';
+  return (
+    (zero ? '' : signOf(value, decimals)) + Math.abs(round(value, decimals)).toFixed(decimals) + '%'
+  );
 }
 
 /** Same, but no leading '+' — used in the small sub-labels under table figures. */
 export function formatPercentNoPlus(value: number, decimals = 2): string {
   const zero = round(value, decimals) === 0;
-  return (zero || value > 0 ? '' : MINUS) + Math.abs(round(value, decimals)).toFixed(decimals) + '%';
+  return (
+    (zero || value > 0 ? '' : MINUS) + Math.abs(round(value, decimals)).toFixed(decimals) + '%'
+  );
 }
 
 /** Annualised returns carry one decimal and the 'p.a.' suffix. */
@@ -82,6 +87,12 @@ export function formatReturnPa(value: number): string {
 /** Holdings under a year show the absolute return instead of an annualised one. */
 export function formatReturnAbs(value: number): string {
   return formatPercentNoPlus(value, 1) + ' abs.';
+}
+
+/** An XIRR result as '12.4% p.a.' or, under a year, '3.1% abs.'. '—' when there isn't one. */
+export function formatReturn(ret: Return): string {
+  if (!ret) return '—';
+  return ret.kind === 'pa' ? formatReturnPa(ret.rate * 100) : formatReturnAbs(ret.rate * 100);
 }
 
 /** 'pos' | 'neg' | '' — drives the gain/loss colour, never the only signal. */
@@ -136,7 +147,10 @@ export function niceStep(value: number): number {
 }
 
 /** An axis scale with roughly `targetTicks` gridlines above zero. */
-export function niceScale(max: number, targetTicks: number): {
+export function niceScale(
+  max: number,
+  targetTicks: number,
+): {
   top: number;
   step: number;
   ticks: number;

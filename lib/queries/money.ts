@@ -2,13 +2,7 @@ import 'server-only';
 import { and, asc, count, desc, eq, gte, lte, or, sql, sum, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { db } from '@/lib/db/client';
-import {
-  accounts,
-  budgets,
-  categories,
-  investmentTransactions,
-  transactions,
-} from '@/lib/db/schema';
+import { accounts, budgets, categories, transactions } from '@/lib/db/schema';
 import { accountBalance, summarise, type Flow } from '@/lib/domain/balances';
 import {
   currentMonth,
@@ -168,10 +162,10 @@ export type TxnFilters = {
 
 export const PAGE_SIZE = 100;
 
-type Params = Record<string, string | string[] | undefined>;
+export type Params = Record<string, string | string[] | undefined>;
 
-/** Read the filter bar's state from the URL. Anything malformed falls back to its default. */
-export function parseTxnFilters(params: Params): TxnFilters {
+/** Read single values and ids from search params; missing or malformed gives '' or null. */
+export function paramReader(params: Params) {
   const one = (key: string) => {
     const v = params[key];
     return (Array.isArray(v) ? v[0] : v)?.trim() ?? '';
@@ -180,11 +174,20 @@ export function parseTxnFilters(params: Params): TxnFilters {
     const n = Number(one(key));
     return Number.isInteger(n) && n > 0 ? n : null;
   };
+  const limit = () => {
+    const n = Number(one('limit'));
+    return Number.isInteger(n) && n > 0 ? Math.min(n, 100_000) : PAGE_SIZE;
+  };
+  return { one, id, limit };
+}
+
+/** Read the filter bar's state from the URL. Anything malformed falls back to its default. */
+export function parseTxnFilters(params: Params): TxnFilters {
+  const { one, id, limit } = paramReader(params);
   const month = currentMonth();
   const from = isValidDate(one('from')) ? one('from') : startOfMonth(month);
   const to = isValidDate(one('to')) ? one('to') : endOfMonth(month);
   const type = one('type');
-  const limit = Number(one('limit'));
   return {
     from: from <= to ? from : to,
     to: from <= to ? to : from,
@@ -194,7 +197,7 @@ export function parseTxnFilters(params: Params): TxnFilters {
     q: one('q').slice(0, 100),
     sort: one('sort') === 'amount' ? 'amount' : 'date',
     dir: one('dir') === 'asc' ? 'asc' : 'desc',
-    limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100_000) : PAGE_SIZE,
+    limit: limit(),
   };
 }
 
@@ -258,7 +261,7 @@ export type TxnRow = {
   toAccountId: number | null;
   toAccountName: string | null;
   /** Set on rows created by an investment transaction. */
-  assetId: number | null;
+  investmentTxnId: number | null;
 };
 
 export function listTransactions(
@@ -292,13 +295,12 @@ export function listTransactions(
       accountName: accounts.name,
       toAccountId: transactions.toAccountId,
       toAccountName: toAccount.name,
-      assetId: investmentTransactions.assetId,
+      investmentTxnId: transactions.investmentTxnId,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(toAccount, eq(transactions.toAccountId, toAccount.id))
-    .leftJoin(investmentTransactions, eq(transactions.investmentTxnId, investmentTransactions.id))
     .where(where)
     .orderBy(
       ...(f.sort === 'amount'

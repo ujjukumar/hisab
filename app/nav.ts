@@ -10,7 +10,7 @@ export const MONEY_TABS: Tab[] = [
 ];
 
 export const INVESTMENT_TABS: Tab[] = [
-  { href: '/investments', label: 'Holdings' },
+  { href: '/investments', label: 'Overview' },
   { href: '/investments/performance', label: 'Performance' },
   { href: '/investments/transactions', label: 'Transactions' },
 ];

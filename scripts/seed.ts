@@ -731,6 +731,10 @@ sqlite.transaction(() => {
         const price = avgPrice * (0.78 + 0.42 * t) * jitter(0.035);
         buys.push({ date: `${addMonths(firstMonth, i)}-10`, units: 0, price, amount });
       }
+      // Scale the curve so the buys add up to the target units; the last buy then only
+      // absorbs rounding instead of a wildly different price.
+      const units = buys.reduce((sum, b) => sum + amount / b.price, 0);
+      for (const b of buys) b.price *= units / h.units;
     } else {
       const avgPrice = h.cost / h.units;
       const lumps = h.plan.buys;
@@ -752,7 +756,8 @@ sqlite.transaction(() => {
           b.units = Number((h.units - used).toFixed(4));
           b.price = Number((b.amount / b.units).toFixed(4));
         }
-        b.amount = rupees(Number((b.units * b.price).toFixed(2)));
+        // A SIP debits exactly its amount; units × price differs from it only by rounding.
+        b.amount = rupees(b.amount);
       }
     } else {
       // Whole units: adjust the last price so the total cost lands on target.

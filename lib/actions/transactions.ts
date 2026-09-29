@@ -10,6 +10,7 @@ import {
   transactions,
   type InvestmentTransaction,
 } from '@/lib/db/schema';
+import { unitsProblem } from '@/lib/queries/investments';
 import { keepForUndo, takeUndo } from '@/lib/undo';
 import {
   failed,
@@ -24,6 +25,7 @@ const LINKED = 'This transaction was created by an investment transaction. Chang
 
 function revalidate() {
   revalidatePath('/money', 'layout');
+  revalidatePath('/investments', 'layout');
   revalidatePath('/');
 }
 
@@ -102,6 +104,8 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
           .from(investmentTransactions)
           .where(eq(investmentTransactions.id, txn.investmentTxnId))
           .get() ?? null;
+      const problem = investment && unitsProblem(investment.assetId, { remove: investment.id });
+      if (problem) return failed(problem.message);
       // Deleting the investment side cascades to this row.
       tx.delete(investmentTransactions)
         .where(eq(investmentTransactions.id, txn.investmentTxnId))
@@ -111,6 +115,9 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
     // Put it back exactly as it was, same id included.
     const undo = keepForUndo(() =>
       db.transaction((tx2) => {
+        if (investment && unitsProblem(investment.assetId, { add: investment })) {
+          throw new Error('oversell');
+        }
         if (investment) tx2.insert(investmentTransactions).values(investment).run();
         tx2.insert(transactions).values(txn).run();
       }),
@@ -128,8 +135,10 @@ export async function undoDelete(token: string): Promise<ActionResult> {
   try {
     restore();
   } catch {
-    // Only possible if its account or category was deleted in the meantime.
-    return failed('Could not undo: its account or category has since been deleted.');
+    // Only possible if something it depends on changed in the meantime.
+    return failed(
+      'Could not undo: its account or category was deleted, or a later sale now needs those units.',
+    );
   }
   revalidate();
   return { ok: true };

@@ -82,8 +82,25 @@ export function IconButton({
   );
 }
 
-/** IconButton's look as a link, e.g. the month picker's arrows. */
-export function IconLink({ icon, label, href }: { icon: IconName; label: string; href: string }) {
+/** IconButton's look as a link, e.g. the month picker's arrows. `download` makes it a file link. */
+export function IconLink({
+  icon,
+  label,
+  href,
+  download,
+}: {
+  icon: IconName;
+  label: string;
+  href: string;
+  download?: boolean;
+}) {
+  if (download) {
+    return (
+      <a href={href} download aria-label={label} title={label} className={styles.icon}>
+        <Icon name={icon} />
+      </a>
+    );
+  }
   return (
     <Link href={href} aria-label={label} title={label} className={styles.icon}>
       <Icon name={icon} />

@@ -9,6 +9,7 @@ import {
   formatINRSigned,
   formatPercent,
   formatPercentNoPlus,
+  formatReturn,
   formatReturnAbs,
   formatReturnPa,
   formatShortINR,
@@ -89,6 +90,12 @@ describe('percentages', () => {
     expect(formatPercentNoPlus(-0.46)).toBe(`${MINUS}0.46%`);
     expect(formatReturnPa(14.83)).toBe('14.8% p.a.');
     expect(formatReturnAbs(3.25)).toBe('3.3% abs.');
+  });
+
+  it('formats an XIRR result from its fraction, or a dash without one', () => {
+    expect(formatReturn({ kind: 'pa', rate: 0.1483 })).toBe('14.8% p.a.');
+    expect(formatReturn({ kind: 'abs', rate: -0.046 })).toBe(`${MINUS}4.6% abs.`);
+    expect(formatReturn(null)).toBe('—');
   });
 });
 

@@ -288,11 +288,11 @@ export function TransactionRowMenu({ row }: { row: TxnRow }) {
   }
 
   const del = { label: 'Delete', onSelect: remove, danger: true };
-  const items = row.assetId
+  const items = row.investmentTxnId
     ? [
         {
           label: 'Open investment transaction',
-          onSelect: () => router.push(`/investments/${row.assetId}`),
+          onSelect: () => router.push(`/investments/transactions?edit=${row.investmentTxnId}`),
         },
         del,
       ]
