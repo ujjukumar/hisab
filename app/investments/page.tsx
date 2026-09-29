@@ -11,7 +11,7 @@ export default function InvestmentsPage() {
         tabs={<Tabs tabs={INVESTMENT_TABS} label="Investment sections" />}
       />
       <Placeholder title="Holdings">
-        Holdings grouped by kind, with units, cost, worth and gain, arrive in phase 3.
+        Holdings grouped by kind, with units, cost, worth and gain, arrive in phase 4.
       </Placeholder>
     </>
   );

@@ -34,18 +34,28 @@ export function Button({
   );
 }
 
-/** The same look, but a real link. */
+/** The same look, but a real link. `download` makes it a plain file link, e.g. a CSV export. */
 export function ButtonLink({
   href,
   variant = 'primary',
   icon,
   hideLabelOnMobile,
+  download,
   children,
-}: Props & { href: string }) {
-  return (
-    <Link href={href} className={classes(variant, hideLabelOnMobile)}>
+}: Props & { href: string; download?: boolean }) {
+  const content = (
+    <>
       {icon && <Icon name={icon} />}
       {children && <span className={styles.label}>{children}</span>}
+    </>
+  );
+  return download ? (
+    <a href={href} download className={classes(variant, hideLabelOnMobile)}>
+      {content}
+    </a>
+  ) : (
+    <Link href={href} className={classes(variant, hideLabelOnMobile)}>
+      {content}
     </Link>
   );
 }

@@ -24,7 +24,7 @@ export const DEFAULT_CATEGORIES: { name: string; kind: 'income' | 'expense'; col
 
 export const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'financial_year_start_month', value: '4' },
-  { key: 'default_fd_compounding', value: 'quarterly' },
+  { key: 'default_fd_compounding', value: '"quarterly"' },
   { key: 'sample_data', value: 'false' },
 ];
 

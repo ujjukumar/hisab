@@ -195,9 +195,13 @@ export function CategoryChip({ name, color }: { name: ReactNode; color?: string 
   );
 }
 
-/** The filter row above a table. */
-export function Filters({ children }: { children: ReactNode }) {
-  return <div className={styles.filters}>{children}</div>;
+/** The filter row above a table. `label` names it as a search landmark. */
+export function Filters({ label, children }: { label?: string; children: ReactNode }) {
+  return (
+    <div className={styles.filters} role={label ? 'search' : undefined} aria-label={label}>
+      {children}
+    </div>
+  );
 }
 
 export const tableStyles = styles;

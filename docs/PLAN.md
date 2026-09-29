@@ -780,7 +780,7 @@ Update this as work happens: one line per phase with the date, status and notes.
 |---|---|---|---|
 | Planning and mockup | Done | Sep 2026 | Mockup approved by owner |
 | 1 — Foundation | Done | 28 Sep 2026 | Shell, all shared components on `/dev/ui`, schema + migration, seed/reset/backup, domain helpers with 35 tests. Drawer uses native `<dialog>`, Menu uses the popover API. `/dev/ui` not compared in a browser — no preview pane on this install. |
-| 2 — Money | Not started | | |
+| 2 — Money | Done | 29 Sep 2026 | Transactions, Accounts and Categories tabs, transaction drawer, Money strip, CSV export; `balances.ts` + validation tests (55 total). Checked in a browser against the seed: strip and September totals match the mockup, transfers excluded. Undo keeps deleted rows in memory for 60 s (lost on restart). Accounts and categories can be deleted only while unused; otherwise archive. Fixed Phase 1 CSS: table alignment, filter spans, page padding. Real-bank balance check is the owner's. |
 | 3 — Budgets | Not started | | |
 | 4 — Investments | Not started | | |
 | 5 — Dashboard and Performance | Not started | | |

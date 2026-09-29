@@ -39,6 +39,8 @@ export function Drawer({
       aria-labelledby={titleId}
       onClose={onClose}
       onCancel={onClose}
+      // The panel fills the dialog box, so a click that lands on the dialog itself is on the backdrop.
+      onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className={styles.head}>
         <h2 className={styles.title} id={titleId}>

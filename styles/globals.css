@@ -49,11 +49,12 @@ a {
 .wrap {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding-inline: 24px;
 }
 
+/* Block padding only, so it combines with .wrap's side padding on the same element. */
 .page-body {
-  padding: 30px 0 64px;
+  padding-block: 30px 64px;
 }
 
 .grid {
@@ -148,7 +149,7 @@ a {
 
 @media (max-width: 760px) {
   .wrap {
-    padding: 0 16px;
+    padding-inline: 16px;
   }
   .grid .half {
     grid-column: span 12;

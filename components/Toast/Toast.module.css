@@ -21,4 +21,16 @@
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.action {
+  margin-left: 16px;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  font: 600 14px/1 var(--sans);
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

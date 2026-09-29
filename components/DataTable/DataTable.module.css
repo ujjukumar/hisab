@@ -51,8 +51,8 @@
   white-space: nowrap;
 }
 
-.tbl th.l,
-.tbl td.l {
+.tbl th:global(.l),
+.tbl td:global(.l) {
   text-align: left;
 }
 
@@ -85,6 +85,11 @@
   align-items: center;
   gap: 7px;
   text-align: inherit;
+  text-decoration: none;
+}
+
+.thBtn:hover {
+  text-decoration: underline;
 }
 
 .sort {
@@ -107,7 +112,7 @@
   font-size: 13px;
 }
 
-.tbl td.r {
+.tbl td:global(.r) {
   text-align: right;
 }
 
@@ -222,6 +227,19 @@
   gap: 7px;
   white-space: nowrap;
   color: var(--text-2);
+}
+
+/* A small label beside a description, e.g. 'Linked' or 'Archived'. */
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  vertical-align: 1px;
 }
 
 .kebab {

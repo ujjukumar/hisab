@@ -7,6 +7,9 @@ import { fontClassNames } from './fonts';
 import '@/styles/tokens.css';
 import '@/styles/globals.css';
 
+// Every page reads the local database, so none may be prerendered at build time.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Hisaab',
   description: 'A private record of money and investments.',

@@ -15,7 +15,8 @@ import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from './defaults.ts';
 export const MIGRATIONS_FOLDER = resolve(process.cwd(), 'lib/db/migrations');
 
 export function databasePath(): string {
-  return resolve(process.cwd(), process.env.DATABASE_PATH ?? './data/finance.db');
+  // The path is only known at runtime, so tell the bundler not to trace the whole project for it.
+  return resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.DATABASE_PATH ?? './data/finance.db');
 }
 
 export function backupsFolder(): string {

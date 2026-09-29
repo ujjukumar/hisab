@@ -72,7 +72,8 @@ export function SearchField({
 }: Base & InputHTMLAttributes<HTMLInputElement>) {
   const fieldId = id ?? `f-${name}`;
   return (
-    <Shell id={fieldId} label={label} className={`${styles.search} ${className}`}>
+    // The plain 'search' and 'range' classes let the filter grid give these fields a wider span.
+    <Shell id={fieldId} label={label} className={`${styles.search} search ${className}`}>
       <Icon name="search" />
       <input id={fieldId} name={name} type="search" {...rest} />
     </Shell>
@@ -92,7 +93,7 @@ export function RangeField({
 }) {
   const fieldId = id ?? `f-${from.name}`;
   return (
-    <Shell id={fieldId} label={label} className={`${styles.range} ${className}`}>
+    <Shell id={fieldId} label={label} className={`${styles.range} range ${className}`}>
       <input id={fieldId} inputMode="decimal" {...from} />
       <span className={styles.sep} aria-hidden="true">
         to

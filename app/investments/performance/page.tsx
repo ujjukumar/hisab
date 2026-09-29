@@ -12,7 +12,7 @@ export default function PerformancePage() {
       />
       <Placeholder title="Performance">
         Invested against worth over time, XIRR per holding, and the best and worst performers arrive
-        in phase 3.
+        in phase 5.
       </Placeholder>
     </>
   );

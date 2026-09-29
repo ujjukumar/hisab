@@ -1,5 +1,17 @@
 import { ensureDefaults, loadEnv, openDatabase } from '../lib/db/connect.ts';
-import { addDays, addMonths, monthEndsBetween, monthOf, type IsoDate } from '../lib/domain/dates.ts';
+import {
+  addDays,
+  addMonths,
+  monthEndsBetween,
+  monthOf,
+  type IsoDate,
+} from '../lib/domain/dates.ts';
+import {
+  accountBalance,
+  accountMovement,
+  type Flow,
+  type OpeningBalance,
+} from '../lib/domain/balances.ts';
 
 /**
  * Invented sample data that recreates the look of docs/mockup.html.
@@ -57,27 +69,149 @@ const MONTHLY_SALARY = 145000;
 
 /** The recurring spending pattern. The remainder of each month's total goes to one big spend. */
 const RECURRING = [
-  { day: 3, desc: 'Rent', note: null, category: 'Housing', account: 'Salary account', base: 32000, vary: 0 },
-  { day: 6, desc: 'Vegetables and fruit', note: 'Weekly market', category: 'Groceries', account: 'Cash', base: 1220, vary: 0.3 },
-  { day: 7, desc: 'Streaming subscriptions', note: 'Two services', category: 'Entertainment', account: 'Credit card', base: 737, vary: 0 },
-  { day: 8, desc: 'Coffee', note: 'Brew Lab', category: 'Dining', account: 'Cash', base: 310, vary: 0.4 },
-  { day: 12, desc: 'Mobile and broadband', note: 'Monthly plan', category: 'Utilities', account: 'Salary account', base: 999, vary: 0 },
-  { day: 14, desc: 'Lunch', note: 'Near office', category: 'Dining', account: 'Credit card', base: 540, vary: 0.4 },
-  { day: 18, desc: 'Auto and metro', note: 'Commute', category: 'Transport', account: 'Cash', base: 420, vary: 0.4 },
-  { day: 19, desc: 'Monthly groceries', note: 'Fresh Basket', category: 'Groceries', account: 'Salary account', base: 4120, vary: 0.2 },
-  { day: 20, desc: 'Pharmacy', note: 'Medicines', category: 'Health', account: 'Cash', base: 640, vary: 0.5 },
-  { day: 22, desc: 'Electricity bill', note: 'Monthly usage', category: 'Utilities', account: 'Salary account', base: 2340, vary: 0.25 },
-  { day: 23, desc: 'Dinner with friends', note: 'Coastal Kitchen', category: 'Dining', account: 'Credit card', base: 2380, vary: 0.35 },
-  { day: 25, desc: 'Petrol', note: 'Fuel station', category: 'Transport', account: 'Credit card', base: 2000, vary: 0.25 },
-  { day: 26, desc: 'Movie tickets', note: 'Cineplex', category: 'Entertainment', account: 'Credit card', base: 760, vary: 0.3 },
-  { day: 27, desc: 'Weekend groceries', note: 'Fresh Basket', category: 'Groceries', account: 'Credit card', base: 2140, vary: 0.25 },
+  {
+    day: 3,
+    desc: 'Rent',
+    note: null,
+    category: 'Housing',
+    account: 'Salary account',
+    base: 32000,
+    vary: 0,
+  },
+  {
+    day: 6,
+    desc: 'Vegetables and fruit',
+    note: 'Weekly market',
+    category: 'Groceries',
+    account: 'Cash',
+    base: 1220,
+    vary: 0.3,
+  },
+  {
+    day: 7,
+    desc: 'Streaming subscriptions',
+    note: 'Two services',
+    category: 'Entertainment',
+    account: 'Credit card',
+    base: 737,
+    vary: 0,
+  },
+  {
+    day: 8,
+    desc: 'Coffee',
+    note: 'Brew Lab',
+    category: 'Dining',
+    account: 'Cash',
+    base: 310,
+    vary: 0.4,
+  },
+  {
+    day: 12,
+    desc: 'Mobile and broadband',
+    note: 'Monthly plan',
+    category: 'Utilities',
+    account: 'Salary account',
+    base: 999,
+    vary: 0,
+  },
+  {
+    day: 14,
+    desc: 'Lunch',
+    note: 'Near office',
+    category: 'Dining',
+    account: 'Credit card',
+    base: 540,
+    vary: 0.4,
+  },
+  {
+    day: 18,
+    desc: 'Auto and metro',
+    note: 'Commute',
+    category: 'Transport',
+    account: 'Cash',
+    base: 420,
+    vary: 0.4,
+  },
+  {
+    day: 19,
+    desc: 'Monthly groceries',
+    note: 'Fresh Basket',
+    category: 'Groceries',
+    account: 'Salary account',
+    base: 4120,
+    vary: 0.2,
+  },
+  {
+    day: 20,
+    desc: 'Pharmacy',
+    note: 'Medicines',
+    category: 'Health',
+    account: 'Cash',
+    base: 640,
+    vary: 0.5,
+  },
+  {
+    day: 22,
+    desc: 'Electricity bill',
+    note: 'Monthly usage',
+    category: 'Utilities',
+    account: 'Salary account',
+    base: 2340,
+    vary: 0.25,
+  },
+  {
+    day: 23,
+    desc: 'Dinner with friends',
+    note: 'Coastal Kitchen',
+    category: 'Dining',
+    account: 'Credit card',
+    base: 2380,
+    vary: 0.35,
+  },
+  {
+    day: 25,
+    desc: 'Petrol',
+    note: 'Fuel station',
+    category: 'Transport',
+    account: 'Credit card',
+    base: 2000,
+    vary: 0.25,
+  },
+  {
+    day: 26,
+    desc: 'Movie tickets',
+    note: 'Cineplex',
+    category: 'Entertainment',
+    account: 'Credit card',
+    base: 760,
+    vary: 0.3,
+  },
+  {
+    day: 27,
+    desc: 'Weekend groceries',
+    note: 'Fresh Basket',
+    category: 'Groceries',
+    account: 'Credit card',
+    base: 2140,
+    vary: 0.25,
+  },
 ];
 
 /** Where a month's leftover spending goes, so the totals match without odd-looking rows. */
 const BIG_SPENDS = [
-  { desc: 'Festival shopping', note: 'Clothes and gifts', category: 'Shopping', account: 'Credit card' },
+  {
+    desc: 'Festival shopping',
+    note: 'Clothes and gifts',
+    category: 'Shopping',
+    account: 'Credit card',
+  },
   { desc: 'Weekend trip', note: 'Travel and stay', category: 'Travel', account: 'Credit card' },
-  { desc: 'Annual insurance premium', note: 'Health cover', category: 'Insurance', account: 'Salary account' },
+  {
+    desc: 'Annual insurance premium',
+    note: 'Health cover',
+    category: 'Insurance',
+    account: 'Salary account',
+  },
   { desc: 'Dental treatment', note: 'Two visits', category: 'Health', account: 'Salary account' },
   { desc: 'New laptop', note: 'Online order', category: 'Shopping', account: 'Credit card' },
   { desc: 'Course fees', note: 'Evening class', category: 'Education', account: 'Salary account' },
@@ -85,25 +219,177 @@ const BIG_SPENDS = [
 
 /** September 2026, taken from the mockup. SIPs, the dividend and the card bill are generated. */
 const SEPTEMBER = [
-  { date: '2026-09-28', desc: 'Tea and snacks', note: 'Office canteen', type: 'expense', category: 'Dining', account: 'Cash', amount: 120 },
-  { date: '2026-09-27', desc: 'Weekend groceries', note: 'Fresh Basket', type: 'expense', category: 'Groceries', account: 'Credit card', amount: 2140 },
-  { date: '2026-09-26', desc: 'Movie tickets', note: 'Cineplex', type: 'expense', category: 'Entertainment', account: 'Credit card', amount: 760 },
-  { date: '2026-09-25', desc: 'Petrol', note: 'Fuel station', type: 'expense', category: 'Transport', account: 'Credit card', amount: 2000 },
-  { date: '2026-09-24', desc: 'Logo design project', note: 'Freelance client', type: 'income', category: 'Freelance', account: 'Savings account', amount: 18000 },
-  { date: '2026-09-23', desc: 'Dinner with friends', note: 'Coastal Kitchen', type: 'expense', category: 'Dining', account: 'Credit card', amount: 2380 },
-  { date: '2026-09-22', desc: 'Electricity bill', note: 'August usage', type: 'expense', category: 'Utilities', account: 'Salary account', amount: 2340 },
-  { date: '2026-09-20', desc: 'Pharmacy', note: 'Medicines', type: 'expense', category: 'Health', account: 'Cash', amount: 640 },
-  { date: '2026-09-19', desc: 'Monthly groceries', note: 'Fresh Basket', type: 'expense', category: 'Groceries', account: 'Salary account', amount: 4120 },
-  { date: '2026-09-18', desc: 'Auto and metro', note: 'Commute', type: 'expense', category: 'Transport', account: 'Cash', amount: 420 },
-  { date: '2026-09-16', desc: 'Headphones', note: 'Online order', type: 'expense', category: 'Shopping', account: 'Credit card', amount: 4560 },
-  { date: '2026-09-14', desc: 'Lunch', note: 'Near office', type: 'expense', category: 'Dining', account: 'Credit card', amount: 540 },
-  { date: '2026-09-12', desc: 'Mobile and broadband', note: 'Monthly plan', type: 'expense', category: 'Utilities', account: 'Salary account', amount: 999 },
-  { date: '2026-09-08', desc: 'Coffee', note: 'Brew Lab', type: 'expense', category: 'Dining', account: 'Cash', amount: 310 },
-  { date: '2026-09-07', desc: 'Streaming subscriptions', note: 'Two services', type: 'expense', category: 'Entertainment', account: 'Credit card', amount: 737 },
-  { date: '2026-09-06', desc: 'Vegetables and fruit', note: 'Weekly market', type: 'expense', category: 'Groceries', account: 'Cash', amount: 1220 },
-  { date: '2026-09-05', desc: 'Birthday dinner', note: 'Coastal Kitchen', type: 'expense', category: 'Dining', account: 'Credit card', amount: 3890 },
-  { date: '2026-09-03', desc: 'Rent', note: 'September', type: 'expense', category: 'Housing', account: 'Salary account', amount: 32000 },
-  { date: '2026-09-01', desc: 'Salary', note: 'September', type: 'income', category: 'Salary', account: 'Salary account', amount: 145000 },
+  {
+    date: '2026-09-28',
+    desc: 'Tea and snacks',
+    note: 'Office canteen',
+    type: 'expense',
+    category: 'Dining',
+    account: 'Cash',
+    amount: 120,
+  },
+  {
+    date: '2026-09-27',
+    desc: 'Weekend groceries',
+    note: 'Fresh Basket',
+    type: 'expense',
+    category: 'Groceries',
+    account: 'Credit card',
+    amount: 2140,
+  },
+  {
+    date: '2026-09-26',
+    desc: 'Movie tickets',
+    note: 'Cineplex',
+    type: 'expense',
+    category: 'Entertainment',
+    account: 'Credit card',
+    amount: 760,
+  },
+  {
+    date: '2026-09-25',
+    desc: 'Petrol',
+    note: 'Fuel station',
+    type: 'expense',
+    category: 'Transport',
+    account: 'Credit card',
+    amount: 2000,
+  },
+  {
+    date: '2026-09-24',
+    desc: 'Logo design project',
+    note: 'Freelance client',
+    type: 'income',
+    category: 'Freelance',
+    account: 'Savings account',
+    amount: 18000,
+  },
+  {
+    date: '2026-09-23',
+    desc: 'Dinner with friends',
+    note: 'Coastal Kitchen',
+    type: 'expense',
+    category: 'Dining',
+    account: 'Credit card',
+    amount: 2380,
+  },
+  {
+    date: '2026-09-22',
+    desc: 'Electricity bill',
+    note: 'August usage',
+    type: 'expense',
+    category: 'Utilities',
+    account: 'Salary account',
+    amount: 2340,
+  },
+  {
+    date: '2026-09-20',
+    desc: 'Pharmacy',
+    note: 'Medicines',
+    type: 'expense',
+    category: 'Health',
+    account: 'Cash',
+    amount: 640,
+  },
+  {
+    date: '2026-09-19',
+    desc: 'Monthly groceries',
+    note: 'Fresh Basket',
+    type: 'expense',
+    category: 'Groceries',
+    account: 'Salary account',
+    amount: 4120,
+  },
+  {
+    date: '2026-09-18',
+    desc: 'Auto and metro',
+    note: 'Commute',
+    type: 'expense',
+    category: 'Transport',
+    account: 'Cash',
+    amount: 420,
+  },
+  {
+    date: '2026-09-16',
+    desc: 'Headphones',
+    note: 'Online order',
+    type: 'expense',
+    category: 'Shopping',
+    account: 'Credit card',
+    amount: 4560,
+  },
+  {
+    date: '2026-09-14',
+    desc: 'Lunch',
+    note: 'Near office',
+    type: 'expense',
+    category: 'Dining',
+    account: 'Credit card',
+    amount: 540,
+  },
+  {
+    date: '2026-09-12',
+    desc: 'Mobile and broadband',
+    note: 'Monthly plan',
+    type: 'expense',
+    category: 'Utilities',
+    account: 'Salary account',
+    amount: 999,
+  },
+  {
+    date: '2026-09-08',
+    desc: 'Coffee',
+    note: 'Brew Lab',
+    type: 'expense',
+    category: 'Dining',
+    account: 'Cash',
+    amount: 310,
+  },
+  {
+    date: '2026-09-07',
+    desc: 'Streaming subscriptions',
+    note: 'Two services',
+    type: 'expense',
+    category: 'Entertainment',
+    account: 'Credit card',
+    amount: 737,
+  },
+  {
+    date: '2026-09-06',
+    desc: 'Vegetables and fruit',
+    note: 'Weekly market',
+    type: 'expense',
+    category: 'Groceries',
+    account: 'Cash',
+    amount: 1220,
+  },
+  {
+    date: '2026-09-05',
+    desc: 'Birthday dinner',
+    note: 'Coastal Kitchen',
+    type: 'expense',
+    category: 'Dining',
+    account: 'Credit card',
+    amount: 3890,
+  },
+  {
+    date: '2026-09-03',
+    desc: 'Rent',
+    note: 'September',
+    type: 'expense',
+    category: 'Housing',
+    account: 'Salary account',
+    amount: 32000,
+  },
+  {
+    date: '2026-09-01',
+    desc: 'Salary',
+    note: 'September',
+    type: 'income',
+    category: 'Salary',
+    account: 'Salary account',
+    amount: 145000,
+  },
 ] as const;
 
 const BUDGETS: Record<string, number> = {
@@ -127,21 +413,194 @@ type Holding = {
   price: number;
   priceDate: IsoDate;
   dayChange: number;
-  plan: { kind: 'sip'; amount: number; count: number } | { kind: 'lumps'; buys: [IsoDate, number][] };
+  plan:
+    { kind: 'sip'; amount: number; count: number } | { kind: 'lumps'; buys: [IsoDate, number][] };
 };
 
 const HOLDINGS: Holding[] = [
-  { name: 'Meridian Flexi Cap Direct-G', type: 'mutual_fund', assetClass: 'equity', ref: 'Folio ••7731', units: 1660.12, unitDecimals: 4, cost: 320000, price: 231.46, priceDate: '2026-09-25', dayChange: 0.42, plan: { kind: 'sip', amount: 10000, count: 32 } },
-  { name: 'Banyan Nifty 50 Index Direct-G', type: 'mutual_fund', assetClass: 'equity', ref: 'Folio ••2210', units: 11520.4, unitDecimals: 4, cost: 240000, price: 24.87, priceDate: '2026-09-25', dayChange: -0.31, plan: { kind: 'sip', amount: 10000, count: 24 } },
-  { name: 'Saffron Small Cap Direct-G', type: 'mutual_fund', assetClass: 'equity', ref: 'Folio ••5094', units: 2290.5, unitDecimals: 4, cost: 120000, price: 61.12, priceDate: '2026-09-25', dayChange: -0.46, plan: { kind: 'sip', amount: 5000, count: 24 } },
-  { name: 'Harbor Short Duration Direct-G', type: 'mutual_fund', assetClass: 'debt', ref: 'Folio ••3318', units: 2748.1, unitDecimals: 4, cost: 100000, price: 39.64, priceDate: '2026-09-25', dayChange: 0.02, plan: { kind: 'sip', amount: 5000, count: 20 } },
-  { name: 'Meridian ELSS Tax Saver Direct-G', type: 'mutual_fund', assetClass: 'equity', ref: 'Folio ••7731', units: 917.04, unitDecimals: 4, cost: 120000, price: 148.2, priceDate: '2026-09-25', dayChange: 0.37, plan: { kind: 'sip', amount: 5000, count: 24 } },
-  { name: 'Kaveri Power Ltd', type: 'stock', assetClass: 'equity', ref: 'Demat ••4402', units: 120, unitDecimals: 0, cost: 177600, price: 1642.35, priceDate: '2026-09-28', dayChange: 1.12, plan: { kind: 'lumps', buys: [['2024-03-14', 40], ['2025-01-20', 40], ['2025-11-06', 40]] } },
-  { name: 'Sahyadri Foods Ltd', type: 'stock', assetClass: 'equity', ref: 'Demat ••4402', units: 45, unitDecimals: 0, cost: 144450, price: 2958.1, priceDate: '2026-09-28', dayChange: -0.64, plan: { kind: 'lumps', buys: [['2024-06-11', 25], ['2025-07-22', 20]] } },
-  { name: 'Deccan Bank Ltd', type: 'stock', assetClass: 'equity', ref: 'Demat ••4402', units: 200, unitDecimals: 0, cost: 162400, price: 868.9, priceDate: '2026-09-28', dayChange: -0.87, plan: { kind: 'lumps', buys: [['2023-11-08', 80], ['2024-09-17', 60], ['2025-06-03', 60]] } },
-  { name: 'Banyan Nifty Next 50 ETF', type: 'etf', assetClass: 'equity', ref: 'Demat ••4402', units: 900, unitDecimals: 0, cost: 61560, price: 74.18, priceDate: '2026-09-28', dayChange: -0.22, plan: { kind: 'lumps', buys: [['2024-05-21', 300], ['2025-02-12', 300], ['2025-10-09', 300]] } },
-  { name: 'Banyan Gold ETF', type: 'gold', assetClass: 'gold', ref: 'Demat ••4402', units: 1200, unitDecimals: 0, cost: 86520, price: 96.4, priceDate: '2026-09-28', dayChange: 0.58, plan: { kind: 'lumps', buys: [['2023-08-18', 500], ['2024-12-05', 400], ['2025-09-15', 300]] } },
-  { name: 'Gold bond, 2031 series', type: 'gold', assetClass: 'gold', ref: 'Demat ••4402', units: 12, unitDecimals: 0, cost: 70680, price: 9780, priceDate: '2026-09-28', dayChange: 0.61, plan: { kind: 'lumps', buys: [['2024-02-27', 6], ['2025-04-16', 6]] } },
+  {
+    name: 'Meridian Flexi Cap Direct-G',
+    type: 'mutual_fund',
+    assetClass: 'equity',
+    ref: 'Folio ••7731',
+    units: 1660.12,
+    unitDecimals: 4,
+    cost: 320000,
+    price: 231.46,
+    priceDate: '2026-09-25',
+    dayChange: 0.42,
+    plan: { kind: 'sip', amount: 10000, count: 32 },
+  },
+  {
+    name: 'Banyan Nifty 50 Index Direct-G',
+    type: 'mutual_fund',
+    assetClass: 'equity',
+    ref: 'Folio ••2210',
+    units: 11520.4,
+    unitDecimals: 4,
+    cost: 240000,
+    price: 24.87,
+    priceDate: '2026-09-25',
+    dayChange: -0.31,
+    plan: { kind: 'sip', amount: 10000, count: 24 },
+  },
+  {
+    name: 'Saffron Small Cap Direct-G',
+    type: 'mutual_fund',
+    assetClass: 'equity',
+    ref: 'Folio ••5094',
+    units: 2290.5,
+    unitDecimals: 4,
+    cost: 120000,
+    price: 61.12,
+    priceDate: '2026-09-25',
+    dayChange: -0.46,
+    plan: { kind: 'sip', amount: 5000, count: 24 },
+  },
+  {
+    name: 'Harbor Short Duration Direct-G',
+    type: 'mutual_fund',
+    assetClass: 'debt',
+    ref: 'Folio ••3318',
+    units: 2748.1,
+    unitDecimals: 4,
+    cost: 100000,
+    price: 39.64,
+    priceDate: '2026-09-25',
+    dayChange: 0.02,
+    plan: { kind: 'sip', amount: 5000, count: 20 },
+  },
+  {
+    name: 'Meridian ELSS Tax Saver Direct-G',
+    type: 'mutual_fund',
+    assetClass: 'equity',
+    ref: 'Folio ••7731',
+    units: 917.04,
+    unitDecimals: 4,
+    cost: 120000,
+    price: 148.2,
+    priceDate: '2026-09-25',
+    dayChange: 0.37,
+    plan: { kind: 'sip', amount: 5000, count: 24 },
+  },
+  {
+    name: 'Kaveri Power Ltd',
+    type: 'stock',
+    assetClass: 'equity',
+    ref: 'Demat ••4402',
+    units: 120,
+    unitDecimals: 0,
+    cost: 177600,
+    price: 1642.35,
+    priceDate: '2026-09-28',
+    dayChange: 1.12,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2024-03-14', 40],
+        ['2025-01-20', 40],
+        ['2025-11-06', 40],
+      ],
+    },
+  },
+  {
+    name: 'Sahyadri Foods Ltd',
+    type: 'stock',
+    assetClass: 'equity',
+    ref: 'Demat ••4402',
+    units: 45,
+    unitDecimals: 0,
+    cost: 144450,
+    price: 2958.1,
+    priceDate: '2026-09-28',
+    dayChange: -0.64,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2024-06-11', 25],
+        ['2025-07-22', 20],
+      ],
+    },
+  },
+  {
+    name: 'Deccan Bank Ltd',
+    type: 'stock',
+    assetClass: 'equity',
+    ref: 'Demat ••4402',
+    units: 200,
+    unitDecimals: 0,
+    cost: 162400,
+    price: 868.9,
+    priceDate: '2026-09-28',
+    dayChange: -0.87,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2023-11-08', 80],
+        ['2024-09-17', 60],
+        ['2025-06-03', 60],
+      ],
+    },
+  },
+  {
+    name: 'Banyan Nifty Next 50 ETF',
+    type: 'etf',
+    assetClass: 'equity',
+    ref: 'Demat ••4402',
+    units: 900,
+    unitDecimals: 0,
+    cost: 61560,
+    price: 74.18,
+    priceDate: '2026-09-28',
+    dayChange: -0.22,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2024-05-21', 300],
+        ['2025-02-12', 300],
+        ['2025-10-09', 300],
+      ],
+    },
+  },
+  {
+    name: 'Banyan Gold ETF',
+    type: 'gold',
+    assetClass: 'gold',
+    ref: 'Demat ••4402',
+    units: 1200,
+    unitDecimals: 0,
+    cost: 86520,
+    price: 96.4,
+    priceDate: '2026-09-28',
+    dayChange: 0.58,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2023-08-18', 500],
+        ['2024-12-05', 400],
+        ['2025-09-15', 300],
+      ],
+    },
+  },
+  {
+    name: 'Gold bond, 2031 series',
+    type: 'gold',
+    assetClass: 'gold',
+    ref: 'Demat ••4402',
+    units: 12,
+    unitDecimals: 0,
+    cost: 70680,
+    price: 9780,
+    priceDate: '2026-09-28',
+    dayChange: 0.61,
+    plan: {
+      kind: 'lumps',
+      buys: [
+        ['2024-02-27', 6],
+        ['2025-04-16', 6],
+      ],
+    },
+  },
 ];
 
 /* ---------- write ---------- */
@@ -194,6 +653,12 @@ const insertBudget = sqlite.prepare(
 const setSetting = sqlite.prepare(
   `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 );
+const flows = () =>
+  sqlite
+    .prepare(
+      `SELECT date, type, amount, account_id AS accountId, to_account_id AS toAccountId FROM transactions`,
+    )
+    .all() as Flow[];
 
 type TxnRow = {
   date: string;
@@ -207,7 +672,9 @@ type TxnRow = {
   investmentTxnId: number | null;
 };
 
-const txn = (row: Partial<TxnRow> & Pick<TxnRow, 'date' | 'type' | 'amount' | 'description'>): TxnRow => ({
+const txn = (
+  row: Partial<TxnRow> & Pick<TxnRow, 'date' | 'type' | 'amount' | 'description'>,
+): TxnRow => ({
   accountId: null,
   toAccountId: null,
   categoryId: null,
@@ -503,7 +970,7 @@ sqlite.transaction(() => {
           categoryId: cat('income', 'Freelance'),
           description: 'Freelance project',
           note: 'Design work',
-          }),
+        }),
       );
     }
 
@@ -595,18 +1062,13 @@ sqlite.transaction(() => {
     insertBudget.run(cat('expense', name), HISTORY_START, rupees(amount));
   }
 
-  /* opening balances, chosen so the balances on 28 Sep 2026 match the mockup */
-  const movement = sqlite.prepare(`
-    SELECT
-      (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='income'   AND account_id=@id)
-    - (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='expense'  AND account_id=@id)
-    - (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='transfer' AND account_id=@id)
-    + (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='transfer' AND to_account_id=@id) AS net
-  `);
+  /* opening balances, chosen so the balances on 28 Sep 2026 match the mockup.
+     Solved with the app's own balance rule, so both always agree. */
   const setOpening = sqlite.prepare('UPDATE accounts SET opening_balance = ? WHERE id = ?');
+  const all = flows();
   for (const a of ACCOUNTS) {
     const id = acct(a.name);
-    const { net } = movement.get({ id }) as { net: number };
+    const net = accountMovement({ id, openingBalance: 0, openingDate: OPENING_DATE }, all, TODAY);
     setOpening.run(a.target - net, id);
   }
 
@@ -620,22 +1082,23 @@ const count = (table: string) =>
 console.log('Sample data loaded (all of it invented):');
 console.log(`  ${count('accounts')} accounts, ${count('categories')} categories`);
 console.log(`  ${count('transactions')} money transactions`);
-console.log(`  ${count('assets')} investments, ${count('investment_transactions')} investment transactions`);
-console.log(`  ${count('prices')} prices, ${count('valuations')} valuations, ${count('budgets')} budgets`);
+console.log(
+  `  ${count('assets')} investments, ${count('investment_transactions')} investment transactions`,
+);
+console.log(
+  `  ${count('prices')} prices, ${count('valuations')} valuations, ${count('budgets')} budgets`,
+);
 
+const all = flows();
 for (const row of sqlite
-  .prepare('SELECT id, name, opening_balance FROM accounts ORDER BY sort_order')
-  .all() as { id: number; name: string; opening_balance: number }[]) {
-  const { net } = sqlite
-    .prepare(
-      `SELECT
-        (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='income'   AND account_id=@id)
-      - (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='expense'  AND account_id=@id)
-      - (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='transfer' AND account_id=@id)
-      + (SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='transfer' AND to_account_id=@id) AS net`,
-    )
-    .get({ id: row.id }) as { net: number };
-  console.log(`  ${row.name}: ₹${((row.opening_balance + net) / 100).toLocaleString('en-IN')}`);
+  .prepare(
+    `SELECT id, name, opening_balance AS openingBalance, opening_date AS openingDate
+     FROM accounts ORDER BY sort_order`,
+  )
+  .all() as (OpeningBalance & { name: string })[]) {
+  console.log(
+    `  ${row.name} on ${TODAY}: ₹${(accountBalance(row, all, TODAY) / 100).toLocaleString('en-IN')}`,
+  );
 }
 
 sqlite.close();

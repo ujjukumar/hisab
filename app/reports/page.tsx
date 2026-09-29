@@ -6,7 +6,7 @@ export default function ReportsPage() {
     <>
       <PageHead title="Reports" />
       <Placeholder title="Reports">
-        Year and financial-year summaries, category trends and CSV export arrive in phase 4.
+        Year and financial-year summaries, category trends and CSV export arrive in phase 6.
       </Placeholder>
     </>
   );

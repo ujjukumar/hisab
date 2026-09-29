@@ -11,7 +11,7 @@ export default function InvestmentTransactionsPage() {
         tabs={<Tabs tabs={INVESTMENT_TABS} label="Investment sections" />}
       />
       <Placeholder title="Investment transactions">
-        Buys, sells, deposits, dividends and interest across every holding arrive in phase 3.
+        Buys, sells, deposits, dividends and interest across every holding arrive in phase 4.
       </Placeholder>
     </>
   );

@@ -8,7 +8,7 @@ export default function DashboardPage() {
       <PageHead title={monthLabel(currentMonth())} />
       <Placeholder title="Dashboard">
         Net worth, the month&rsquo;s income and spending, budgets and the investment summary will
-        appear here in phase 2.
+        appear here in phase 5.
       </Placeholder>
     </>
   );
