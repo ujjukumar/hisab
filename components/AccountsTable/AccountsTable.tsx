@@ -19,15 +19,7 @@ import { today } from '@/lib/domain/dates';
 import { formatAmount, formatDate } from '@/lib/domain/format';
 import { paiseToInput } from '@/lib/domain/money';
 import type { AccountRow } from '@/lib/queries/money';
-import { ACCOUNT_TYPES } from '@/lib/validation/money';
-
-const ACCOUNT_TYPE_LABELS: Record<AccountRow['type'], string> = {
-  bank: 'Bank account',
-  card: 'Credit card',
-  cash: 'Cash',
-  wallet: 'Wallet',
-  other: 'Other',
-};
+import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPES } from '@/lib/validation/money';
 
 export function AccountsTable({ rows }: { rows: AccountRow[] }) {
   const toast = useToast();

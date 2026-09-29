@@ -11,6 +11,7 @@ import {
   financialYearOf,
   financialYearRange,
   isValidDate,
+  monthEndsBetween,
   monthOf,
   startOfMonth,
   today,
@@ -51,9 +52,9 @@ export type AccountRow = {
   transactionCount: number;
 };
 
-export function listAccounts(): AccountRow[] {
+/** Every account with its balance at the end of `onDate`. */
+export function listAccounts(onDate: IsoDate = today()): AccountRow[] {
   const flows = allFlows();
-  const onDate = today();
   return db
     .select()
     .from(accounts)
@@ -327,6 +328,13 @@ export type MoneyStrip = {
   accountCount: number;
 };
 
+/** The day a month's balances and values are shown at: its last day, or today while it runs. */
+export function asOfDate(month: IsoMonth): IsoDate {
+  const end = endOfMonth(month);
+  const now = today();
+  return end < now ? end : now;
+}
+
 export function moneyStrip(month: IsoMonth = currentMonth()): MoneyStrip {
   const summary = summarise(
     db
@@ -338,7 +346,7 @@ export function moneyStrip(month: IsoMonth = currentMonth()): MoneyStrip {
       .all(),
   );
   const { budget } = monthBudgets(month);
-  const active = listAccounts().filter((a) => !a.archived);
+  const active = listAccounts(asOfDate(month)).filter((a) => !a.archived);
   return {
     month,
     ...summary,
@@ -346,4 +354,76 @@ export function moneyStrip(month: IsoMonth = currentMonth()): MoneyStrip {
     bankAndCash: active.reduce((total, a) => total + a.balance, 0),
     accountCount: active.length,
   };
+}
+
+/* ---------- Dashboard ---------- */
+
+export type MonthTotals = { month: IsoMonth; income: Paise; spending: Paise };
+
+/** Income and spending for each month from `from` to `to`, zero months included. Transfers are left out. */
+export function monthlyTotals(from: IsoMonth, to: IsoMonth): MonthTotals[] {
+  const month = sql<string>`substr(${transactions.date}, 1, 7)`;
+  const found = new Map(
+    db
+      .select({
+        month,
+        income: sql<number>`coalesce(sum(case when ${transactions.type} = 'income' then ${transactions.amount} end), 0)`,
+        spending: sql<number>`coalesce(sum(case when ${transactions.type} = 'expense' then ${transactions.amount} end), 0)`,
+      })
+      .from(transactions)
+      .where(
+        and(gte(transactions.date, startOfMonth(from)), lte(transactions.date, endOfMonth(to))),
+      )
+      .groupBy(month)
+      .all()
+      .map((r) => [r.month, r]),
+  );
+  return monthEndsBetween(from, to).map((end) => {
+    const m = monthOf(end);
+    return { month: m, income: found.get(m)?.income ?? 0, spending: found.get(m)?.spending ?? 0 };
+  });
+}
+
+export type SpendShare = { key: string; name: string; value: Paise; color: string | null };
+
+/** A month's spending by category (with its colour) and by the account it was paid from. Largest first. */
+export function spendingBreakdown(month: IsoMonth): {
+  byCategory: SpendShare[];
+  byAccount: SpendShare[];
+} {
+  const inMonth = and(
+    eq(transactions.type, 'expense'),
+    gte(transactions.date, startOfMonth(month)),
+    lte(transactions.date, endOfMonth(month)),
+  );
+  const total = sum(transactions.amount).mapWith(Number);
+  const byCategory = db
+    .select({ id: categories.id, name: categories.name, color: categories.color, value: total })
+    .from(transactions)
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(inMonth)
+    .groupBy(categories.id)
+    .orderBy(desc(total))
+    .all()
+    .map((r) => ({
+      key: `c${r.id ?? 0}`,
+      name: r.name ?? 'Uncategorised',
+      value: r.value,
+      color: r.color,
+    }));
+  const byAccount = db
+    .select({ id: accounts.id, name: accounts.name, value: total })
+    .from(transactions)
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+    .where(inMonth)
+    .groupBy(accounts.id)
+    .orderBy(desc(total))
+    .all()
+    .map((r) => ({
+      key: `a${r.id ?? 0}`,
+      name: r.name ?? 'No account',
+      value: r.value,
+      color: null,
+    }));
+  return { byCategory, byAccount };
 }

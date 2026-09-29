@@ -105,6 +105,13 @@ export function LineChart({ points }: { points: LinePoint[] }) {
 
         <path d={path('invested')} fill="none" stroke="var(--c1)" strokeWidth="2" strokeLinejoin="round" />
         <path d={path('worth')} fill="none" stroke="var(--c2)" strokeWidth="2.2" strokeLinejoin="round" />
+        {n === 1 && (
+          // A single point draws no line, so mark it.
+          <>
+            <circle cx={x(0)} cy={y(points[0]!.invested)} r="4" fill="var(--c1)" />
+            <circle cx={x(0)} cy={y(points[0]!.worth)} r="4" fill="var(--c2)" />
+          </>
+        )}
 
         {active && at !== null && (
           <>

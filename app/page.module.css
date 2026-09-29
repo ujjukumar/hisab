@@ -1,0 +1,24 @@
+.months {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.budgets {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.empty {
+  margin: 18px 0 0;
+  color: var(--text-2);
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.empty p {
+  margin: 0;
+}

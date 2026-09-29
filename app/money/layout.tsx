@@ -9,6 +9,7 @@ import { MONEY_TABS } from '@/app/nav';
 import { monthLabel } from '@/lib/domain/dates';
 import { formatINR } from '@/lib/domain/format';
 import { listAccounts, listCategories, moneyStrip } from '@/lib/queries/money';
+import { spentAndSaved } from './stats';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -28,23 +29,7 @@ export default function MoneyLayout({ children }: { children: ReactNode }) {
             value: formatINR(s.income),
             aside: plural(s.incomeCount, 'payment received', 'payments received'),
           },
-          {
-            label: `Spent in ${month}`,
-            value: formatINR(s.spending),
-            aside: !s.budget
-              ? 'No budget set'
-              : s.spending > s.budget
-                ? `over the ${formatINR(s.budget)} budget`
-                : `of ${formatINR(s.budget)} budget`,
-            asideTone: s.budget && s.spending > s.budget ? 'neg' : '',
-          },
-          {
-            label: `Saved in ${month}`,
-            value: formatINR(s.saved),
-            aside:
-              s.savingsRate === null ? 'No income yet' : `${Math.round(s.savingsRate)}% of income`,
-            asideTone: s.saved > 0 ? 'pos' : s.saved < 0 ? 'neg' : '',
-          },
+          ...spentAndSaved(s),
           {
             label: 'In bank and cash',
             value: formatINR(s.bankAndCash),

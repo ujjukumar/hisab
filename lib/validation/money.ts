@@ -92,6 +92,14 @@ export type TransactionInput = z.infer<typeof transactionSchema>;
 
 export const ACCOUNT_TYPES = ['bank', 'card', 'cash', 'wallet', 'other'] as const;
 
+export const ACCOUNT_TYPE_LABELS: Record<(typeof ACCOUNT_TYPES)[number], string> = {
+  bank: 'Bank account',
+  card: 'Credit card',
+  cash: 'Cash',
+  wallet: 'Wallet',
+  other: 'Other',
+};
+
 export const accountSchema = z.object({
   name: requiredText(60, 'Give the account a name.'),
   type: z.enum(ACCOUNT_TYPES, 'Choose the kind of account.'),

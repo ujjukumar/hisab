@@ -17,6 +17,13 @@ import { isValidDate, monthEndsBetween, monthOf, today, type IsoDate } from '@/l
 import { formatDate } from '@/lib/domain/format';
 import { computeHolding, moneyMoved, OversellError, type HoldingTxn } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
+import {
+  PERIODS,
+  periodRows,
+  periodStart,
+  sinceLastRows,
+  type Period,
+} from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
 import { INVESTMENT_ACTIONS } from '@/lib/validation/investments';
 import { PAGE_SIZE, paramReader, type Params } from './money';
@@ -68,24 +75,23 @@ export function unitsProblem(
 
 // ponytail: the whole portfolio is replayed from every transaction on each request.
 // Fine for one household's few hundred rows; cache holdings per asset if it ever drags.
-function loadData(): PortfolioData {
-  return {
-    assets: db.select().from(assets).orderBy(asc(assets.name)).all(),
-    txns: allTxns(),
-    prices: db
-      .select({ assetId: prices.assetId, date: prices.date, price: prices.price })
-      .from(prices)
-      .all(),
-    valuations: db
-      .select({ assetId: valuations.assetId, date: valuations.date, value: valuations.value })
-      .from(valuations)
-      .all(),
-  };
-}
+/** Everything the portfolio is worked out from, loaded once per request. */
+export const portfolioData = cache((): PortfolioData => ({
+  assets: db.select().from(assets).orderBy(asc(assets.name)).all(),
+  txns: allTxns(),
+  prices: db
+    .select({ assetId: prices.assetId, date: prices.date, price: prices.price })
+    .from(prices)
+    .all(),
+  valuations: db
+    .select({ assetId: valuations.assetId, date: valuations.date, value: valuations.value })
+    .from(valuations)
+    .all(),
+}));
 
 /** Every asset's holding and value on `date`, worked out once per request. */
 export const portfolio = cache((date: IsoDate = today()): HoldingRow[] =>
-  buildPortfolio(loadData(), date),
+  buildPortfolio(portfolioData(), date),
 );
 
 /** The Overview's `?group=` and `?sold=1`, applied to the portfolio. Shared with its CSV export. */
@@ -297,7 +303,7 @@ export type HistoryPoint = { date: IsoDate; invested: Paise; worth: Paise };
  * FDs), plus today. Prices before the first transaction are left out.
  */
 export function holdingHistory(assetId: number): HistoryPoint[] {
-  const data = loadData();
+  const data = portfolioData();
   const asset = data.assets.find((a) => a.id === assetId);
   const first = data.txns
     .filter((t) => t.assetId === assetId)
@@ -326,4 +332,20 @@ export function holdingHistory(assetId: number): HistoryPoint[] {
       const [row] = buildPortfolio(own, date);
       return { date, invested: row?.holding.cost ?? 0, worth: row?.value ?? 0 };
     });
+}
+
+/* ---------- performance ---------- */
+
+/** The Performance tab's `?asof=` and `?period=`, and each holding's figures for them. Shared with its CSV export. */
+export function periodPerformance(params: Params, yearStartMonth: number) {
+  const { one } = paramReader(params);
+  const now = today();
+  const asked = one('asof');
+  const asOf = isValidDate(asked) && asked <= now ? asked : now;
+  const p = one('period');
+  const period: Period = (PERIODS as readonly string[]).includes(p) ? (p as Period) : 'all';
+  const from = periodStart(period, asOf, yearStartMonth);
+  const rows =
+    period === 'since' ? sinceLastRows(portfolio(asOf)) : periodRows(portfolioData(), from, asOf);
+  return { asOf, period, from, rows };
 }

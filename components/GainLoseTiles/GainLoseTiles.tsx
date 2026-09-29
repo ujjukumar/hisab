@@ -7,7 +7,7 @@ export type Mover = {
   name: string;
   /** Gain in paise. Negative for a loss. */
   gain: number;
-  /** Gain as a percentage of cost. */
+  /** Gain as a percentage of the starting value. */
   percent: number;
 };
 

@@ -683,6 +683,21 @@ export function AddInvestmentButton() {
   );
 }
 
+/** A small "Add" link, e.g. beside an investment type with no holdings yet. `label` names what it adds. */
+export function AddInvestmentLink({ label }: { label: string }) {
+  const { open } = useContext(Context);
+  return (
+    <button
+      type="button"
+      className="linkish"
+      aria-label={label}
+      onClick={() => open({ kind: 'txn' })}
+    >
+      Add
+    </button>
+  );
+}
+
 export function RecordTransactionButton({ assetId }: { assetId?: number }) {
   const { open } = useContext(Context);
   return (
