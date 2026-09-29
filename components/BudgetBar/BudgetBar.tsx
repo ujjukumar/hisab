@@ -14,7 +14,6 @@ export function BudgetBar({
   budget: number;
 }) {
   const over = spent > budget;
-  const width = budget > 0 ? Math.min(100, (spent / budget) * 100) : spent > 0 ? 100 : 0;
 
   return (
     <div className={styles.budget}>
@@ -24,9 +23,17 @@ export function BudgetBar({
           <b>{formatINR(spent)}</b> of {formatINR(budget)}
         </span>
       </div>
-      <div className={`${styles.bar} ${over ? styles.over : ''}`} aria-hidden="true">
-        <i style={{ width: `${width}%` }} />
-      </div>
+      <Bar spent={spent} budget={budget} />
+    </div>
+  );
+}
+
+/** Just the bar. It is decorative, so callers must show the figures as text too. */
+export function Bar({ spent, budget }: { spent: number; budget: number }) {
+  const width = budget > 0 ? Math.min(100, (spent / budget) * 100) : spent > 0 ? 100 : 0;
+  return (
+    <div className={`${styles.bar} ${spent > budget ? styles.over : ''}`} aria-hidden="true">
+      <i style={{ width: `${width}%` }} />
     </div>
   );
 }

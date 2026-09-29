@@ -781,7 +781,7 @@ Update this as work happens: one line per phase with the date, status and notes.
 | Planning and mockup | Done | Sep 2026 | Mockup approved by owner |
 | 1 — Foundation | Done | 28 Sep 2026 | Shell, all shared components on `/dev/ui`, schema + migration, seed/reset/backup, domain helpers with 35 tests. Drawer uses native `<dialog>`, Menu uses the popover API. `/dev/ui` not compared in a browser — no preview pane on this install. |
 | 2 — Money | Done | 29 Sep 2026 | Transactions, Accounts and Categories tabs, transaction drawer, Money strip, CSV export; `balances.ts` + validation tests (55 total). Checked in a browser against the seed: strip and September totals match the mockup, transfers excluded. Undo keeps deleted rows in memory for 60 s (lost on restart). Accounts and categories can be deleted only while unused; otherwise archive. Fixed Phase 1 CSS: table alignment, filter spans, page padding. Real-bank balance check is the owner's. |
-| 3 — Budgets | Not started | | |
+| 3 — Budgets | Done | 29 Sep 2026 | Budgets tab with month picker, inline editing (blur/Enter saves, Escape reverts), "Without a budget" list with Set budget, totals row, over-budget states, copy last month with Undo. Budgets, the Money strip and (from Phase 5) the Dashboard card all read `monthBudgets()`, so they agree. "Copy last month's budgets" removes this month's own changes, since budgets carry forward. A value equal to what carries in stores no row. Undo store moved to `lib/undo.ts`. 64 tests. |
 | 4 — Investments | Not started | | |
 | 5 — Dashboard and Performance | Not started | | |
 | 6 — Reports, Settings and polish | Not started | | |

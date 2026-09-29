@@ -81,3 +81,12 @@ export function IconButton({
     </button>
   );
 }
+
+/** IconButton's look as a link, e.g. the month picker's arrows. */
+export function IconLink({ icon, label, href }: { icon: IconName; label: string; href: string }) {
+  return (
+    <Link href={href} aria-label={label} title={label} className={styles.icon}>
+      <Icon name={icon} />
+    </Link>
+  );
+}

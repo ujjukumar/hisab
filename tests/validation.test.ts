@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountSchema, transactionSchema } from '@/lib/validation/money';
+import { accountSchema, budgetSchema, transactionSchema } from '@/lib/validation/money';
 
 const base = {
   type: 'expense',
@@ -84,5 +84,26 @@ describe('accountSchema', () => {
     expect(accountSchema.parse({ ...account, openingBalance: '-18640.5' }).openingBalance).toBe(
       -1864050,
     );
+  });
+});
+
+describe('budgetSchema', () => {
+  const budget = { categoryId: 3, month: '2026-09', amount: '12,000' };
+
+  it('parses the amount into paise', () => {
+    expect(budgetSchema.parse(budget).amount).toBe(1200000);
+  });
+
+  it('treats an empty amount as 0, meaning no budget', () => {
+    expect(budgetSchema.parse({ ...budget, amount: '' }).amount).toBe(0);
+    expect(budgetSchema.parse({ ...budget, amount: '0' }).amount).toBe(0);
+  });
+
+  it('rejects a negative amount and a bad month', () => {
+    const result = budgetSchema.safeParse({ ...budget, amount: '-500', month: '2026-13' });
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path[0]);
+    expect(paths).toContain('amount');
+    expect(paths).toContain('month');
   });
 });

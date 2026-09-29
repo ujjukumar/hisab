@@ -1,0 +1,25 @@
+.picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.month {
+  margin: 0;
+  min-width: 9.5em;
+  text-align: center;
+  font: 400 25px/1.2 var(--serif);
+  font-variation-settings:
+    'SOFT' 100,
+    'WONK' 0,
+    'opsz' 30;
+  color: var(--heading);
+}
+
+@media (max-width: 760px) {
+  .month {
+    font-size: 21px;
+  }
+}

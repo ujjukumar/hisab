@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isValidDate } from '@/lib/domain/dates';
+import { isValidDate, isValidMonth } from '@/lib/domain/dates';
 import { parsePaise, parsePositivePaise } from '@/lib/domain/money';
 
 /** What every server action returns. `undo` is the token a delete hands back for its Undo toast. */
@@ -104,4 +104,16 @@ export const categorySchema = z.object({
   name: requiredText(40, 'Give the category a name.'),
   kind: z.enum(['expense', 'income'], 'Choose spending or income.'),
   color: z.enum(CATEGORY_COLORS, 'Pick a colour.'),
+});
+
+export const monthSchema = z.string().refine(isValidMonth, 'Pick a month.');
+
+export const budgetSchema = z.object({
+  categoryId: idSchema,
+  month: monthSchema,
+  // Empty or 0 means no budget from this month.
+  amount: amount(parsePaise, '', 0).refine(
+    (paise) => paise >= 0,
+    'Enter a budget of zero or more. Leave it empty for no budget.',
+  ),
 });

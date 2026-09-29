@@ -10,7 +10,6 @@ import {
   transactions,
 } from '@/lib/db/schema';
 import { accountBalance, summarise, type Flow } from '@/lib/domain/balances';
-import { budgetsForMonth } from '@/lib/domain/budgets';
 import {
   currentMonth,
   endOfMonth,
@@ -25,6 +24,7 @@ import {
   type IsoMonth,
 } from '@/lib/domain/dates';
 import type { Paise } from '@/lib/domain/money';
+import { monthBudgets } from './budgets';
 import { financialYearStartMonth } from './settings';
 
 // ponytail: balances replay every transaction on each request. Fine for a
@@ -335,10 +335,7 @@ export function moneyStrip(month: IsoMonth = currentMonth()): MoneyStrip {
       )
       .all(),
   );
-  const budget = [...budgetsForMonth(db.select().from(budgets).all(), month).values()].reduce(
-    (a, b) => a + b,
-    0,
-  );
+  const { budget } = monthBudgets(month);
   const active = listAccounts().filter((a) => !a.archived);
   return {
     month,

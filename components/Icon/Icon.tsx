@@ -6,6 +6,7 @@ export type IconName =
   | 'plus'
   | 'chevDown'
   | 'chevRight'
+  | 'chevLeft'
   | 'kebab'
   | 'search'
   | 'refresh'
@@ -39,6 +40,11 @@ const ICONS: Record<IconName, (props: SVGProps<SVGSVGElement>) => JSX.Element> =
   chevRight: (p) => (
     <svg {...stroke(13, 3.2, true)} {...p}>
       <path d="m9 6 6 6-6 6" />
+    </svg>
+  ),
+  chevLeft: (p) => (
+    <svg {...stroke(13, 3.2, true)} {...p}>
+      <path d="m15 6-6 6 6 6" />
     </svg>
   ),
   kebab: (p) => (

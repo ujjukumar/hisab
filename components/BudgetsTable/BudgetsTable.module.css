@@ -1,0 +1,44 @@
+.used {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 3.5em;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.edit {
+  display: inline-block;
+  text-align: left;
+}
+
+.input {
+  width: 120px;
+  margin: -6px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--heading);
+  font: 500 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.input:hover {
+  border-color: var(--primary);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--loss);
+}
+
+.edit p {
+  margin: 10px 0 0;
+  max-width: 200px;
+  font-size: 12px;
+}
+
+button.set {
+  margin: -6px 0;
+  padding: 5px 12px;
+}

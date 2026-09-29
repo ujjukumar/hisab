@@ -1,6 +1,5 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/client';
@@ -10,8 +9,8 @@ import {
   investmentTransactions,
   transactions,
   type InvestmentTransaction,
-  type Transaction,
 } from '@/lib/db/schema';
+import { keepForUndo, takeUndo } from '@/lib/undo';
 import {
   failed,
   idSchema,
@@ -87,19 +86,10 @@ export async function saveTransaction(
 
 /* ---------- delete with undo ---------- */
 
-type Deleted = { expires: number; txn: Transaction; investment: InvestmentTransaction | null };
-
-// ponytail: in-memory, so Undo is lost if the server restarts in the few seconds the toast is up.
-const store = globalThis as unknown as { hisaabUndo?: Map<string, Deleted> };
-const deleted = (store.hisaabUndo ??= new Map());
-
 /** Delete right away and hand back a token for Undo. A linked row takes its investment transaction with it. */
 export async function deleteTransaction(id: number): Promise<ActionResult> {
   const parsedId = idSchema.safeParse(id);
   if (!parsedId.success) return failed('That transaction no longer exists.');
-
-  const now = Date.now();
-  for (const [token, entry] of deleted) if (entry.expires < now) deleted.delete(token);
 
   const result = db.transaction((tx): ActionResult => {
     const txn = tx.select().from(transactions).where(eq(transactions.id, parsedId.data)).get();
@@ -118,31 +108,29 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
         .run();
     }
     tx.delete(transactions).where(eq(transactions.id, txn.id)).run();
-    const token = randomUUID();
-    deleted.set(token, { expires: now + 60_000, txn, investment });
-    return { ok: true, id: txn.id, undo: token };
+    // Put it back exactly as it was, same id included.
+    const undo = keepForUndo(() =>
+      db.transaction((tx2) => {
+        if (investment) tx2.insert(investmentTransactions).values(investment).run();
+        tx2.insert(transactions).values(txn).run();
+      }),
+    );
+    return { ok: true, id: txn.id, undo };
   });
 
   if (result.ok) revalidate();
   return result;
 }
 
-/** Put a just-deleted transaction back exactly as it was, same id included. */
 export async function undoDelete(token: string): Promise<ActionResult> {
-  const entry = typeof token === 'string' ? deleted.get(token) : undefined;
-  if (!entry || entry.expires < Date.now()) return failed('Too late to undo that delete.');
-  deleted.delete(token);
-
+  const restore = takeUndo(token);
+  if (!restore) return failed('Too late to undo that delete.');
   try {
-    db.transaction((tx) => {
-      if (entry.investment) tx.insert(investmentTransactions).values(entry.investment).run();
-      tx.insert(transactions).values(entry.txn).run();
-    });
+    restore();
   } catch {
     // Only possible if its account or category was deleted in the meantime.
     return failed('Could not undo: its account or category has since been deleted.');
   }
-
   revalidate();
-  return { ok: true, id: entry.txn.id };
+  return { ok: true };
 }
