@@ -13,7 +13,15 @@ import {
   type InvestmentAction,
 } from '@/lib/db/schema';
 import { GROUPS, groupOf, maskRef, type GroupKey } from '@/lib/domain/assets';
-import { isValidDate, monthEndsBetween, monthOf, today, type IsoDate } from '@/lib/domain/dates';
+import {
+  addMonths,
+  currentMonth,
+  isValidDate,
+  monthEndsBetween,
+  monthOf,
+  today,
+  type IsoDate,
+} from '@/lib/domain/dates';
 import { formatDate } from '@/lib/domain/format';
 import { computeHolding, moneyMoved, OversellError, type HoldingTxn } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
@@ -25,6 +33,7 @@ import {
   type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
+import { pastPriceNeeds } from '@/lib/domain/priceFeeds';
 import { INVESTMENT_ACTIONS } from '@/lib/validation/investments';
 import { PAGE_SIZE, paramReader, type Params } from './money';
 
@@ -348,4 +357,13 @@ export function periodPerformance(params: Params, yearStartMonth: number) {
   const rows =
     period === 'since' ? sinceLastRows(portfolio(asOf)) : periodRows(portfolioData(), from, asOf);
   return { asOf, period, from, rows };
+}
+
+/** Month-ends "Fetch past prices" still has to download, up to last month, and which files each needs. */
+export function pastPriceDates(): { date: IsoDate; funds: boolean; listed: boolean }[] {
+  return pastPriceNeeds(portfolioData(), addMonths(currentMonth(), -1)).map((n) => ({
+    date: n.date,
+    funds: n.linked.some((a) => a.feed === 'amfi'),
+    listed: n.linked.some((a) => a.feed === 'nse'),
+  }));
 }

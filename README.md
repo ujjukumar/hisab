@@ -147,12 +147,32 @@ skipped, so you can import a fresh All-time file whenever you like and only
 the new rows are added. A backup is saved first as `…-pre-import.db`; restore
 it from Settings to undo an import.
 
+## Automatic prices
+
+Once a day, the first time you open the app, Hisaab downloads the latest fund
+NAVs from AMFI and the last closing prices of stocks and ETFs from NSE. This
+works for funds, stocks and ETFs whose **Symbol or code** is their ISIN (the
+Value Research import fills it in). Investments shows when prices were last
+updated, with **Update now** to fetch them again.
+
+- Only AMFI's and NSE's public whole-market files are downloaded, about 0.5 MB
+  a day. Nothing about your investments is sent.
+- Each price is saved under the date in the file, so you keep one price per
+  day for the days you open the app. Prices you enter or import are never
+  replaced.
+- **Settings → Prices → Fetch past prices** fills in month-end prices back to
+  your first purchase (about 0.5 MB a month). You can stop it and carry on
+  later.
+- Switch it off under **Settings → Prices**. Then the app makes no requests at
+  all.
+
 ## Privacy
 
 - The server always binds to `127.0.0.1`, never `0.0.0.0`.
 - Next.js telemetry is disabled.
 - Fonts are downloaded at build time and served from this machine. The running
-  app makes no external requests at all.
+  app's only requests are the AMFI and NSE price files above, which you can
+  switch off.
 - `data/` is never committed. Neither are `*.db`, `*.db-wal`, `*.db-shm` or
   `.env*`.
 - Every name and number in `scripts/seed.ts` is invented. No real financial data

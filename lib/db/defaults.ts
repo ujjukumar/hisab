@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'financial_year_start_month', value: '4' },
   { key: 'default_fd_compounding', value: '"quarterly"' },
   { key: 'sample_data', value: 'false' },
+  { key: 'auto_prices', value: 'true' },
 ];
 
 /** Overview sub-tabs and table order. Only groups with holdings are shown. */

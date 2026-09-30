@@ -585,7 +585,11 @@ function AssetForm({ asset, onDone }: { asset: AssetOption; onDone: () => void }
         maxLength={40}
         defaultValue={asset.symbol ?? ''}
         {...describe('symbol')}
+        aria-describedby={error('symbol') ? 'h-symbol e-symbol' : 'h-symbol'}
       />
+      <p className={styles.hint} id="h-symbol">
+        The ISIN, for example INF000XX0000. Needed for automatic prices.
+      </p>
       {error('symbol')}
       <TextField
         label="Note (optional)"

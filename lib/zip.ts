@@ -1,4 +1,4 @@
-import { crc32, deflateRawSync } from 'node:zlib';
+import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 
 /**
  * A plain .zip of small text files, built with node:zlib so the full export needs no zip library.
@@ -46,6 +46,29 @@ export function zip(files: { name: string; text: string }[], now = new Date()): 
   end.writeUInt32LE(directory.length, 12);
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, directory, end]);
+}
+
+/**
+ * The first file in a .zip, such as NSE's one-file bhavcopy. Sizes come from the central directory,
+ * because some zips leave them out of the local header. Throws when it isn't a zip it can read.
+ */
+export function unzipFirst(buf: Buffer): Buffer {
+  const end = buf.lastIndexOf(u32(0x06054b50));
+  if (end < 0 || end + 22 > buf.length) throw new Error('Not a zip file.');
+  const cd = buf.readUInt32LE(end + 16);
+  if (cd + 46 > buf.length || buf.readUInt32LE(cd) !== 0x02014b50)
+    throw new Error('Not a zip file.');
+  const method = buf.readUInt16LE(cd + 10);
+  const size = buf.readUInt32LE(cd + 20);
+  const local = buf.readUInt32LE(cd + 42);
+  if (local + 30 > buf.length || buf.readUInt32LE(local) !== 0x04034b50) {
+    throw new Error('Not a zip file.');
+  }
+  const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+  const data = buf.subarray(start, start + size);
+  if (method === 0) return data;
+  if (method === 8) return inflateRawSync(data);
+  throw new Error('Unsupported zip compression.');
 }
 
 function u32(n: number): Buffer {

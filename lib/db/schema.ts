@@ -173,7 +173,7 @@ export const prices = sqliteTable(
       .references(() => assets.id),
     date: text('date').notNull(),
     price: text('price').notNull(),
-    source: text('source', { enum: ['manual', 'import'] })
+    source: text('source', { enum: ['manual', 'import', 'auto'] })
       .notNull()
       .default('manual'),
     ...stamps,

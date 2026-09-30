@@ -1,6 +1,6 @@
 import { inflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { zip } from '@/lib/zip';
+import { unzipFirst, zip } from '@/lib/zip';
 
 /** Read a zip back through its central directory, the way unzip tools do. */
 function unzip(archive: Buffer): Record<string, string> {
@@ -38,5 +38,31 @@ describe('zip', () => {
 
   it('makes a valid empty archive', () => {
     expect(unzip(zip([]))).toEqual({});
+  });
+});
+
+describe('unzipFirst', () => {
+  const text = 'ISIN,ClsPric\r\nINE000KP0011,412.35\r\n'.repeat(200);
+
+  it('reads the first file back', () => {
+    const archive = zip([
+      { name: 'bhav.csv', text },
+      { name: 'other.txt', text: 'x' },
+    ]);
+    expect(unzipFirst(archive).toString('utf8')).toBe(text);
+  });
+
+  it('reads sizes from the central directory when the local header leaves them out', () => {
+    const archive = zip([{ name: 'bhav.csv', text }]);
+    archive.writeUInt16LE(0x0808, 6); // "sizes follow the data"
+    archive.writeUInt32LE(0, 18);
+    archive.writeUInt32LE(0, 22);
+    expect(unzipFirst(archive).toString('utf8')).toBe(text);
+  });
+
+  it('refuses anything that is not a zip', () => {
+    expect(() => unzipFirst(Buffer.from('<!DOCTYPE html><html>Not found</html>'))).toThrow();
+    expect(() => unzipFirst(Buffer.alloc(0))).toThrow();
+    expect(() => unzipFirst(zip([{ name: 'a', text }]).subarray(0, 40))).toThrow();
   });
 });

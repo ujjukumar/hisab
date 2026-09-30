@@ -120,6 +120,14 @@ export function formatDay(date: IsoDate): string {
   return `${day} ${SHORT_MONTHS[month - 1]}`;
 }
 
+/** '7:40 pm' in this computer's time zone, for "Prices updated 1 Oct, 7:40 pm". */
+export function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const h = d.getHours();
+  return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
 /* ---------- chart axes ---------- */
 
 /** '0', '75K', '1.5L', '2 Cr'. Takes rupees, not paise. */

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ButtonLink } from '@/components/Button/Button';
 import { AddInvestmentButton } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { PageHead } from '@/components/PageHead/PageHead';
+import { UpdatePricesButton } from '@/components/Prices/Prices';
 import { Tabs } from '@/components/Tabs/Tabs';
 import { INVESTMENT_TABS } from '@/app/nav';
 import { today } from '@/lib/domain/dates';
@@ -16,14 +17,22 @@ import {
 } from '@/lib/domain/format';
 import { totals } from '@/lib/domain/portfolio';
 import { portfolio } from '@/lib/queries/investments';
+import { priceStatus, priceUpdate } from '@/lib/queries/settings';
 
-export default function InvestmentTabsLayout({ children }: { children: ReactNode }) {
+export default async function InvestmentTabsLayout({ children }: { children: ReactNode }) {
   const t = totals(portfolio(), today());
+  const last = await priceUpdate();
 
   return (
     <>
       <PageHead
         title="Investments"
+        sub={
+          <>
+            {last ? priceStatus(last) : 'Prices not updated automatically yet.'}{' '}
+            <UpdatePricesButton link />
+          </>
+        }
         actions={
           <>
             <ButtonLink variant="secondary" href="/investments/import">

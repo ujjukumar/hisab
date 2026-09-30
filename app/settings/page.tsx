@@ -1,17 +1,22 @@
 import { Button, ButtonLink } from '@/components/Button/Button';
 import { Card } from '@/components/Card/Card';
 import { PageHead } from '@/components/PageHead/PageHead';
+import { AutoPricesSwitch, PastPrices, UpdatePricesButton } from '@/components/Prices/Prices';
 import {
   PreferencesForm,
   RestoreForm,
   SettingRow,
   StartFreshForm,
 } from '@/components/SettingsForms/SettingsForms';
+import { pastPriceDates } from '@/lib/queries/investments';
 import {
+  autoPrices,
   databaseInfo,
   defaultCompounding,
   financialYearStartMonth,
   isSampleData,
+  priceStatus,
+  priceUpdate,
 } from '@/lib/queries/settings';
 import { version } from '@/package.json';
 import styles from './page.module.css';
@@ -22,10 +27,12 @@ const size = (bytes: number) =>
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export default async function SettingsPage() {
-  const [sample, startMonth, compounding] = await Promise.all([
+  const [sample, startMonth, compounding, auto, last] = await Promise.all([
     isSampleData(),
     financialYearStartMonth(),
     defaultCompounding(),
+    autoPrices(),
+    priceUpdate(),
   ]);
   const info = databaseInfo();
 
@@ -93,6 +100,29 @@ export default async function SettingsPage() {
                   ? 'Deletes the invented sample accounts, transactions and investments, and puts back the default categories.'
                   : 'Deletes every account, transaction, budget and investment, and puts back the default categories.'}{' '}
                 A backup is saved first.
+              </p>
+            </SettingRow>
+          </Card>
+
+          <Card
+            title="Prices"
+            sub="Only AMFI's and NSE's public price files are downloaded. Nothing about your investments is sent."
+          >
+            <SettingRow title="Automatic prices" control={<AutoPricesSwitch on={auto} />}>
+              <p>
+                Once a day, when the app opens, funds get their latest NAV from AMFI and stocks and
+                ETFs their closing price from NSE. It works for investments whose symbol is an ISIN.
+                Prices you enter or import are never replaced.
+              </p>
+            </SettingRow>
+            <SettingRow title="Update prices now" control={<UpdatePricesButton />}>
+              <p>{last ? priceStatus(last) : 'Prices not updated automatically yet.'}</p>
+            </SettingRow>
+            <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
+              <p>
+                Fills in the price at each month-end since your first purchase, for the charts on
+                Performance and Overview. Months that already have a price are skipped, so you can
+                stop and carry on later.
               </p>
             </SettingRow>
           </Card>

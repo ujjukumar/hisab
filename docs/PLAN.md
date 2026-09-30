@@ -34,7 +34,7 @@ hisaab/
 - **Money:** income, spending, transfers between own accounts, account balances, monthly budgets per category.
 - **Investments:** holdings, cost, current value, gains, annualised returns (XIRR), allocation. Instruments the owner uses or may use: mutual funds, stocks, ETFs, gold (ETFs and gold bonds), fixed deposits, PPF, EPF, NPS, bonds.
 
-**Not in version 1:** logins or multiple users, cloud sync, bank or broker connections, automatic price feeds, tax reports, multiple currencies, a mobile app. (See the backlog in section 14.)
+**Not in version 1:** logins or multiple users, cloud sync, bank or broker connections, tax reports, multiple currencies, a mobile app. (See the backlog in section 14.)
 
 ---
 
@@ -310,7 +310,7 @@ Linked rows are shown on the Money side with a small "Linked" label. Their row m
 | asset_id | INTEGER NOT NULL → assets | |
 | date | TEXT NOT NULL | |
 | price | TEXT NOT NULL | |
-| source | TEXT NOT NULL DEFAULT 'manual' | `manual` · `import` |
+| source | TEXT NOT NULL DEFAULT 'manual' | `manual` · `import` · `auto` (downloaded; only `auto` rows are ever replaced by a download) |
 | | | PRIMARY KEY(asset_id, date), no `id` column |
 
 ### valuations
@@ -617,7 +617,7 @@ Privacy and local-only defaults:
 - Always bind to `127.0.0.1`, never `0.0.0.0`, so other devices on the network can't reach the app.
 - Disable Next.js telemetry: add `NEXT_TELEMETRY_DISABLED=1` to `.env` and document `npx next telemetry disable` in the README.
 - `.gitignore` must include `data/`, `*.db`, `*.db-wal`, `*.db-shm`, `.env*`.
-- The only network use is `npm install` and the build-time font download. The running app makes no external requests.
+- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
 - The database path comes from `DATABASE_PATH` (default `./data/finance.db`). Create the folder if it's missing.
 
 Write a `README.md` covering install, first run, daily use (`build` + `start`), backup and restore, and the privacy notes above.
@@ -736,6 +736,19 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 
 - A real download imports with net invested equal to the file's totals, and importing it again adds nothing.
 
+### Phase 8 — Automatic prices
+
+- Owner-approved exception to "no external requests": only AMFI's and NSE's public whole-market price files, all fetched by `lib/feeds.ts`. Requests are the same whatever the owner holds.
+- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before). Weekends and holidays walk back up to 7 days.
+- Only `units` funds, stocks and ETFs whose symbol is an ISIN take part. Downloaded prices are stored with `source = 'auto'` under the file's own date; a `manual` or `import` price on the same day is never replaced.
+- On open, at most once a day (setting `auto_prices`, on by default; last result in `price_update`). "Update now" on Investments and Settings forces it. A failed check still counts for the day.
+- Settings → Prices → Fetch past prices fills month-ends from the first purchase where a held, linked investment has no price in the week before, one month per request with progress and Stop.
+- No migration: `source` is a TypeScript-only enum.
+
+*Done when:*
+
+- Opening the app once a day stores that day's prices, a reload doesn't download again, and switching it off stops all downloads.
+
 ---
 
 ## 12. Testing checklist (minimum)
@@ -763,7 +776,8 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 | Charts | Custom SVG; no chart library | Matches the design exactly |
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
 | Dark mode | Follows system setting | Already designed in the mockup |
-| Daily change | "Since last update" instead of "1 day" | Prices are entered by hand, not daily |
+| Daily change | "Since last update" instead of "1 day" | Prices come by hand, import or a once-a-day download, so the last two prices may be days apart |
+| Automatic prices | AMFI and NSE whole-market files, once a day on open; past prices at month-ends only | Owner-approved (Oct 2026). Nothing about holdings is sent; daily history for past years would be hundreds of MB |
 | Cost method | Average cost | Simple and standard for tracking; not a tax calculation |
 | Short holdings | Under 365 days show absolute return "abs." | Annualising short periods misleads |
 | Investment payments | Optional "Paid from" / "Received in" creates a linked money transaction | Avoids entering SIPs twice |
@@ -778,7 +792,6 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 
 - Import bank and card statements from CSV, with column mapping and duplicate detection.
 - Recurring transactions (rent, SIPs, subscriptions) with reminders.
-- Automatic prices, e.g. importing mutual fund NAVs from a downloaded file. Any online source would need the owner's approval and a check of its terms of use.
 - Benchmark comparison (e.g. against an index) and inflation-adjusted returns.
 - Tax view: capital gains by financial year using FIFO. This is not tax advice.
 - Rule-based insights card ("Dining is 30% above your 3-month average").
@@ -800,3 +813,4 @@ Update this as work happens: one line per phase with the date, status and notes.
 | 5 — Dashboard and Performance | Done | 29 Sep 2026 | Dashboard on real queries with a month picker (past months show balances and holdings at month-end; future or invalid months fall back to this month): strip, income vs spending, where money went, portfolio performance, allocation, budgets, recent transactions, returns by type, top gainers & losers, accounts. Performance tab: as-of date and period filter, returns card with XIRR, invested-vs-worth chart, one table per investment type with totals, CSV export. `performance.ts` with 16 tests (138 total). Checked in a browser: September and August figures match the Money, Budgets and Investments pages; charts render with 0, 1 and many points (single points now draw dots); 360px layout. Performance adds a "Financial year to date" period; the Dashboard's YTD chip uses the calendar year, as in the mockup. "Since last update" covers holdings with two or more prices. |
 | 6 — Reports, Settings and polish | Done | 30 Sep 2026 | Reports: financial or calendar year, strip (income, spent, saved with savings rate, net invested), monthly income vs spending chart, spending and income by category × month tables with totals, CSV. Settings: Back up now (saved to `data/backups/` and downloaded), restore with validation (SQLite header, integrity check, Hisaab tables, not from a newer version, migrated, foreign keys) after a `-pre-restore` backup, full CSV export as a zip (hand-written with `node:zlib`, no new dependency), start fresh (type DELETE, `-pre-reset` backup), preferences (FY start month, default FD compounding, now used by the investment drawer), About (paths, size, backup count, version). Empty states: Dashboard "Get started" card with three steps that tick off; the transaction drawer sends a new owner to add an account first. Passes: accessibility audit of 12 page variants (names, labels, ids, headings), mobile button labels now visually hidden instead of removed; 360/768/1440 and dark mode checked in a browser. `tests/backup.test.ts` proves seed → backup → reset → restore gives identical tables; zip round-trip test. Playwright skipped (would add a dependency). Placeholder component removed. 145 tests. |
 | 7 — Import from Value Research | Done | 30 Sep 2026 | `/investments/import` with check-then-import, entry points on Investments (head and empty state) and Settings. Hand-written `.xls` reader (`lib/xls.ts`, no dependency; SheetJS on npm is stale and not approved), `valueResearch.ts` parser, `planImport` (ISIN match, same-name suggestion, count-based duplicate check, oversell check) and `applyImport` (one transaction, `-pre-import` backup, prices from real NAVs only, optional linked Money transfers). `linkedFields` moved to `holdings.ts` as `linkedMoneyRow`. Tests build `.xls` fixtures in memory from invented data (`tests/helpers/xlsWriter.ts`). Parser checked against the owner's real download locally (not committed): 103 rows, 34 ISINs, totals match, one sale gets a worked-out price. Browser check with the real file still to do. Dividends, switches and bonus rows in future files are listed as not imported. |
+| 8 — Automatic prices | Done | 1 Oct 2026 | Owner-approved downloads of AMFI NAVs and NSE bhavcopy only (`lib/feeds.ts`, global `fetch`, 20 s timeout). Probed sizes: AMFI `NAVAll.txt` 1.5 MB text / 0.26 MB gzipped in about 1 s; AMFI history for one date about 0.27 MB gzipped; NSE UDiFF zip about 0.2 MB (from Jan 2024; older format to Jul 2024). Parsers and `pastPriceNeeds` in `lib/domain/priceFeeds.ts`; `unzipFirst` added to `lib/zip.ts` (reads sizes from the central directory, as NSE's older zips use data descriptors). `applyFeedPrices` upserts `source = 'auto'` and never replaces `manual` or `import`. `PriceRefresher` in the root layout checks once a day on open; status line and Update now on Investments; Settings → Prices card with the switch, Update prices now and Fetch past prices (month-ends only, a deliberate choice: daily history for past years is hundreds of MB). ISIN hint on the investment drawer's symbol field. No migration (TS-only enum), no new dependency. Days the app isn't opened have no stored price; valuation carries the last price forward. |

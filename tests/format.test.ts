@@ -5,6 +5,7 @@ import {
   formatAmountSigned,
   formatDate,
   formatDay,
+  formatTime,
   formatINR,
   formatINRSigned,
   formatPercent,
@@ -142,5 +143,15 @@ describe('chart axes', () => {
 
   it('survives an empty chart', () => {
     expect(niceScale(0, 4)).toEqual({ top: 1, step: 1, ticks: 1 });
+  });
+});
+
+describe('formatTime', () => {
+  it('uses a 12-hour clock with am and pm', () => {
+    const at = (h: number, m: number) => new Date(2026, 9, 1, h, m).toISOString();
+    expect(formatTime(at(19, 40))).toBe('7:40 pm');
+    expect(formatTime(at(0, 5))).toBe('12:05 am');
+    expect(formatTime(at(12, 0))).toBe('12:00 pm');
+    expect(formatTime('not a time')).toBe('');
   });
 });

@@ -6,6 +6,8 @@ import { TABLES, backupTo, backupsFolder, databasePath } from '@/lib/db/connect'
 import { settings } from '@/lib/db/schema';
 import { cell } from '@/lib/csv';
 import { COMPOUNDING } from '@/lib/domain/assets';
+import { isValidDate, type IsoDate } from '@/lib/domain/dates';
+import { formatDay, formatTime } from '@/lib/domain/format';
 
 /** Read one setting. Returns null when it has never been written. */
 export async function getSetting(key: string): Promise<string | null> {
@@ -78,4 +80,43 @@ export function exportTables(): { name: string; text: string }[] {
     );
     return { name: `${table}.csv`, text: [header.join(','), ...lines].join('\r\n') + '\r\n' };
   });
+}
+
+/** Whether prices are downloaded when the app opens. On unless switched off in Settings. */
+export async function autoPrices(): Promise<boolean> {
+  return (await getSetting('auto_prices')) !== 'false';
+}
+
+/** The last automatic or requested price update, saved as JSON in `price_update`. */
+export type PriceUpdate = {
+  /** The day it ran, for the once-a-day check. */
+  on: IsoDate;
+  /** When it finished, as an ISO timestamp. */
+  at: string;
+  ok: boolean;
+  updated: number;
+  message: string;
+};
+
+export async function priceUpdate(): Promise<PriceUpdate | null> {
+  const value = parseJson(await getSetting('price_update'));
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Partial<PriceUpdate>;
+  return typeof v.on === 'string' && isValidDate(v.on) && typeof v.at === 'string'
+    ? {
+        on: v.on,
+        at: v.at,
+        ok: v.ok === true,
+        updated: typeof v.updated === 'number' ? v.updated : 0,
+        message: typeof v.message === 'string' ? v.message : '',
+      }
+    : null;
+}
+
+/** 'Prices updated 1 Oct, 7:40 pm.', followed by anything that went wrong. */
+export function priceStatus(last: PriceUpdate): string {
+  const done = last.ok || last.updated > 0;
+  return [done && `Prices updated ${formatDay(last.on)}, ${formatTime(last.at)}.`, last.message]
+    .filter(Boolean)
+    .join(' ');
 }
