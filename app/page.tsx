@@ -42,7 +42,18 @@ import {
   gainClass,
   MINUS,
 } from '@/lib/domain/format';
-import { linePoints, performanceSeries, periodStart, type Period } from '@/lib/domain/performance';
+import {
+  linePoints,
+  performanceSeries,
+  PERIOD_LABELS,
+  periodRows,
+  PERIODS,
+  periodStart,
+  periodTotals,
+  sinceLastRows,
+  type Period,
+  type PeriodRow,
+} from '@/lib/domain/performance';
 import { totals, type HoldingRow } from '@/lib/domain/portfolio';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/validation/money';
 import { monthBudgets } from '@/lib/queries/budgets';
@@ -59,7 +70,7 @@ import {
   type Params,
   paramReader,
 } from '@/lib/queries/money';
-import { defaultCompounding } from '@/lib/queries/settings';
+import { defaultCompounding, financialYearStartMonth } from '@/lib/queries/settings';
 import styles from './page.module.css';
 
 const color = (i: number) => `var(--c${(i % 8) + 1})`;
@@ -210,8 +221,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     tone: r.type === 'income' ? 'pos' : r.type === 'transfer' ? 'muted' : '',
   }));
 
+  /* ---------- returns over each period, for the two cards below ---------- */
+  const yearStart = await financialYearStartMonth();
+  const byPeriod = PERIODS.map((period) => {
+    const from = periodStart(period, asOf, yearStart);
+    return {
+      period,
+      from,
+      rows: period === 'since' ? sinceLastRows(rows) : periodRows(portfolioData(), from, asOf),
+    };
+  });
+
   /* ---------- returns by investment type ---------- */
-  const returnRows = (mode: 'since' | 'all'): Row[] =>
+  const returnRows = (mode: Period, periodRowsOf: PeriodRow[]): Row[] =>
     GROUPS.map((g) => {
       const own = rows.filter((r) => r.group === g.key);
       if (own.length === 0) {
@@ -226,6 +248,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         };
       }
       const gt = totals(own, asOf);
+      if (mode !== 'all' && mode !== 'since') {
+        const mine = periodRowsOf.filter((r) => r.row.group === g.key);
+        if (mine.length === 0) {
+          return { key: g.key, name: g.title, amount: 'Not held in this period', tone: 'muted' };
+        }
+        const pt = periodTotals(mine, asOf);
+        const pct = pt.absolute === null ? '—' : formatPercent(pt.absolute * 100);
+        return {
+          key: g.key,
+          name: g.title,
+          amount: `${formatINRSigned(pt.gain)} (${pct})`,
+          tone: gainClass(pt.gain),
+        };
+      }
       if (mode === 'all') {
         return {
           key: g.key,
@@ -246,17 +282,30 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     });
 
   /* ---------- gainers and losers ---------- */
-  const movers = rows
-    .filter((r) => !r.sold && r.sinceLast && r.sinceLast.change !== 0)
-    .map((r) => ({
-      id: r.asset.id,
-      name: r.asset.name,
-      group: r.group,
-      gain: r.sinceLast!.change,
-      percent: r.sinceLast!.previousValue
-        ? (r.sinceLast!.change / r.sinceLast!.previousValue) * 100
-        : 0,
-    }));
+  const movers = Object.fromEntries(
+    byPeriod.map(({ period, rows: periodRowsOf }) => [
+      period,
+      periodRowsOf
+        .filter((r) => !r.row.sold && r.gain !== 0)
+        .map((r) => ({
+          id: r.row.asset.id,
+          name: r.row.asset.name,
+          group: r.row.group,
+          gain: r.gain,
+          percent: (r.absolute ?? 0) * 100,
+        })),
+    ]),
+  );
+  const moverPeriods = byPeriod.map(({ period, from }) => ({
+    value: period,
+    label: PERIOD_LABELS[period],
+    sub:
+      period === 'since'
+        ? "Change since each holding's previous price"
+        : from
+          ? `Gain from ${formatDate(from)} to ${formatDate(asOf)}, after money added or taken out`
+          : 'Gain since each holding was bought',
+  }));
 
   return (
     <TransactionDrawerProvider
@@ -455,21 +504,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               label="Duration"
               title="Returns by investment type"
               span={4}
-              options={[
-                {
-                  value: 'since',
-                  label: 'Since last update',
-                  content: <Rows rows={returnRows('since')} />,
-                },
-                { value: 'all', label: 'All time', content: <Rows rows={returnRows('all')} /> },
-              ]}
+              options={byPeriod.map(({ period, rows: periodRowsOf }) => ({
+                value: period,
+                label: PERIOD_LABELS[period],
+                content: <Rows rows={returnRows(period, periodRowsOf)} />,
+              }))}
               footer={<MoreLink href="/investments">See all holdings</MoreLink>}
             />
 
             <MoversCard
               movers={movers}
-              groups={GROUPS.filter((g) => movers.some((m) => m.group === g.key))}
-              sub="Change since each holding's previous price"
+              periods={moverPeriods}
+              groups={GROUPS.filter((g) =>
+                Object.values(movers).some((list) => list.some((m) => m.group === g.key)),
+              )}
             />
 
             <Card

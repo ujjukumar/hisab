@@ -6,27 +6,43 @@ import { SelectField } from '@/components/Field/Field';
 import { GainLoseTiles, type Mover } from '@/components/GainLoseTiles/GainLoseTiles';
 import styles from './MoversCard.module.css';
 
-/** Top gainers and losers since each holding's previous price, filtered and sorted in the browser. */
+/** Top gainers and losers over a chosen period, filtered and sorted in the browser. */
 export function MoversCard({
   movers,
+  periods,
   groups,
-  sub,
 }: {
-  movers: (Mover & { group: string })[];
+  /** Movers for each period, keyed by the period's value. */
+  movers: Record<string, (Mover & { group: string })[]>;
+  /** The periods to choose from; the first is shown first. */
+  periods: { value: string; label: string; sub: string }[];
   /** The investment groups that have movers, for the filter. */
   groups: { key: string; title: string }[];
-  sub: string;
 }) {
+  const [period, setPeriod] = useState(periods[0]?.value ?? '');
   const [group, setGroup] = useState('');
   const [sort, setSort] = useState<'value' | 'percent'>('value');
   const key = sort === 'value' ? 'gain' : 'percent';
-  const pool = movers.filter((m) => !group || m.group === group);
+  const shown = periods.find((p) => p.value === period) ?? periods[0];
+  const pool = (movers[period] ?? []).filter((m) => !group || m.group === group);
   const gainers = pool.filter((m) => m.gain > 0).sort((a, b) => b[key] - a[key]);
   const losers = pool.filter((m) => m.gain < 0).sort((a, b) => a[key] - b[key]);
 
   return (
-    <Card title="Top gainers & losers" sub={sub} span={7}>
+    <Card title="Top gainers & losers" sub={shown?.sub} span={7}>
       <div className={styles.filters}>
+        <SelectField
+          id="movers-period"
+          label="Period"
+          value={period}
+          onChange={(event) => setPeriod(event.target.value)}
+        >
+          {periods.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </SelectField>
         <SelectField
           id="movers-group"
           label="Investment type"
