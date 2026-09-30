@@ -6,7 +6,7 @@
 export type IsoDate = string; // YYYY-MM-DD
 export type IsoMonth = string; // YYYY-MM
 
-const MONTH_NAMES = [
+export const MONTH_NAMES = [
   'January',
   'February',
   'March',

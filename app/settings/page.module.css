@@ -1,0 +1,32 @@
+.about {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 12px 24px;
+  margin: 14px 0 0;
+}
+
+.about dt {
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.about dd {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.about code {
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .about {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .about dd + dt {
+    margin-top: 12px;
+  }
+}

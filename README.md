@@ -83,25 +83,48 @@ Both serve on <http://127.0.0.1:3000>. Rebuild after pulling changes.
 
 ## Backup and restore
 
+Everything is in one file, so a backup is one file too. Keep a recent one
+somewhere other than this computer, such as a USB drive.
+
+**Back up.** In the app, go to Settings → Back up now. That saves a copy to
+`data/backups/finance-YYYYMMDD-HHmm.db` and downloads the same file. From a
+terminal, this does the same without the download:
+
 ```bash
 npm run backup
 ```
 
-This writes a consistent copy (`VACUUM INTO`) to
-`data/backups/finance-YYYYMMDD-HHmm.db`. It is safe to run while the app is
-open, and the result is a plain SQLite file you can copy anywhere.
+Both write a consistent copy (`VACUUM INTO`), so they are safe while the app is
+open. The result is a plain SQLite file you can copy anywhere.
 
-To restore, stop the app, then replace the live database with a backup:
+**Restore.** In the app, go to Settings → Restore from backup and choose a `.db`
+file. The app checks it first (it must be a Hisaab backup, undamaged, and not
+from a newer version) and changes nothing if it isn't. It then saves your
+current data as `…-pre-restore.db` and replaces everything with the backup's.
+Backups from an older version are brought up to date as they are restored.
+
+If the app won't start, restore by hand instead: stop it, delete
+`data/finance.db-wal` and `data/finance.db-shm` if they exist, and copy the
+backup over the live file:
 
 ```bash
 cp data/backups/finance-20260928-2130.db data/finance.db
 ```
 
-Delete any leftover `data/finance.db-wal` and `data/finance.db-shm` alongside it
-before starting up again.
+**Automatic backups.** The app also saves a backup in the same folder before it
+applies a pending migration (`…-pre-migrate.db`), before a restore
+(`…-pre-restore.db`) and before Settings → start fresh (`…-pre-reset.db`).
+Nothing deletes old backups; clear the folder out yourself now and then.
 
-The app also makes its own backup automatically, in the same folder, before it
-applies any pending migration.
+**Start fresh.** Settings → Remove sample data and start fresh deletes every
+row and puts back the default categories, after a backup. Type `DELETE` to
+confirm. `npm run reset -- --yes` does the same from a terminal, without the
+backup.
+
+**Export.** Settings → Export everything downloads a zip with one CSV per table.
+Amounts are in paise (divide by 100 for rupees). It is for your own analysis;
+use a backup, not the export, to move your data to another computer. Reports
+has its own Export CSV for the year on screen.
 
 ## Privacy
 

@@ -22,3 +22,67 @@
 .empty p {
   margin: 0;
 }
+
+.steps {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  counter-reset: step;
+}
+
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.steps h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  color: var(--heading);
+}
+
+.steps p {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.steps li.done h3 {
+  text-decoration: line-through;
+  color: var(--text-3);
+}
+
+.check {
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.check::before {
+  content: '✓ ';
+}
+
+@media (max-width: 560px) {
+  .steps li {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .steps li > :last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

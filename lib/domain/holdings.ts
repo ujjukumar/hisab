@@ -147,6 +147,16 @@ export function moneyMoved(t: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>): P
   return amount;
 }
 
+/** Money put into investments less money taken out: buys and deposits minus sells and withdrawals. */
+export function netInvested(txns: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>[]): Paise {
+  let net = 0;
+  for (const t of txns) {
+    if (t.action === 'buy' || t.action === 'deposit') net += moneyMoved(t)!;
+    if (t.action === 'sell' || t.action === 'withdrawal') net -= moneyMoved(t)!;
+  }
+  return net;
+}
+
 /** units × price in paise, rounded. Buy and sell amounts are stored this way. */
 export function unitsAmount(u: string | Decimal, price: string | Decimal): Paise {
   return new Decimal(u).times(price).times(100).round().toNumber();

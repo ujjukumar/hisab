@@ -44,11 +44,99 @@ function countAppliedMigrations(db: Database.Database): number {
   return (db.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get() as { n: number }).n;
 }
 
-function countPendingMigrations(db: Database.Database): number {
+function countKnownMigrations(): number {
   const journalPath = resolve(MIGRATIONS_FOLDER, 'meta/_journal.json');
   if (!existsSync(journalPath)) return 0;
-  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: unknown[] };
-  return Math.max(0, journal.entries.length - countAppliedMigrations(db));
+  return (JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: unknown[] }).entries.length;
+}
+
+function countPendingMigrations(db: Database.Database): number {
+  return Math.max(0, countKnownMigrations() - countAppliedMigrations(db));
+}
+
+/** Every app table, children before parents, so deleting in this order respects foreign keys. */
+export const TABLES = [
+  'transactions',
+  'investment_transactions',
+  'prices',
+  'valuations',
+  'budgets',
+  'assets',
+  'categories',
+  'accounts',
+  'settings',
+] as const;
+
+/** Delete every row and restart the ids. Call `ensureDefaults` afterwards. */
+export function wipeAll(sqlite: Database.Database): void {
+  sqlite.transaction(() => {
+    for (const table of TABLES) sqlite.prepare(`DELETE FROM ${table}`).run();
+    sqlite.prepare('DELETE FROM sqlite_sequence').run();
+  })();
+}
+
+/** A backup that can't be restored. The message is shown to the owner as is. */
+export class BackupError extends Error {}
+
+const NOT_A_BACKUP =
+  "That file isn't a Hisaab backup. Choose a .db file from the data/backups folder.";
+
+/**
+ * Check that a file is a readable Hisaab backup and bring it up to this version's tables.
+ * Changes the file, so pass a temporary copy.
+ */
+export function prepareBackup(file: string): void {
+  const header = readFileSync(file).subarray(0, 16).toString('latin1');
+  if (header !== 'SQLite format 3\0') throw new BackupError(NOT_A_BACKUP);
+  const backup = new Database(file);
+  try {
+    if (backup.pragma('integrity_check', { simple: true }) !== 'ok') {
+      throw new BackupError('That backup is damaged, so nothing was changed. Try an older one.');
+    }
+    const names = new Set(
+      (
+        backup.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as {
+          name: string;
+        }[]
+      ).map((r) => r.name),
+    );
+    if (!names.has('__drizzle_migrations') || !TABLES.every((t) => names.has(t))) {
+      throw new BackupError(NOT_A_BACKUP);
+    }
+    if (countAppliedMigrations(backup) > countKnownMigrations()) {
+      throw new BackupError(
+        'That backup is from a newer version of Hisaab. Update the app, then try again.',
+      );
+    }
+    migrate(drizzle(backup, { schema }), { migrationsFolder: MIGRATIONS_FOLDER });
+    if ((backup.pragma('foreign_key_check') as unknown[]).length > 0) {
+      throw new BackupError('That backup is damaged, so nothing was changed. Try an older one.');
+    }
+  } catch (error) {
+    if (error instanceof BackupError) throw error;
+    throw new BackupError(NOT_A_BACKUP);
+  } finally {
+    backup.close();
+  }
+}
+
+/** Replace every row with the rows of a prepared backup, all in one transaction. */
+export function restoreFrom(sqlite: Database.Database, file: string): void {
+  sqlite.prepare('ATTACH DATABASE ? AS backup').run(file);
+  try {
+    sqlite.transaction(() => {
+      // Tables are refilled parents first, but a link can point either way, so check keys at commit.
+      sqlite.pragma('defer_foreign_keys = ON');
+      for (const table of TABLES) sqlite.prepare(`DELETE FROM main.${table}`).run();
+      for (const table of [...TABLES].reverse()) {
+        sqlite.prepare(`INSERT INTO main.${table} SELECT * FROM backup.${table}`).run();
+      }
+      sqlite.prepare('DELETE FROM main.sqlite_sequence').run();
+      sqlite.prepare('INSERT INTO main.sqlite_sequence SELECT * FROM backup.sqlite_sequence').run();
+    })();
+  } finally {
+    sqlite.prepare('DETACH DATABASE backup').run();
+  }
 }
 
 export type Db = ReturnType<typeof drizzle<typeof schema>>;

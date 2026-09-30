@@ -53,11 +53,18 @@ type State =
   | { kind: 'asset'; id: number }
   | { kind: 'updates'; ids: number[] };
 
+type Compounding = (typeof COMPOUNDING)[number];
+
 type Choice = Pick<AccountRow, 'id' | 'name' | 'archived'>;
 
-const Context = createContext<{ open: (state: State) => void; options: AssetOption[] }>({
+const Context = createContext<{
+  open: (state: State) => void;
+  options: AssetOption[];
+  compounding: Compounding;
+}>({
   open: () => {},
   options: [],
+  compounding: 'quarterly',
 });
 
 const FORM = 'investment-form';
@@ -66,10 +73,13 @@ const FORM = 'investment-form';
 export function InvestmentDrawerProvider({
   options,
   accounts,
+  compounding,
   children,
 }: {
   options: AssetOption[];
   accounts: Choice[];
+  /** The Settings default for new fixed deposits. */
+  compounding: Compounding;
   children: ReactNode;
 }) {
   const [state, setState] = useState<(State & { key: number }) | null>(null);
@@ -90,7 +100,7 @@ export function InvestmentDrawerProvider({
           : ['Add investment transaction', 'Save transaction'];
 
   return (
-    <Context.Provider value={{ open, options }}>
+    <Context.Provider value={{ open, options, compounding }}>
       {children}
       <Drawer
         open={state !== null}
@@ -445,6 +455,7 @@ function AssetFields({
   describe,
   error,
 }: Plumbing & { asset?: AssetOption; type: AssetType; onType: (t: AssetType) => void }) {
+  const { compounding } = useContext(Context);
   const hasRate = type === 'fixed_deposit' || type === 'bond';
   const hasDates = hasRate || type === 'ppf';
   return (
@@ -512,7 +523,7 @@ function AssetFields({
             <SelectField
               label="Interest added"
               name="compounding"
-              defaultValue={asset?.compounding ?? 'quarterly'}
+              defaultValue={asset?.compounding ?? compounding}
               {...describe('compounding')}
             >
               {COMPOUNDING.map((c) => (

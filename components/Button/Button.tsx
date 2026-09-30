@@ -41,8 +41,9 @@ export function ButtonLink({
   icon,
   hideLabelOnMobile,
   download,
+  onClick,
   children,
-}: Props & { href: string; download?: boolean }) {
+}: Props & { href: string; download?: boolean; onClick?: () => void }) {
   const content = (
     <>
       {icon && <Icon name={icon} />}
@@ -54,7 +55,7 @@ export function ButtonLink({
       {content}
     </a>
   ) : (
-    <Link href={href} className={classes(variant, hideLabelOnMobile)}>
+    <Link href={href} className={classes(variant, hideLabelOnMobile)} onClick={onClick}>
       {content}
     </Link>
   );

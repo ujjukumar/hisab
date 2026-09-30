@@ -4,6 +4,7 @@ import {
   computeHolding,
   isSold,
   moneyMoved,
+  netInvested,
   OversellError,
   unitsAmount,
   type HoldingTxn,
@@ -172,5 +173,25 @@ describe('moneyMoved', () => {
   it('is zero for bonus units and null for a split', () => {
     expect(moneyMoved(trade('2026-01-01', 'buy', '10', '0'))).toBe(0);
     expect(moneyMoved(t('2026-01-01', 'split', { splitFrom: 1, splitTo: 5 }))).toBeNull();
+  });
+});
+
+describe('netInvested', () => {
+  it('counts buys and deposits in, sells and withdrawals out, and ignores income and splits', () => {
+    const txns = [
+      trade('2026-01-01', 'buy', '10', '100', 20),
+      t('2026-02-01', 'deposit', { amount: 5000 }),
+      trade('2026-03-01', 'sell', '4', '120', 10),
+      t('2026-04-01', 'withdrawal', { amount: 1000 }),
+      t('2026-05-01', 'dividend', { amount: 640 }),
+      t('2026-06-01', 'split', { splitFrom: 1, splitTo: 2 }),
+    ];
+    // ₹1,020 + ₹50 − (₹480 − ₹10) − ₹10.
+    expect(netInvested(txns)).toBe(102000 + 5000 - 47000 - 1000);
+  });
+
+  it('is zero with nothing, and negative when more came out than went in', () => {
+    expect(netInvested([])).toBe(0);
+    expect(netInvested([trade('2026-01-01', 'sell', '1', '500')])).toBe(-50000);
   });
 });

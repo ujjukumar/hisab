@@ -1,4 +1,4 @@
-import { ensureDefaults, loadEnv, openDatabase } from '../lib/db/connect.ts';
+import { ensureDefaults, loadEnv, openDatabase, wipeAll } from '../lib/db/connect.ts';
 
 /** Wipe every table and recreate the default categories. Requires --yes. */
 
@@ -9,25 +9,7 @@ if (!process.argv.includes('--yes')) {
 
 loadEnv();
 const { sqlite } = openDatabase();
-
-// Child tables first: foreign keys are on.
-const TABLES = [
-  'transactions',
-  'investment_transactions',
-  'prices',
-  'valuations',
-  'budgets',
-  'assets',
-  'categories',
-  'accounts',
-  'settings',
-];
-
-sqlite.transaction(() => {
-  for (const table of TABLES) sqlite.prepare(`DELETE FROM ${table}`).run();
-  sqlite.prepare(`DELETE FROM sqlite_sequence`).run();
-})();
-
+wipeAll(sqlite);
 ensureDefaults(sqlite);
 sqlite.close();
 console.log('All data removed. Default categories recreated.');

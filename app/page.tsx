@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { spentAndSaved } from '@/app/money/stats';
 import { BudgetBar } from '@/components/BudgetBar/BudgetBar';
-import { IconLink } from '@/components/Button/Button';
+import { ButtonLink, IconLink } from '@/components/Button/Button';
 import { Card, MoreLink } from '@/components/Card/Card';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutSplit, type Slice } from '@/components/charts/Donut';
@@ -59,6 +59,7 @@ import {
   type Params,
   paramReader,
 } from '@/lib/queries/money';
+import { defaultCompounding } from '@/lib/queries/settings';
 import styles from './page.module.css';
 
 const color = (i: number) => `var(--c${(i % 8) + 1})`;
@@ -88,6 +89,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const accounts = allAccounts.filter((a) => !a.archived);
   const rows = portfolio(asOf);
   const t = totals(rows, asOf);
+  const options = assetOptions();
+
+  /* ---------- get started, for a brand-new app ---------- */
+  const steps = [
+    {
+      title: 'Add an account',
+      text: 'Your bank accounts, cards and cash, each with its balance today.',
+      done: accounts.length > 0,
+      action: (
+        <ButtonLink href="/money/accounts" icon="plus">
+          Add account
+        </ButtonLink>
+      ),
+    },
+    {
+      title: 'Add a transaction',
+      text: 'Record what you spend and earn. Budgets and reports are built from these.',
+      done: allAccounts.some((a) => a.transactionCount > 0),
+      action: <AddTransactionButton />,
+    },
+    {
+      title: 'Add an investment',
+      text: 'Mutual funds, stocks, deposits, gold or anything else you hold.',
+      done: options.length > 0,
+      action: <AddInvestmentButton />,
+    },
+  ];
 
   /* ---------- income vs spending ---------- */
   const months = monthlyTotals(addMonths(month, -11), month);
@@ -192,7 +220,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           name: g.title,
           amount: (
             <span className="muted">
-              Not added · <AddInvestmentLink label={`Add ${g.title.toLowerCase()}`} />
+              Not added · <AddInvestmentLink label={`Add ${g.title}`} />
             </span>
           ),
         };
@@ -236,8 +264,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       categories={listCategories()}
     >
       <InvestmentDrawerProvider
-        options={assetOptions()}
+        options={options}
         accounts={allAccounts.map(({ id, name, archived }) => ({ id, name, archived }))}
+        compounding={await defaultCompounding()}
       >
         <PageHead
           title={monthLabel(month)}
@@ -285,6 +314,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <div className="wrap page-body">
           <div className="grid">
+            {steps.some((step) => !step.done) && (
+              <Card
+                span={12}
+                title="Get started"
+                sub="Three steps and the dashboard fills itself in. Everything stays on this computer."
+              >
+                <ol className={styles.steps}>
+                  {steps.map((step) => (
+                    <li key={step.title} className={step.done ? styles.done : undefined}>
+                      <div>
+                        <h3>{step.title}</h3>
+                        <p>{step.text}</p>
+                      </div>
+                      {step.done ? <span className={styles.check}>Done</span> : step.action}
+                    </li>
+                  ))}
+                </ol>
+                <p className="footnote">
+                  Moving from another computer?{' '}
+                  <Link className="linkish" href="/settings">
+                    Restore a backup in Settings
+                  </Link>
+                  .
+                </p>
+              </Card>
+            )}
             <SwitchCard
               id="cash-range"
               label="Time range"

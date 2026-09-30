@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
-import { Button } from '@/components/Button/Button';
+import { Button, ButtonLink } from '@/components/Button/Button';
 import { Drawer, FieldPair } from '@/components/Drawer/Drawer';
 import { AmountField, FieldError, SelectField, TextField } from '@/components/Field/Field';
 import { Menu } from '@/components/Menu/Menu';
@@ -46,6 +46,8 @@ export function TransactionDrawerProvider({
 }) {
   const [state, setState] = useState<{ mode: Mode; row?: TxnRow; key: number } | null>(null);
   const open: Open = (mode, row) => setState({ mode, row, key: Date.now() });
+  // A transaction needs an account, so a brand-new app sends the owner to add one first.
+  const needsAccount = state?.mode === 'add' && !accounts.some((a) => !a.archived);
 
   return (
     <DrawerContext.Provider value={open}>
@@ -59,21 +61,35 @@ export function TransactionDrawerProvider({
             <Button variant="secondary" onClick={() => setState(null)}>
               Cancel
             </Button>
-            <Button type="submit" form="transaction-form">
-              {state?.mode === 'edit' ? 'Save changes' : 'Save transaction'}
-            </Button>
+            {!needsAccount && (
+              <Button type="submit" form="transaction-form">
+                {state?.mode === 'edit' ? 'Save changes' : 'Save transaction'}
+              </Button>
+            )}
           </>
         }
       >
-        {state && (
-          <TransactionForm
-            key={state.key}
-            mode={state.mode}
-            row={state.row}
-            accounts={accounts}
-            categories={categories}
-            onDone={() => setState(null)}
-          />
+        {needsAccount ? (
+          <>
+            <p>
+              Every transaction comes from or goes to an account. Add your bank account, card or
+              cash first, with its balance today.
+            </p>
+            <ButtonLink href="/money/accounts" icon="plus" onClick={() => setState(null)}>
+              Add an account
+            </ButtonLink>
+          </>
+        ) : (
+          state && (
+            <TransactionForm
+              key={state.key}
+              mode={state.mode}
+              row={state.row}
+              accounts={accounts}
+              categories={categories}
+              onDone={() => setState(null)}
+            />
+          )
         )}
       </Drawer>
     </DrawerContext.Provider>

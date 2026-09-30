@@ -25,3 +25,8 @@ export function takeUndo(token: unknown): (() => void) | null {
   entries.delete(token as string);
   return entry.expires < Date.now() ? null : entry.restore;
 }
+
+/** Forget every pending undo, after a restore or reset replaces the rows they would put back. */
+export function clearUndo(): void {
+  entries.clear();
+}

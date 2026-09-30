@@ -1,9 +1,0 @@
-.placeholder p {
-  max-width: 54ch;
-  color: var(--text-2);
-  margin: 8px 0 22px;
-}
-
-.placeholder :global(.btn) {
-  align-self: flex-start;
-}
