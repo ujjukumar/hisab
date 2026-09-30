@@ -1,8 +1,10 @@
 import { Decimal } from 'decimal.js';
-import type { InvestmentAction } from '@/lib/db/schema';
+import type { InvestmentAction, transactions } from '@/lib/db/schema';
 import type { IsoDate } from './dates';
 import type { Paise } from './money';
 import type { CashFlow } from './xirr';
+
+type TransactionInsert = typeof transactions.$inferInsert;
 
 export type HoldingTxn = {
   id: number;
@@ -145,6 +147,22 @@ export function moneyMoved(t: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>): P
   if (t.action === 'buy' || t.action === 'deposit') return amount + t.fees;
   if (t.action === 'sell' || t.action === 'withdrawal') return amount - t.fees;
   return amount;
+}
+
+/** The Money row linked to an investment transaction (PLAN section 5): paid from, received in, or income. */
+export function linkedMoneyRow(
+  t: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>,
+  accountId: number,
+  categoryId: number | null,
+): Pick<TransactionInsert, 'type' | 'amount' | 'accountId' | 'toAccountId' | 'categoryId'> {
+  const amount = moneyMoved(t) ?? 0;
+  if (t.action === 'dividend' || t.action === 'interest') {
+    return { type: 'income', amount, accountId, toAccountId: null, categoryId };
+  }
+  const paid = t.action === 'buy' || t.action === 'deposit' || t.action === 'fee';
+  return paid
+    ? { type: 'transfer', amount, accountId, toAccountId: null, categoryId: null }
+    : { type: 'transfer', amount, accountId: null, toAccountId: accountId, categoryId: null };
 }
 
 /** Money put into investments less money taken out: buys and deposits minus sells and withdrawals. */

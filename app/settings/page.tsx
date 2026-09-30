@@ -57,6 +57,19 @@ export default async function SettingsPage() {
               </p>
             </SettingRow>
             <SettingRow
+              title="Import from Value Research"
+              control={
+                <ButtonLink variant="secondary" href="/investments/import">
+                  Import transactions
+                </ButtonLink>
+              }
+            >
+              <p>
+                Adds the fund, stock and ETF buys and sales from a Value Research transaction
+                history (.xls). You check what it adds before anything changes.
+              </p>
+            </SettingRow>
+            <SettingRow
               title="Export everything as CSV"
               control={
                 <ButtonLink variant="secondary" icon="download" download href="/api/export/all">

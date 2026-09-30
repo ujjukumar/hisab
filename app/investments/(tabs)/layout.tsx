@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ButtonLink } from '@/components/Button/Button';
 import { AddInvestmentButton } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { PageHead } from '@/components/PageHead/PageHead';
 import { Tabs } from '@/components/Tabs/Tabs';
@@ -23,7 +24,14 @@ export default function InvestmentTabsLayout({ children }: { children: ReactNode
     <>
       <PageHead
         title="Investments"
-        actions={<AddInvestmentButton />}
+        actions={
+          <>
+            <ButtonLink variant="secondary" href="/investments/import">
+              Import
+            </ButtonLink>
+            <AddInvestmentButton />
+          </>
+        }
         statsVariant="three"
         stats={[
           {

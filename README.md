@@ -113,7 +113,8 @@ cp data/backups/finance-20260928-2130.db data/finance.db
 
 **Automatic backups.** The app also saves a backup in the same folder before it
 applies a pending migration (`…-pre-migrate.db`), before a restore
-(`…-pre-restore.db`) and before Settings → start fresh (`…-pre-reset.db`).
+(`…-pre-restore.db`), before an import (`…-pre-import.db`) and before Settings →
+start fresh (`…-pre-reset.db`).
 Nothing deletes old backups; clear the folder out yourself now and then.
 
 **Start fresh.** Settings → Remove sample data and start fresh deletes every
@@ -125,6 +126,26 @@ backup.
 Amounts are in paise (divide by 100 for rupees). It is for your own analysis;
 use a backup, not the export, to move your data to another computer. Reports
 has its own Export CSV for the year on screen.
+
+## Importing from Value Research
+
+Investments → Import (or Settings → Import from Value Research) reads the
+Transaction History that Value Research downloads as Excel (`.xls`). Choose
+All-time as the period.
+
+1. Choose the file and select **Check file**. Nothing changes yet. You see how
+   many transactions will be added, which rows can't be imported and why, and
+   each fund or stock in the file.
+2. For each new one, pick **New investment** or an investment you already
+   entered by hand, and check the asset class.
+3. Optionally choose an account under **Record in Money** to add each buy and
+   sale as a transfer from or to it.
+4. Select **Import**.
+
+Funds and stocks are matched by ISIN, and transactions already in Hisaab are
+skipped, so you can import a fresh All-time file whenever you like and only
+the new rows are added. A backup is saved first as `…-pre-import.db`; restore
+it from Settings to undo an import.
 
 ## Privacy
 

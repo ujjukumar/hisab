@@ -233,6 +233,13 @@ export default async function OverviewPage({
                   what it&apos;s worth.
                 </p>
                 <AddInvestmentButton />
+                <p>
+                  Or{' '}
+                  <Link className="linkish" href="/investments/import">
+                    import your Value Research transaction history
+                  </Link>
+                  .
+                </p>
               </>
             }
           />

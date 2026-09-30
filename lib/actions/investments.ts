@@ -15,16 +15,11 @@ import {
 } from '@/lib/db/schema';
 import { ACTION_LABELS, actionsFor } from '@/lib/domain/assets';
 import { isValidDate, today } from '@/lib/domain/dates';
-import { computeHolding, isSold, moneyMoved } from '@/lib/domain/holdings';
+import { computeHolding, isSold, linkedMoneyRow } from '@/lib/domain/holdings';
 import { parsePaise } from '@/lib/domain/money';
 import { unitsProblem } from '@/lib/queries/investments';
 import { keepForUndo, takeUndo } from '@/lib/undo';
-import {
-  assetSchema,
-  investmentTxnSchema,
-  parseDecimal,
-  type InvestmentTxnInput,
-} from '@/lib/validation/investments';
+import { assetSchema, investmentTxnSchema, parseDecimal } from '@/lib/validation/investments';
 import { failed, idSchema, invalid, type ActionResult } from '@/lib/validation/money';
 
 function revalidate() {
@@ -38,23 +33,6 @@ const now = () => new Date().toISOString();
 const GONE = 'That investment no longer exists.';
 
 /* ---------- investment transactions ---------- */
-
-type Linked = Pick<
-  typeof transactions.$inferInsert,
-  'type' | 'amount' | 'accountId' | 'toAccountId' | 'categoryId'
->;
-
-/** The linked Money row (PLAN section 5): paid from, received in, or income for dividends and interest. */
-function linkedFields(t: InvestmentTxnInput, accountId: number, categoryId: number | null): Linked {
-  const amount = moneyMoved(t) ?? 0;
-  if (t.action === 'dividend' || t.action === 'interest') {
-    return { type: 'income', amount, accountId, toAccountId: null, categoryId };
-  }
-  const paid = t.action === 'buy' || t.action === 'deposit' || t.action === 'fee';
-  return paid
-    ? { type: 'transfer', amount, accountId, toAccountId: null, categoryId: null }
-    : { type: 'transfer', amount, accountId: null, toAccountId: accountId, categoryId: null };
-}
 
 /** Add an investment transaction (id null) or change one. `assetId=new` creates the investment too. */
 export async function saveInvestmentTxn(
@@ -166,7 +144,7 @@ export async function saveInvestmentTxn(
     if (!t.accountId) {
       if (linked) tx.delete(transactions).where(eq(transactions.id, linked.id)).run();
     } else {
-      const row = { ...linkedFields(t, t.accountId, categoryId), date: t.date };
+      const row = { ...linkedMoneyRow(t, t.accountId, categoryId), date: t.date };
       const description = `${ACTION_LABELS[t.action]}, ${assetName}`;
       if (linked) {
         // Keep the owner's wording unless the action changed.

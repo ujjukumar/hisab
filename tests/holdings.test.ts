@@ -3,6 +3,7 @@ import {
   byDateThenId,
   computeHolding,
   isSold,
+  linkedMoneyRow,
   moneyMoved,
   netInvested,
   OversellError,
@@ -173,6 +174,39 @@ describe('moneyMoved', () => {
   it('is zero for bonus units and null for a split', () => {
     expect(moneyMoved(trade('2026-01-01', 'buy', '10', '0'))).toBe(0);
     expect(moneyMoved(t('2026-01-01', 'split', { splitFrom: 1, splitTo: 5 }))).toBeNull();
+  });
+});
+
+describe('linkedMoneyRow', () => {
+  it('pays buys, deposits and fees from the account and puts sale money into it', () => {
+    expect(linkedMoneyRow(trade('2026-01-01', 'buy', '10', '100', 20), 3, null)).toEqual({
+      type: 'transfer',
+      amount: 102000,
+      accountId: 3,
+      toAccountId: null,
+      categoryId: null,
+    });
+    expect(linkedMoneyRow(t('2026-01-01', 'fee', { amount: 500 }), 3, null)).toMatchObject({
+      accountId: 3,
+      toAccountId: null,
+    });
+    expect(linkedMoneyRow(trade('2026-01-01', 'sell', '10', '100', 20), 3, null)).toEqual({
+      type: 'transfer',
+      amount: 98000,
+      accountId: null,
+      toAccountId: 3,
+      categoryId: null,
+    });
+  });
+
+  it('records dividends and interest as income in the category', () => {
+    expect(linkedMoneyRow(t('2026-01-01', 'dividend', { amount: 640 }), 3, 9)).toEqual({
+      type: 'income',
+      amount: 640,
+      accountId: 3,
+      toAccountId: null,
+      categoryId: 9,
+    });
   });
 });
 

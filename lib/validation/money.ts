@@ -7,8 +7,10 @@ export type ActionResult =
   | { ok: true; id?: number; undo?: string }
   | { ok: false; message: string; fieldErrors: Record<string, string> };
 
+export type ActionFailure = Extract<ActionResult, { ok: false }>;
+
 /** Turn a Zod error into the result shape: the first message per field. */
-export function invalid(error: z.ZodError): ActionResult {
+export function invalid(error: z.ZodError): ActionFailure {
   const fieldErrors: Record<string, string> = {};
   for (const issue of error.issues) {
     const key = String(issue.path[0] ?? '');
@@ -21,7 +23,7 @@ export function invalid(error: z.ZodError): ActionResult {
   };
 }
 
-export function failed(message: string, field?: string): ActionResult {
+export function failed(message: string, field?: string): ActionFailure {
   return { ok: false, message, fieldErrors: field ? { [field]: message } : {} };
 }
 
