@@ -8,9 +8,10 @@ import {
   parseAmfiNav,
   parseBhavcopy,
   pastPriceNeeds,
+  pendingPriceNeeds,
   pricesFor,
 } from '@/lib/domain/priceFeeds';
-import { amfiFor, nseLatest } from '@/lib/feeds';
+import { amfiFor, bseLatest, nseLatest } from '@/lib/feeds';
 
 vi.mock('server-only', () => ({}));
 
@@ -99,6 +100,22 @@ describe('parseBhavcopy', () => {
     });
   });
 
+  it('reads BSE UDiFF and prefers A even when a quoted name contains commas', () => {
+    const csv = [
+      'TradDt,Src,ISIN,FinInstrmNm,SctySrs,ClsPric',
+      '2024-07-08,BSE,INE000KP0011,"Company, Inc",T,12.4',
+      '2024-07-08,BSE,INE000KP0011,"Company, Inc",A,12.5',
+    ].join('\n');
+    expect(parseBhavcopy(csv).get('INE000KP0011')).toEqual({ date: '2024-07-08', price: '12.5' });
+  });
+
+  it('reads the older BSE equity file with ISIN and trading date', () => {
+    expect(parseBhavcopy([
+      'SC_CODE,SC_NAME,SC_GROUP,CLOSE,ISIN_CODE,TRADING_DATE',
+      '500001,"Example, Ltd",A,100.50,INE000KP0011,05-Jul-24',
+    ].join('\n')).get('INE000KP0011')).toEqual({ date: '2024-07-05', price: '100.5' });
+  });
+
   it('returns nothing without the columns it needs', () => {
     expect(parseBhavcopy('Symbol,Close\nKAVERI,10').size).toBe(0);
   });
@@ -135,6 +152,53 @@ describe('historical downloads', () => {
     });
     expect(await nseLatest('2024-04-02', 1)).toEqual(new Map());
     expect(requests).toHaveLength(2);
+  });
+
+  it('treats a week without either market file as missing data, not a stopped backfill', async () => {
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      requests.push(String(url));
+      return new Response('', { status: 404 });
+    });
+    expect(await nseLatest('2024-07-07', 7)).toEqual(new Map());
+    expect(await bseLatest('2024-07-07', 7)).toEqual(new Map());
+    expect(requests.every((url) => !url.includes('INE000KP0011'))).toBe(true);
+  });
+
+  it('downloads BSE market files without ISINs in the URL across the format boundary', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(String(url));
+      return new Response(urls.length === 1
+        ? 'TradDt,Src,ISIN,SctySrs,ClsPric\n2024-07-08,BSE,INE000KP0011,A,50'
+        : 'ISIN_CODE,SC_GROUP,CLOSE,TRADING_DATE\nINE000KP0011,A,45,05-Jul-24');
+    });
+    expect((await bseLatest('2024-07-08', 1)).get('INE000KP0011')?.price).toBe('50');
+    expect((await bseLatest('2024-07-05', 1)).get('INE000KP0011')?.price).toBe('45');
+    expect(urls).toEqual([
+      'https://www.bseindia.com/download/BhavCopy/Equity/BhavCopy_BSE_CM_0_0_0_20240708_F_0000.CSV',
+      'https://www.bseindia.com/download/BhavCopy/Equity/EQ_ISINCODE_050724.CSV',
+    ]);
+  });
+
+  it('skips BSE HTML sent with status 200 for unpublished dates, including during weekly lookback', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(String(url));
+      return new Response(String(url).includes('20260930')
+        ? 'TradDt,Src,ISIN,SctySrs,ClsPric\n2026-09-30,BSE,INE000KP0011,A,50'
+        : '<!DOCTYPE html><html><title>Archive unavailable</title></html>', { status: 200 });
+    });
+    expect(await bseLatest('2026-10-01', 1)).toEqual(new Map());
+    expect((await bseLatest('2026-10-01', 7)).get('INE000KP0011')).toEqual({
+      date: '2026-09-30', price: '50',
+    });
+    expect(urls).toHaveLength(3);
+  });
+
+  it('still rejects a non-HTML BSE file with invalid columns', async () => {
+    vi.stubGlobal('fetch', async () => new Response('not,a,bhavcopy\n1,2,3', { status: 200 }));
+    await expect(bseLatest('2026-09-30', 1)).rejects.toThrow("BSE's closing prices couldn't be read");
   });
 });
 
@@ -274,6 +338,25 @@ describe('pastPriceNeeds', () => {
       .map((need) => need.date);
     expect(weekly('2024-04-30')).toEqual(weekly('2024-05-01'));
     expect(weekly('2024-05-01').slice(-2)).toEqual(['2024-03-10', '2024-03-17']);
+  });
+
+  it('rechecks newly linked investments without retrying earlier failed prices in the same run', () => {
+    const first: PortfolioData = {
+      assets: [asset(1, 'mutual_fund', 'INF000MF0012')],
+      txns: [trade(1, 1, '2024-04-01', 'buy', '1')],
+      prices: [],
+      valuations: [],
+    };
+    const date = '2024-04-02';
+    const attempted = new Set([`${date}:daily:1`]);
+    expect(pendingPriceNeeds(first, date, attempted).find((n) => n.date === date)).toBeUndefined();
+    const added: PortfolioData = {
+      ...first,
+      assets: [...first.assets, asset(2, 'stock', 'INE000KP0011')],
+      txns: [...first.txns, trade(2, 2, '2024-04-01', 'buy', '1')],
+    };
+    expect(pendingPriceNeeds(added, date, attempted).find((n) => n.date === date)?.linked.map((a) => a.id))
+      .toEqual([2]);
   });
 
   it('skips weekly dates with a nearby price and assets after they are sold', () => {

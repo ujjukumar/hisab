@@ -5,7 +5,7 @@ import { computeHolding } from './holdings';
 import type { PortfolioData } from './portfolio';
 import { parseVrDate } from './valueResearch';
 
-/** Reads AMFI's NAV files and NSE's bhavcopy into prices by ISIN (PLAN section 11, phase 8). */
+/** Reads AMFI NAVs and NSE/BSE bhavcopy into prices by ISIN (PLAN section 11, phase 8). */
 
 export type FeedPrice = { date: IsoDate; price: string };
 export type PriceMap = Map<string, FeedPrice>;
@@ -50,34 +50,53 @@ export function parseAmfiNav(text: string): PriceMap {
 }
 
 /**
- * NSE's cash-market bhavcopy CSV, in either format: UDiFF (from 2024: `ISIN`, `ClsPric`,
- * `TradDt`, `SctySrs`) or the older one (`ISIN`, `CLOSE`, `TIMESTAMP`, `SERIES`).
- * An ISIN listed in several series keeps its `EQ` close, otherwise the first one.
+ * NSE cash-market UDiFF and older CSV; BSE cash-market UDiFF and Equity-with-ISIN CSV.
+ * An ISIN listed in several series keeps NSE's `EQ` or BSE's `A` close.
  */
 export function parseBhavcopy(csv: string): PriceMap {
   const out: PriceMap = new Map();
   const eq = new Set<string>();
   const [head = '', ...lines] = csv.split(/\r?\n/);
-  const names = head.split(',').map((h) => h.trim().toUpperCase());
+  const names = csvCells(head).map((h) => h.trim().toUpperCase());
   const col = (...want: string[]) => names.findIndex((n) => want.includes(n));
-  const isinAt = col('ISIN');
+  const isinAt = col('ISIN', 'ISIN_CODE');
   const closeAt = col('CLSPRIC', 'CLOSE');
-  const dateAt = col('TRADDT', 'TIMESTAMP');
-  const seriesAt = col('SCTYSRS', 'SERIES');
+  const dateAt = col('TRADDT', 'TIMESTAMP', 'TRADING_DATE');
+  const seriesAt = col('SCTYSRS', 'SERIES', 'SC_GROUP');
+  const sourceAt = col('SRC');
   if (isinAt < 0 || closeAt < 0 || dateAt < 0) return out;
 
   for (const line of lines) {
-    const cells = line.split(',').map((c) => c.trim());
+    const cells = csvCells(line).map((c) => c.trim());
     const isin = (cells[isinAt] ?? '').toUpperCase();
     const p = price(cells[closeAt]);
     const raw = cells[dateAt] ?? '';
     const date = isValidDate(raw) ? raw : parseVrDate(raw);
     if (!ISIN_RE.test(isin) || !p || !date || eq.has(isin)) continue;
-    const isEq = cells[seriesAt]?.toUpperCase() === 'EQ';
+    const preferred = names.includes('SC_GROUP') || cells[sourceAt]?.toUpperCase() === 'BSE' ? 'A' : 'EQ';
+    const isEq = cells[seriesAt]?.toUpperCase() === preferred;
     if (isEq) eq.add(isin);
     if (isEq || !out.has(isin)) out.set(isin, { date, price: p });
   }
   return out;
+}
+
+function csvCells(line: string): string[] {
+  const cells: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') { value += '"'; index++; }
+      else quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      cells.push(value);
+      value = '';
+    } else value += char;
+  }
+  cells.push(value);
+  return cells;
 }
 
 /** Automatic prices are checked at most once a calendar day. */
@@ -159,5 +178,20 @@ export function pastPriceNeeds(data: PortfolioData, asOf: IsoDate): PriceNeed[] 
       return !(priceDates.get(a.id) ?? []).some((d) => d >= from && d <= date);
     });
     return missing.length ? [{ date, linked: missing, cadence }] : [];
+  });
+}
+
+export function priceWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, assetId: number): string {
+  return `${need.date}:${need.cadence}:${assetId}`;
+}
+
+export function pendingPriceNeeds(
+  data: PortfolioData,
+  asOf: IsoDate,
+  attempted: ReadonlySet<string>,
+): PriceNeed[] {
+  return pastPriceNeeds(data, asOf).flatMap((need) => {
+    const linked = need.linked.filter((asset) => !attempted.has(priceWorkKey(need, asset.id)));
+    return linked.length ? [{ ...need, linked }] : [];
   });
 }

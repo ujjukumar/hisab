@@ -9,8 +9,9 @@ import {
 } from '@/components/DataTable/DataTable';
 import {
   AddInvestmentButton,
+  FetchPricesButton,
   HoldingRowMenu,
-  UpdatePricesButton,
+  UpdateValuesButton,
 } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { SubTabs } from '@/components/SubTabs/SubTabs';
 import { ASSET_TYPE_LABELS, GROUPS, maskRef } from '@/lib/domain/assets';
@@ -273,16 +274,21 @@ export default async function OverviewPage({
               const groupIds = new Set(groupRows.map((r) => r.asset.id));
               const groupChange = periodTotals(changes.filter((r) => groupIds.has(r.row.asset.id)), date);
               const updatable = groupRows.filter((r) => !r.sold && r.asset.valuation !== 'fd');
-              const pricesOnly = updatable.every((r) => r.asset.valuation === 'units');
+              const priced = updatable.filter((r) => r.asset.valuation === 'units');
+              const manual = updatable.filter((r) => r.asset.valuation === 'manual');
               return (
                 <DataTable
                   key={g.key}
                   title={`${g.title} (${groupRows.length})`}
                   actions={
                     <>
-                      <UpdatePricesButton
-                        ids={updatable.map((r) => r.asset.id)}
-                        label={`${pricesOnly ? 'Update prices' : 'Update values'} for ${g.title}`}
+                      <FetchPricesButton
+                        ids={priced.map((r) => r.asset.id)}
+                        label={`Fetch prices for ${g.title}`}
+                      />
+                      <UpdateValuesButton
+                        ids={manual.map((r) => r.asset.id)}
+                        label={`Update values for ${g.title}`}
                       />
                       <IconLink
                         icon="download"

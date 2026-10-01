@@ -106,12 +106,12 @@ export default async function SettingsPage() {
 
           <Card
             title="Prices"
-            sub="Only AMFI's and NSE's public price files are downloaded. Nothing about your investments is sent."
+            sub="Only AMFI's, NSE's and BSE's public whole-market files are downloaded. Nothing about your investments is sent."
           >
             <SettingRow title="Automatic prices" control={<AutoPricesSwitch on={auto} />}>
               <p>
                 Once a day, when the app opens, funds get their latest NAV from AMFI and stocks and
-                ETFs their closing price from NSE. It works for investments whose symbol is an ISIN.
+                ETFs their closing price from NSE, or BSE if NSE has no price. It works for investments whose symbol is an ISIN.
                 Prices you enter or import are never replaced.
               </p>
             </SettingRow>
@@ -121,7 +121,9 @@ export default async function SettingsPage() {
             <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
               <p>
                 Fetches daily prices for the last 30 days and weekly prices before that, back to
-                your first purchase. Existing prices are skipped. You can stop and carry on later.
+                your first purchase. Existing prices are skipped. Progress and Stop stay available on every page.
+                An unfinished run resumes when the app reopens; it cannot fetch while the app is closed.
+                Run it again to retry missing dates or newly linked investments.
               </p>
             </SettingRow>
           </Card>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/Icon/Icon';
+import { PriceJobProgress } from '@/components/Prices/Prices';
 import styles from './TopBar.module.css';
 
 const NAV = [
@@ -45,6 +46,7 @@ export function TopBar({ sampleData = false }: { sampleData?: boolean }) {
           </span>
         </div>
       </div>
+      <PriceJobProgress />
     </header>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { PriceRefresher } from '@/components/Prices/Prices';
+import { PriceJobProvider, PriceRefresher } from '@/components/Prices/Prices';
 import { TopBar } from '@/components/TopBar/TopBar';
 import { ToastProvider } from '@/components/Toast/Toast';
 import { isSampleData } from '@/lib/queries/settings';
@@ -30,9 +30,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en-IN" className={fontClassNames}>
       <body>
         <ToastProvider>
-          <TopBar sampleData={sampleData} />
-          <main>{children}</main>
-          <PriceRefresher />
+          <PriceJobProvider>
+            <TopBar sampleData={sampleData} />
+            <main>{children}</main>
+            <PriceRefresher />
+          </PriceJobProvider>
         </ToastProvider>
       </body>
     </html>

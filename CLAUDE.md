@@ -26,7 +26,7 @@ relative imports inside them need explicit `.ts` extensions.
 - Always bind to `127.0.0.1`, never `0.0.0.0`, so other devices on the network can't reach the app.
 - Next.js telemetry is off: `NEXT_TELEMETRY_DISABLED=1` in `.env`, plus `npx next telemetry disable`.
 - `.gitignore` covers `data/`, `*.db`, `*.db-wal`, `*.db-shm`, `.env*`.
-- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
+- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's and BSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
 - The database path comes from `DATABASE_PATH` (default `./data/finance.db`). Create the folder if it's missing.
 - Node.js 24+ supplies SQLite through `node:sqlite`; use Drizzle's `node-sqlite` driver. Drizzle ORM and Kit are pinned to matching 1.0 RC versions. Back up an existing database before upgrading legacy migration history, even when no schema SQL is pending.
 - **Never commit anything in `data/`. Never use real personal financial data anywhere in the repo** — not in seed files, fixtures, tests, screenshots or commit messages. All sample data is invented.

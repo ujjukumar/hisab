@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { applyFeedPrices } from '@/lib/actions/applyPrices';
+import { fetchAndSave } from '@/lib/actions/priceDownloads';
 import { db } from '@/lib/db/client';
 import { settings } from '@/lib/db/schema';
 import { isValidDate, today, type IsoDate } from '@/lib/domain/dates';
@@ -11,11 +11,8 @@ import {
   isDue,
   LOOK_BACK_DAYS,
   pastPriceNeeds,
-  pricesFor,
-  type FeedAsset,
-  type PriceMap,
 } from '@/lib/domain/priceFeeds';
-import { FeedError, amfiFor, amfiLatest, nseLatest } from '@/lib/feeds';
+import { amfiFor, amfiLatest } from '@/lib/feeds';
 import { portfolio, portfolioData } from '@/lib/queries/investments';
 import { autoPrices, priceUpdate, type PriceUpdate } from '@/lib/queries/settings';
 import { failed, invalid, type ActionFailure } from '@/lib/validation/money';
@@ -37,45 +34,6 @@ function saveSetting(key: string, value: string) {
       set: { value, updatedAt: new Date().toISOString() },
     })
     .run();
-}
-
-/**
- * Download the files `linked` needs, save their prices and collect what went wrong.
- * One source failing doesn't stop the other.
- */
-async function fetchAndSave(
-  linked: FeedAsset[],
-  date: IsoDate,
-  funds: (isins: string[]) => Promise<PriceMap>,
-  lookBackDays = LOOK_BACK_DAYS,
-): Promise<{ updated: number; problems: string[] }> {
-  const amfi = linked.filter((a) => a.feed === 'amfi');
-  const nse = linked.filter((a) => a.feed === 'nse');
-  const none: PriceMap = new Map();
-  const got = await Promise.allSettled([
-    amfi.length ? funds(amfi.map((a) => a.isin)) : none,
-    nse.length ? nseLatest(date, lookBackDays) : none,
-  ]);
-  const problems: string[] = [];
-  const rows = [amfi, nse].flatMap((group, i) => {
-    const result = got[i];
-    if (!result || group.length === 0) return [];
-    if (result.status === 'rejected') {
-      if (!(result.reason instanceof FeedError)) throw result.reason;
-      problems.push(result.reason.message);
-      return [];
-    }
-    const found = pricesFor(group, result.value);
-    const lacking = group.length - found.length;
-    if (lacking > 0 && !(lookBackDays === 1 && result.value.size === 0)) {
-      const source = i === 0 ? 'AMFI' : 'NSE';
-      problems.push(
-        `${source} had no price for ${lacking === 1 ? '1 investment' : `${lacking} investments`}. Check the ISIN in each one.`,
-      );
-    }
-    return found;
-  });
-  return { updated: rows.length ? applyFeedPrices(db, rows) : 0, problems };
 }
 
 // Two tabs opening at once share one download instead of fetching twice.
@@ -126,6 +84,28 @@ export async function refreshPrices(force: boolean): Promise<PriceResult | null>
   return running;
 }
 
+const investmentIds = z.array(z.number().int().positive()).min(1).max(500);
+
+export async function fetchInvestmentPrices(ids: number[]): Promise<PriceResult> {
+  const parsed = investmentIds.safeParse(ids);
+  if (!parsed.success) return invalid(parsed.error);
+  const selected = new Set(parsed.data);
+  const held = new Set(
+    portfolio()
+      .filter((row) => !row.sold && selected.has(row.asset.id))
+      .map((row) => row.asset.id),
+  );
+  const linked = feedAssets(portfolioData().assets).filter((asset) => held.has(asset.id));
+  if (!linked.length) return failed('Add a valid ISIN to this investment to fetch its price.');
+
+  const { updated, problems } = await fetchAndSave(linked, today(), () => amfiLatest());
+  revalidate();
+  if (problems.length) return failed(problems.join(' '));
+  return updated
+    ? { ok: true, updated }
+    : failed('No new prices were found. Try again after the market closes.');
+}
+
 export async function setAutoPrices(on: boolean): Promise<PriceResult> {
   const parsed = z.boolean().safeParse(on);
   if (!parsed.success) return invalid(parsed.error);
@@ -137,9 +117,8 @@ export async function setAutoPrices(on: boolean): Promise<PriceResult> {
 const pastSchema = z.string().refine(isValidDate, 'Choose a valid date.');
 
 /**
- * Fill in one daily or weekly price target for "Fetch past prices". The page calls this once
- * per date so the owner sees progress and can stop; a date already filled is skipped.
- * ponytail: an ISIN AMFI or NSE never lists keeps its date on the list.
+ * Fill one daily or weekly target for older Settings clients. The background job now owns
+ * the scheduled loop and progress; a date already filled is skipped.
  */
 export async function fetchPastPrices(date: string): Promise<PriceResult> {
   const parsed = pastSchema.safeParse(date);

@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button/Button';
 import { useToast } from '@/components/Toast/Toast';
-import { fetchPastPrices, refreshPrices, setAutoPrices } from '@/lib/actions/prices';
+import { priceJobStatus, startPriceJob, stopPriceJob } from '@/lib/actions/priceJob';
+import type { PriceJobStatus } from '@/lib/actions/priceJobStore';
+import { refreshPrices, setAutoPrices } from '@/lib/actions/prices';
 import type { IsoDate } from '@/lib/domain/dates';
 import { formatDate } from '@/lib/domain/format';
 import styles from './Prices.module.css';
@@ -83,70 +86,123 @@ export function AutoPricesSwitch({ on }: { on: boolean }) {
 
 export type PastDate = { date: IsoDate; funds: boolean; listed: boolean; cadence: 'daily' | 'weekly' };
 
-// Measured in September 2026: one day of AMFI NAVs is about 0.3 MB compressed, NSE's about 0.2 MB.
+// Measured in September 2026: AMFI ~0.3 MB, NSE ~0.2 MB, BSE ~0.9 MB per day.
 const size = (dates: PastDate[]) =>
   dates.reduce(
-    (mb, d) => mb + ((d.funds ? 0.3 : 0) + (d.listed ? 0.2 : 0)) * (d.cadence === 'weekly' ? 7 : 1),
+    (mb, d) => mb + ((d.funds ? 0.3 : 0) + (d.listed ? 1.1 : 0)) * (d.cadence === 'weekly' ? 7 : 1),
     0,
   );
 
-/** "Fetch past prices": one scheduled date at a time, with progress and a way to stop. */
-export function PastPrices({ dates }: { dates: PastDate[] }) {
-  const toast = useToast();
-  const [progress, setProgress] = useState<{ date: string; at: number; total: number } | null>(
-    null,
-  );
-  const stop = useRef(false);
-  // When the last date is filled the button goes away, so focus moves to the message instead.
-  const [ran, setRan] = useState(false);
-  const doneRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (ran && dates.length === 0) doneRef.current?.focus();
-  }, [ran, dates.length]);
+type JobContextValue = {
+  status: PriceJobStatus | null;
+  busy: boolean;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+};
 
-  async function run() {
-    const list = dates;
-    stop.current = false;
-    let saved = 0;
-    let problem = '';
-    for (const [i, d] of list.entries()) {
-      if (stop.current) break;
-      setProgress({ date: formatDate(d.date), at: i + 1, total: list.length });
+const JobContext = createContext<JobContextValue | null>(null);
+
+export function PriceJobProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [status, setStatus] = useState<PriceJobStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const previous = useRef<PriceJobStatus | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function poll() {
       try {
-        const r = await fetchPastPrices(d.date);
-        if (r.ok) saved += r.updated;
-        else problem = r.message;
+        const next = await priceJobStatus();
+        if (!mounted) return;
+        const last = previous.current;
+        previous.current = next;
+        setStatus(next);
+        if (last && (last.state === 'running' || last.state === 'stopping') &&
+          next?.state !== 'running' && next?.state !== 'stopping') {
+          router.refresh();
+          toast(next?.state === 'failed' ? next.message : next?.state === 'stopped' ? 'Past prices stopped' : 'Past prices fetched');
+        }
       } catch {
-        problem = "Past prices couldn't be saved. Try again.";
-        break;
+        // The next poll will retry once the local server responds.
       }
     }
-    setProgress(null);
-    setRan(true);
-    toast(problem || (saved > 0 ? 'Past prices fetched' : 'No past prices were found'));
+    void poll();
+    const timer = setInterval(() => void poll(), 2500);
+    return () => { mounted = false; clearInterval(timer); };
+  }, [router, toast]);
+
+  async function start() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setStatus(await startPriceJob());
+    } catch {
+      toast("Past prices couldn't be started. Try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (dates.length === 0 && !progress) {
+  async function stop() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setStatus(await stopPriceJob());
+    } catch {
+      toast("Past prices couldn't be stopped. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <JobContext.Provider value={{ status, busy, start, stop }}>{children}</JobContext.Provider>;
+}
+
+function usePriceJob() {
+  const job = useContext(JobContext);
+  if (!job) throw new Error('PriceJobProvider is missing');
+  return job;
+}
+
+export function PriceJobProgress() {
+  const { status, busy, stop } = usePriceJob();
+  if (!status || (status.state !== 'running' && status.state !== 'stopping')) return null;
+  return (
+    <div className={styles.progress} role="status" aria-live="polite">
+      <div className={`wrap ${styles.progressInner}`}>
+        <span>{status.state === 'stopping' ? 'Stopping past prices…' :
+          status.date ? `Fetching ${formatDate(status.date)} (${status.done + 1} of ${Math.max(1, status.total)})` : 'Preparing past prices…'}</span>
+        <progress value={status.done} max={Math.max(1, status.total)} aria-label="Past prices fetched" />
+        <Button variant="secondary" onClick={() => void stop()} disabled={busy || status.state === 'stopping'}>Stop</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Start another pass to retry missing prices or newly linked investments. */
+export function PastPrices({ dates }: { dates: PastDate[] }) {
+  const { status, busy, start, stop } = usePriceJob();
+  const active = status?.state === 'running' || status?.state === 'stopping';
+
+  if (dates.length === 0 && !active) {
     return (
-      <p className="muted" ref={doneRef} tabIndex={-1}>
+      <p className="muted">
         Nothing to fetch: scheduled prices are filled, or no investment has an ISIN yet.
       </p>
     );
   }
-  // One button that turns into Stop, so keyboard focus stays put.
   return (
     <div className={styles.past}>
       <p className="muted" role="status">
-        {progress
-          ? `Fetching ${progress.date} (${progress.at} of ${progress.total})`
+        {active
+          ? status?.state === 'stopping' ? 'Stopping after this download…' : `${status?.done ?? 0} of ${status?.total ?? 0} dates checked; ${status?.updated ?? 0} prices saved`
           : `${dates.length === 1 ? '1 date' : `${dates.length} dates`} to check, up to ${Math.max(0.1, size(dates)).toFixed(1)} MB`}
       </p>
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={progress ? () => (stop.current = true) : run}
-      >
-        {progress ? 'Stop' : 'Fetch past prices'}
+      {!active && status?.message && <p className="muted">{status.message}</p>}
+      <Button type="button" variant="secondary" disabled={busy || status?.state === 'stopping'}
+        onClick={() => void (active ? stop() : start())}>
+        {active ? 'Stop' : status ? 'Retry missing prices' : 'Fetch past prices'}
       </Button>
     </div>
   );

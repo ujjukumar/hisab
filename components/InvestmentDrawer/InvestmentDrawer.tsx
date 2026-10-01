@@ -25,6 +25,7 @@ import {
   setAssetArchived,
   undoInvestmentDelete,
 } from '@/lib/actions/investments';
+import { fetchInvestmentPrices } from '@/lib/actions/prices';
 import type { AssetType, InvestmentAction } from '@/lib/db/schema';
 import {
   ACTION_LABELS,
@@ -722,12 +723,47 @@ export function RecordTransactionButton({ assetId }: { assetId?: number }) {
   );
 }
 
-/** Opens the update drawer for these investments. Renders nothing when none can be updated by hand. */
-export function UpdatePricesButton({
+function useFetchPrices(ids: number[]) {
+  const toast = useToast();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const fetchPrices = () => {
+    if (pending) return;
+    start(async () => {
+      try {
+        const result = await fetchInvestmentPrices(ids);
+        toast(result.ok ? (result.updated === 1 ? 'Price fetched' : 'Prices fetched') : result.message);
+        if (result.ok) router.refresh();
+      } catch {
+        toast("Prices couldn't be fetched. Check the connection and try again.");
+      }
+    });
+  };
+  return { fetchPrices, pending };
+}
+
+export function FetchPricesButton({
   ids,
   label,
   variant = 'icon',
 }: {
+  ids: number[];
+  label: string;
+  variant?: 'icon' | 'button';
+}) {
+  const { fetchPrices, pending } = useFetchPrices(ids);
+  if (ids.length === 0) return null;
+  return variant === 'icon' ? (
+    <IconButton icon="refresh" label={pending ? 'Fetching prices' : label} onClick={fetchPrices} aria-disabled={pending} />
+  ) : (
+    <Button variant="secondary" icon="refresh" onClick={fetchPrices} aria-disabled={pending}>
+      {pending ? 'Fetching prices…' : label}
+    </Button>
+  );
+}
+
+/** Opens the statement-value drawer for assets that cannot receive feed prices. */
+export function UpdateValuesButton({ ids, label, variant = 'icon' }: {
   ids: number[];
   label: string;
   variant?: 'icon' | 'button';
@@ -764,6 +800,7 @@ export function HoldingRowMenu({ asset, compact }: { asset: AssetOption; compact
   const { open } = useContext(Context);
   const router = useRouter();
   const archive = useArchive();
+  const { fetchPrices } = useFetchPrices([asset.id]);
   const edit = { label: 'Edit investment', onSelect: () => open({ kind: 'asset', id: asset.id }) };
   const archiveItem = asset.archived
     ? { label: 'Unarchive', onSelect: () => archive(asset.id, false) }
@@ -776,8 +813,10 @@ export function HoldingRowMenu({ asset, compact }: { asset: AssetOption; compact
           ? []
           : [
               {
-                label: asset.valuation === 'units' ? 'Update price' : 'Update value',
-                onSelect: () => open({ kind: 'updates', ids: [asset.id] }),
+                label: asset.valuation === 'units' ? 'Fetch price' : 'Update value',
+                onSelect: asset.valuation === 'units'
+                  ? fetchPrices
+                  : () => open({ kind: 'updates', ids: [asset.id] }),
               },
             ]),
         {

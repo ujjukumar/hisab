@@ -11,8 +11,6 @@ import { unzipFirst } from '@/lib/zip';
 /**
  * The only place Hisaab goes online (PLAN section 11, phase 8). It downloads AMFI's and NSE's
  * public whole-market price files; every request is the same whatever the owner holds.
- * ponytail: two sources, no retries, and a plain User-Agent. If NSE starts refusing it, stocks
- * and ETFs report the failure while funds still update; BSE's bhavcopy is the fallback to add.
  */
 
 const HEADERS = { 'User-Agent': 'Hisaab (personal use)' };
@@ -20,6 +18,7 @@ const TIMEOUT_MS = 20_000;
 const AMFI_LATEST = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 const AMFI_HISTORY = 'https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx';
 const NSE = 'https://nsearchives.nseindia.com/content';
+const BSE = 'https://www.bseindia.com/download/BhavCopy/Equity';
 
 export class FeedError extends Error {}
 
@@ -103,6 +102,31 @@ export async function nseLatest(date: IsoDate, lookBackDays = LOOK_BACK_DAYS): P
     const map = await nseOn(addDays(date, -i));
     if (map) return map;
   }
-  if (lookBackDays === 1) return new Map();
-  throw new FeedError('NSE had no closing prices for the week. Try again later.');
+  return new Map();
+}
+
+/** BSE equity cash-market bhavcopy, UDiFF from 8 July 2024, Equity-with-ISIN before then. */
+async function bseOn(date: IsoDate): Promise<PriceMap | null> {
+  const { year, month, day } = parts(date);
+  const ymd = `${year}${pad(month)}${pad(day)}`;
+  const old = `${pad(day)}${pad(month)}${String(year).slice(-2)}`;
+  const url = date >= '2024-07-08'
+    ? `${BSE}/BhavCopy_BSE_CM_0_0_0_${ymd}_F_0000.CSV`
+    : `${BSE}/EQ_ISINCODE_${old}.CSV`;
+  const file = await download(url, 'BSE');
+  if (!file) return null;
+  const text = file.toString('utf8');
+  if (/^\s*(?:<!doctype html|<html\b)/i.test(text)) return null;
+  const map = parseBhavcopy(text);
+  if (!map.size) throw new FeedError("BSE's closing prices couldn't be read. Try again later.");
+  return map;
+}
+
+/** BSE's whole-market closes, used locally for ISINs not present in NSE's file. */
+export async function bseLatest(date: IsoDate, lookBackDays = LOOK_BACK_DAYS): Promise<PriceMap> {
+  for (let i = 0; i < lookBackDays; i++) {
+    const map = await bseOn(addDays(date, -i));
+    if (map) return map;
+  }
+  return new Map();
 }

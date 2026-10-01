@@ -156,21 +156,28 @@ it from Settings to undo an import.
 ## Automatic prices
 
 Once a day, the first time you open the app, Hisaab downloads the latest fund
-NAVs from AMFI and the last closing prices of stocks and ETFs from NSE. This
+NAVs from AMFI and the last closing prices of stocks and ETFs from NSE, using
+BSE for listed ISINs NSE does not have. This
 works for funds, stocks and ETFs whose **Symbol or code** is their ISIN (the
 Value Research import fills it in). Investments shows when prices were last
-updated, with **Update now** to fetch them again.
+updated, with **Update now** to fetch them again. **Fetch price** on a holding
+and **Fetch prices** on a group fetch prices for those investments. Assets whose
+value comes from a statement still use **Update value** for manual entry.
 
-- Only AMFI's and NSE's public whole-market files are downloaded, about 0.5 MB
-  a day. Nothing about your investments is sent.
+- Only AMFI's, NSE's and (when needed) BSE's public whole-market files are
+  downloaded. Nothing about your investments is sent.
 - Each price is saved under the date in the file, so you keep one price per
   day for the days you open the app. Prices you enter or import are never
   replaced.
 - **Settings → Prices → Fetch past prices** fills missing weekday prices for
   the last 30 days and weekly prices before that, back to your first purchase.
   Older weeks end on Sunday and look back up to seven days for a trading price;
-  the estimated maximum download size appears before you start. You can stop it
-  and carry on later.
+  the estimated maximum download size appears before you start. Progress and Stop
+  stay under the header on every page. The local server checkpoints each date,
+  so an interrupted run resumes when you reopen the app. It cannot run while the
+  app is shut down. Run it again to retry missing prices or pick up newly linked
+  investments. Holidays and invalid ISINs are skipped within a run, not retried
+  forever.
 - Turn off automatic prices under **Settings → Prices** to stop downloads on
   open. A manual update or past-price fetch downloads only when you request it.
 

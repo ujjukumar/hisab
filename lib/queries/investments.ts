@@ -82,7 +82,7 @@ export function unitsProblem(
 // ponytail: the whole portfolio is replayed from every transaction on each request.
 // Fine for one household's few hundred rows; cache holdings per asset if it ever drags.
 /** Everything the portfolio is worked out from, loaded once per request. */
-export const portfolioData = cache((): PortfolioData => ({
+export const freshPortfolioData = (): PortfolioData => ({
   assets: db.select().from(assets).orderBy(asc(assets.name)).all(),
   txns: allTxns(),
   prices: db
@@ -93,7 +93,9 @@ export const portfolioData = cache((): PortfolioData => ({
     .select({ assetId: valuations.assetId, date: valuations.date, value: valuations.value })
     .from(valuations)
     .all(),
-}));
+});
+
+export const portfolioData = cache(freshPortfolioData);
 
 /** Every asset's holding and value on `date`, worked out once per request. */
 export const portfolio = cache((date: IsoDate = today()): HoldingRow[] =>

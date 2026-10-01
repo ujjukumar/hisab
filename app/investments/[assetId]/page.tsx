@@ -5,7 +5,8 @@ import { LegendInline, LegendKey } from '@/components/charts/Tip';
 import {
   HoldingRowMenu,
   RecordTransactionButton,
-  UpdatePricesButton,
+  FetchPricesButton,
+  UpdateValuesButton,
 } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { InvestmentTxnTable } from '@/components/InvestmentTxnTable/InvestmentTxnTable';
 import { PageHead } from '@/components/PageHead/PageHead';
@@ -71,13 +72,11 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
         actions={
           <>
             <RecordTransactionButton assetId={id} />
-            {asset.valuation !== 'fd' && !row.sold && (
-              <UpdatePricesButton
-                variant="button"
-                ids={[id]}
-                label={units ? 'Update price' : 'Update value'}
-              />
-            )}
+            {!row.sold && (units ? (
+              <FetchPricesButton variant="button" ids={[id]} label="Fetch price" />
+            ) : asset.valuation === 'manual' ? (
+              <UpdateValuesButton variant="button" ids={[id]} label="Update value" />
+            ) : null)}
             <HoldingRowMenu asset={option} compact />
           </>
         }
@@ -105,7 +104,7 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
           <Card
             span={asset.valuation === 'fd' ? 8 : 12}
             title="Invested and worth"
-            sub={units ? 'At each price you entered' : 'At each statement and transaction'}
+            sub={units ? 'At each recorded price' : 'At each statement and transaction'}
             action={
               <LegendInline>
                 <LegendKey color="var(--c1)">Invested</LegendKey>

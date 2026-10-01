@@ -527,7 +527,7 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
 - Totals row per group.
 - "Show sold investments" toggle (`?sold=1`). Sold rows show their realised gain.
 - The name links to the holding detail page.
-- **Update prices drawer:** every holding in the group with its last price, a new price field and one date field, then "Save prices".
+- **Investment updates:** Fetch prices for selected unit-priced holdings from AMFI/NSE/BSE; update statement-based values by hand. Manual/import prices are not replaced.
 - **Add investment:**
   - Picking "New investment…" in the investment select opens fields for name, type, asset class, account ref, and the rate/dates for FDs.
   - Then comes the transaction part as mocked: Buy / Sell / Dividend, plus Deposit / Withdrawal for manual and FD assets. Fields: date, units, price, fees, an optional "Paid from" / "Received in" account, and a live total.
@@ -617,7 +617,7 @@ Privacy and local-only defaults:
 - Always bind to `127.0.0.1`, never `0.0.0.0`, so other devices on the network can't reach the app.
 - Disable Next.js telemetry: add `NEXT_TELEMETRY_DISABLED=1` to `.env` and document `npx next telemetry disable` in the README.
 - `.gitignore` must include `data/`, `*.db`, `*.db-wal`, `*.db-shm`, `.env*`.
-- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
+- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's and BSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
 - The database path comes from `DATABASE_PATH` (default `./data/finance.db`). Create the folder if it's missing.
 
 Write a `README.md` covering install, first run, daily use (`build` + `start`), backup and restore, and the privacy notes above.
@@ -685,7 +685,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 
 - Assets: create, edit, archive; the "New investment…" flow.
 - Investment transaction drawer: every action, "Paid from" / "Received in" linking, live total, oversell check.
-- Prices and valuations: the Update prices drawer, and the single-price action on each row.
+- Prices and valuations: feed fetch for unit-priced holdings and manual update for statement values.
 - `holdings.ts`, `valuation.ts` (including FD maths) and `xirr.ts`, with the test vectors from section 6.
 - Overview tab: groups, sub-tabs, totals, sold toggle, CSV.
 - Investments → Transactions tab, including balance units.
@@ -738,11 +738,11 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 
 ### Phase 8 — Automatic prices
 
-- Owner-approved exception to "no external requests": only AMFI's and NSE's public whole-market price files, all fetched by `lib/feeds.ts`. Requests are the same whatever the owner holds.
-- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before). Weekly history looks back up to 7 days for weekends and holidays; recent daily history uses the exact trading date.
+- Owner-approved exception to "no external requests": only AMFI's, NSE's and BSE's public whole-market price files, all fetched by `lib/feeds.ts`. Requests are the same whatever the owner holds.
+- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before), falling back to BSE's Equity-with-ISIN CSV (UDiFF from 8 July 2024) for ISINs absent from NSE. Weekly history looks back up to 7 days for weekends and holidays; recent daily history uses the exact trading date.
 - Only `units` funds, stocks and ETFs whose symbol is an ISIN take part. Downloaded prices are stored with `source = 'auto'` under the file's own date; a `manual` or `import` price on the same day is never replaced.
 - On open, at most once a day (setting `auto_prices`, on by default; last result in `price_update`). "Update now" on Investments and Settings forces it. A failed check still counts for the day.
-- Settings → Prices → Fetch past prices fills missing weekdays in the latest 30 calendar days, then fixed Sunday week-ends back to the first purchase for held, linked investments. One date per request, with progress and Stop; existing prices are skipped. The once-a-day automatic refresh still fetches only the latest prices.
+- Settings → Prices → Fetch past prices fills missing weekdays in the latest 30 calendar days, then fixed Sunday week-ends back to the first purchase for held, linked investments. A local worker checkpoints dates and investments in SQLite, resumes interrupted work when the app reopens, and shows progress and Stop across routes. A new run retries missing prices and catches newly linked investments. The once-a-day automatic refresh still fetches only the latest prices.
 - No migration: `source` is a TypeScript-only enum.
 
 *Done when:*
@@ -778,7 +778,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
 | Dark mode | Follows system setting | Already designed in the mockup |
 | Daily change | Each holding's last two available prices for 1 day; calendar dates for 1 week and longer | The latest NAV or close can predate today (weekends, holidays, delayed updates). Each holding can have different quote dates; remove money flows so a purchase is not counted as a gain |
-| Automatic prices | AMFI and NSE whole-market files, once a day on open; optional backfill daily for the last 30 days and weekly before | Owner-approved (Oct 2026). Nothing about holdings is sent; a manual, stoppable backfill limits historical download volume |
+| Automatic prices | AMFI, NSE and BSE whole-market files, once a day on open; optional backfill daily for the last 30 days and weekly before | Owner-approved (Oct 2026). Nothing about holdings is sent; a manual, stoppable backfill limits historical download volume |
 | Cost method | Average cost | Simple and standard for tracking; not a tax calculation |
 | Short holdings | Under 365 days show absolute return "abs." | Annualising short periods misleads |
 | Investment payments | Optional "Paid from" / "Received in" creates a linked money transaction | Avoids entering SIPs twice |
@@ -806,6 +806,8 @@ Update this as work happens: one line per phase with the date, status and notes.
 
 | Phase | Status | Date | Notes |
 |---|---|---|---|
+| Investment price buttons | Done | 1 Oct 2026 | Group and holding price actions fetch whole-market AMFI/NSE/BSE prices for selected held investments instead of opening price-entry fields. Manual statement-value updates remain separate; selected fetches do not mark the app-wide daily check complete. |
+| Price backfill and BSE fallback | Done | 1 Oct 2026 | SQLite checkpoints and a single local worker keep progress and Stop available across pages; unfinished work resumes on reopen. Recomputed needs pick up newly linked investments and gaps, with per-run attempts to avoid retry loops. BSE public Equity-with-ISIN CSVs (UDiFF from 8 July 2024) fill ISINs missing from NSE without sending holdings; NSE keeps precedence. No new dependency or migration. |
 | Price history cadence | Done | 1 Oct 2026 | Settings backfill now checks weekdays for the latest 30 days and fixed Sunday week-ends back to the first purchase. Daily downloads require a price on the requested date; weekly downloads can fall back up to seven days for holidays. The existing ISIN-only, whole-market AMFI/NSE requests, Stop control and manual/import price protection remain; no new dependency or schema change. |
 | Daily investment change correction | Done | 1 Oct 2026 | One-day gains use each holding's two latest quotes or statements instead of comparing two days with the same stale price. Buys and sells remain flow-adjusted; net-worth adds the missed price gain to yesterday's cash and value change without counting a cash-funded purchase twice. Dashboard, Investments, holding detail, Performance and CSV share the calculation; CSV includes each row's comparison date. |
 | Investment change periods | Done | 1 Oct 2026 | Replaced all visible previous-price changes with selectable 1-day, 1-week, longer and all-time flow-adjusted gains. Dashboard returns and movers, Investments header, overview rows and totals, holding detail, Performance filter and CSV share calendar-period calculations; the overview and header keep the period in the URL. No new dependencies. |
