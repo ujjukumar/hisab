@@ -1,13 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { Asset } from '@/lib/db/schema';
-import {
-  addDays,
-  isValidDate,
-  monthEndsBetween,
-  monthOf,
-  type IsoDate,
-  type IsoMonth,
-} from './dates';
+import { addDays, dayOfWeek, isValidDate, type IsoDate } from './dates';
 import { computeHolding } from './holdings';
 import type { PortfolioData } from './portfolio';
 import { parseVrDate } from './valueResearch';
@@ -117,16 +110,17 @@ export function pricesFor(
   });
 }
 
-/** Past prices are looked for up to a week before each month-end, for weekends and holidays. */
+/** Weekly price targets look back to the nearest earlier trading day. */
 export const LOOK_BACK_DAYS = 7;
 
-export type PriceNeed = { date: IsoDate; linked: FeedAsset[] };
+export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily' | 'weekly' };
 
 /**
- * Month-ends, from the first transaction to `lastMonth`, where a linked investment was held but
- * has no price in the week up to that day. These are what "Fetch past prices" downloads.
+ * Missing weekday prices in the last 30 days, then weekly prices back to the first purchase.
+ * Weekly targets accept the most recent price in the preceding week; daily targets need an
+ * actual price for that date. These are the "Fetch past prices" jobs.
  */
-export function pastPriceNeeds(data: PortfolioData, lastMonth: IsoMonth): PriceNeed[] {
+export function pastPriceNeeds(data: PortfolioData, asOf: IsoDate): PriceNeed[] {
   const linked = feedAssets(data.assets);
   const ids = new Set(linked.map((a) => a.id));
   const txns = data.txns.filter((t) => ids.has(t.assetId));
@@ -141,13 +135,29 @@ export function pastPriceNeeds(data: PortfolioData, lastMonth: IsoMonth): PriceN
       priceDates.set(p.assetId, [...(priceDates.get(p.assetId) ?? []), p.date]);
   }
 
-  return monthEndsBetween(monthOf(first), lastMonth).flatMap((date) => {
-    const from = addDays(date, 1 - LOOK_BACK_DAYS);
+  const dailyFrom = addDays(asOf, -29);
+  const lastOlderDay = addDays(dailyFrom, -1);
+  const targets: { date: IsoDate; cadence: PriceNeed['cadence'] }[] = [];
+  for (
+    let date = addDays(lastOlderDay, -dayOfWeek(lastOlderDay));
+    date >= first;
+    date = addDays(date, -7)
+  ) {
+    targets.push({ date, cadence: 'weekly' });
+  }
+  for (let date = dailyFrom; date <= asOf; date = addDays(date, 1)) {
+    const weekday = dayOfWeek(date);
+    if (weekday !== 0 && weekday !== 6) targets.push({ date, cadence: 'daily' });
+  }
+  targets.sort((a, b) => a.date.localeCompare(b.date));
+
+  return targets.flatMap(({ date, cadence }) => {
+    const from = cadence === 'daily' ? date : addDays(date, 1 - LOOK_BACK_DAYS);
     const missing = linked.filter((a) => {
       const own = txns.filter((t) => t.assetId === a.id && t.date <= date);
       if (own.length === 0 || computeHolding(own).units.lte(0)) return false;
       return !(priceDates.get(a.id) ?? []).some((d) => d >= from && d <= date);
     });
-    return missing.length ? [{ date, linked: missing }] : [];
+    return missing.length ? [{ date, linked: missing, cadence }] : [];
   });
 }

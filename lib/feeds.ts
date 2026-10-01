@@ -54,19 +54,25 @@ export async function amfiLatest(): Promise<PriceMap> {
 /** Fund NAVs published for one day. Weekend lists hold only the few funds priced every day. */
 async function amfiOn(date: IsoDate): Promise<PriceMap> {
   const { year, month, day } = parts(date);
-  const url = `${AMFI_HISTORY}?frmdt=${pad(day)}-${SHORT_MONTHS[month - 1]}-${year}`;
+  const dayText = `${pad(day)}-${SHORT_MONTHS[month - 1]}-${year}`;
+  const url = `${AMFI_HISTORY}?frmdt=${dayText}&todt=${dayText}`;
   const file = await download(url, 'AMFI');
   return file ? parseAmfiNav(file.toString('utf8')) : new Map();
 }
 
-/** NAVs for `isins` on `date`, or the nearest earlier day within a week. */
-export async function amfiFor(date: IsoDate, isins: string[]): Promise<PriceMap> {
+/** NAVs on `date`, or the nearest earlier day when a weekly target allows lookback. */
+export async function amfiFor(
+  date: IsoDate,
+  isins: string[],
+  lookBackDays = LOOK_BACK_DAYS,
+): Promise<PriceMap> {
   const out: PriceMap = new Map();
-  for (let i = 0; i < LOOK_BACK_DAYS && out.size < isins.length; i++) {
-    const day = await amfiOn(addDays(date, -i));
+  for (let i = 0; i < lookBackDays && out.size < isins.length; i++) {
+    const dayDate = addDays(date, -i);
+    const day = await amfiOn(dayDate);
     for (const isin of isins) {
       const found = day.get(isin);
-      if (found && !out.has(isin)) out.set(isin, found);
+      if (found?.date === dayDate && !out.has(isin)) out.set(isin, found);
     }
   }
   return out;
@@ -91,11 +97,12 @@ async function nseOn(date: IsoDate): Promise<PriceMap | null> {
   return null;
 }
 
-/** Closing prices on `date`, or the last trading day within a week before it. */
-export async function nseLatest(date: IsoDate): Promise<PriceMap> {
-  for (let i = 0; i < LOOK_BACK_DAYS; i++) {
+/** Closing prices on `date`, or the last trading day within a requested lookback. */
+export async function nseLatest(date: IsoDate, lookBackDays = LOOK_BACK_DAYS): Promise<PriceMap> {
+  for (let i = 0; i < lookBackDays; i++) {
     const map = await nseOn(addDays(date, -i));
     if (map) return map;
   }
+  if (lookBackDays === 1) return new Map();
   throw new FeedError('NSE had no closing prices for the week. Try again later.');
 }

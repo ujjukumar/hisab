@@ -120,9 +120,8 @@ export default async function SettingsPage() {
             </SettingRow>
             <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
               <p>
-                Fills in the price at each month-end since your first purchase, for the charts on
-                Performance and Overview. Months that already have a price are skipped, so you can
-                stop and carry on later.
+                Fetches daily prices for the last 30 days and weekly prices before that, back to
+                your first purchase. Existing prices are skipped. You can stop and carry on later.
               </p>
             </SettingRow>
           </Card>

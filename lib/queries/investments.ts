@@ -14,8 +14,6 @@ import {
 } from '@/lib/db/schema';
 import { GROUPS, groupOf, maskRef, type GroupKey } from '@/lib/domain/assets';
 import {
-  addMonths,
-  currentMonth,
   isValidDate,
   monthEndsBetween,
   monthOf,
@@ -361,10 +359,16 @@ export function periodPerformance(params: Params, yearStartMonth: number) {
   return { asOf, period, from, rows };
 }
 
-/** Month-ends "Fetch past prices" still has to download, up to last month, and which files each needs. */
-export function pastPriceDates(): { date: IsoDate; funds: boolean; listed: boolean }[] {
-  return pastPriceNeeds(portfolioData(), addMonths(currentMonth(), -1)).map((n) => ({
+/** Scheduled daily and weekly prices still missing for linked investments. */
+export function pastPriceDates(): {
+  date: IsoDate;
+  funds: boolean;
+  listed: boolean;
+  cadence: 'daily' | 'weekly';
+}[] {
+  return pastPriceNeeds(portfolioData(), today()).map((n) => ({
     date: n.date,
+    cadence: n.cadence,
     funds: n.linked.some((a) => a.feed === 'amfi'),
     listed: n.linked.some((a) => a.feed === 'nse'),
   }));

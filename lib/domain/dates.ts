@@ -115,6 +115,12 @@ export function addDays(date: IsoDate, delta: number): IsoDate {
   return makeDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
 
+/** Sunday = 0, Saturday = 6, independent of the machine's timezone. */
+export function dayOfWeek(date: IsoDate): number {
+  const { year, month, day } = parts(date);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
 /** Whole days from `from` to `to`. Negative when `to` is earlier. */
 export function daysBetween(from: IsoDate, to: IsoDate): number {
   const a = parts(from);

@@ -739,10 +739,10 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 ### Phase 8 — Automatic prices
 
 - Owner-approved exception to "no external requests": only AMFI's and NSE's public whole-market price files, all fetched by `lib/feeds.ts`. Requests are the same whatever the owner holds.
-- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before). Weekends and holidays walk back up to 7 days.
+- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before). Weekly history looks back up to 7 days for weekends and holidays; recent daily history uses the exact trading date.
 - Only `units` funds, stocks and ETFs whose symbol is an ISIN take part. Downloaded prices are stored with `source = 'auto'` under the file's own date; a `manual` or `import` price on the same day is never replaced.
 - On open, at most once a day (setting `auto_prices`, on by default; last result in `price_update`). "Update now" on Investments and Settings forces it. A failed check still counts for the day.
-- Settings → Prices → Fetch past prices fills month-ends from the first purchase where a held, linked investment has no price in the week before, one month per request with progress and Stop.
+- Settings → Prices → Fetch past prices fills missing weekdays in the latest 30 calendar days, then fixed Sunday week-ends back to the first purchase for held, linked investments. One date per request, with progress and Stop; existing prices are skipped. The once-a-day automatic refresh still fetches only the latest prices.
 - No migration: `source` is a TypeScript-only enum.
 
 *Done when:*
@@ -778,7 +778,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
 | Dark mode | Follows system setting | Already designed in the mockup |
 | Daily change | Each holding's last two available prices for 1 day; calendar dates for 1 week and longer | The latest NAV or close can predate today (weekends, holidays, delayed updates). Each holding can have different quote dates; remove money flows so a purchase is not counted as a gain |
-| Automatic prices | AMFI and NSE whole-market files, once a day on open; past prices at month-ends only | Owner-approved (Oct 2026). Nothing about holdings is sent; daily history for past years would be hundreds of MB |
+| Automatic prices | AMFI and NSE whole-market files, once a day on open; optional backfill daily for the last 30 days and weekly before | Owner-approved (Oct 2026). Nothing about holdings is sent; a manual, stoppable backfill limits historical download volume |
 | Cost method | Average cost | Simple and standard for tracking; not a tax calculation |
 | Short holdings | Under 365 days show absolute return "abs." | Annualising short periods misleads |
 | Investment payments | Optional "Paid from" / "Received in" creates a linked money transaction | Avoids entering SIPs twice |
@@ -806,6 +806,7 @@ Update this as work happens: one line per phase with the date, status and notes.
 
 | Phase | Status | Date | Notes |
 |---|---|---|---|
+| Price history cadence | Done | 1 Oct 2026 | Settings backfill now checks weekdays for the latest 30 days and fixed Sunday week-ends back to the first purchase. Daily downloads require a price on the requested date; weekly downloads can fall back up to seven days for holidays. The existing ISIN-only, whole-market AMFI/NSE requests, Stop control and manual/import price protection remain; no new dependency or schema change. |
 | Daily investment change correction | Done | 1 Oct 2026 | One-day gains use each holding's two latest quotes or statements instead of comparing two days with the same stale price. Buys and sells remain flow-adjusted; net-worth adds the missed price gain to yesterday's cash and value change without counting a cash-funded purchase twice. Dashboard, Investments, holding detail, Performance and CSV share the calculation; CSV includes each row's comparison date. |
 | Investment change periods | Done | 1 Oct 2026 | Replaced all visible previous-price changes with selectable 1-day, 1-week, longer and all-time flow-adjusted gains. Dashboard returns and movers, Investments header, overview rows and totals, holding detail, Performance filter and CSV share calendar-period calculations; the overview and header keep the period in the URL. No new dependencies. |
 | Dashboard net-worth periods | Done | 1 Oct 2026 | Net-worth strip now compares cash plus investments on the dashboard date with the same total 1 day, 1 week, 1/3/6 months or 1 year earlier. A URL-backed dropdown replaces the previous-price-only “since” figure and keeps its selection across dashboard months. Checked on an invented temporary database in desktop and 360px views; existing chart tooltip overflow is unrelated. |

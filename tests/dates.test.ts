@@ -3,6 +3,7 @@ import {
   addDays,
   addMonths,
   currentMonth,
+  dayOfWeek,
   daysBetween,
   daysInMonth,
   endOfMonth,
@@ -74,6 +75,13 @@ describe('leap years', () => {
     expect(daysBetween('2023-01-01', '2024-01-01')).toBe(365);
     expect(daysBetween('2026-09-28', '2026-09-27')).toBe(-1);
     expect(yearsBetween('2023-01-01', '2024-01-01')).toBe(1);
+  });
+
+  it('finds weekdays across a month and leap day in UTC', () => {
+    expect(dayOfWeek('2024-02-29')).toBe(4);
+    expect(dayOfWeek('2024-03-01')).toBe(5);
+    expect(dayOfWeek('2024-03-02')).toBe(6);
+    expect(dayOfWeek('2024-03-03')).toBe(0);
   });
 });
 

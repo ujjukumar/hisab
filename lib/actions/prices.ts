@@ -5,10 +5,11 @@ import { z } from 'zod';
 import { applyFeedPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
 import { settings } from '@/lib/db/schema';
-import { addMonths, currentMonth, isValidDate, today, type IsoDate } from '@/lib/domain/dates';
+import { isValidDate, today, type IsoDate } from '@/lib/domain/dates';
 import {
   feedAssets,
   isDue,
+  LOOK_BACK_DAYS,
   pastPriceNeeds,
   pricesFor,
   type FeedAsset,
@@ -46,13 +47,14 @@ async function fetchAndSave(
   linked: FeedAsset[],
   date: IsoDate,
   funds: (isins: string[]) => Promise<PriceMap>,
+  lookBackDays = LOOK_BACK_DAYS,
 ): Promise<{ updated: number; problems: string[] }> {
   const amfi = linked.filter((a) => a.feed === 'amfi');
   const nse = linked.filter((a) => a.feed === 'nse');
   const none: PriceMap = new Map();
   const got = await Promise.allSettled([
     amfi.length ? funds(amfi.map((a) => a.isin)) : none,
-    nse.length ? nseLatest(date) : none,
+    nse.length ? nseLatest(date, lookBackDays) : none,
   ]);
   const problems: string[] = [];
   const rows = [amfi, nse].flatMap((group, i) => {
@@ -65,7 +67,7 @@ async function fetchAndSave(
     }
     const found = pricesFor(group, result.value);
     const lacking = group.length - found.length;
-    if (lacking > 0) {
+    if (lacking > 0 && !(lookBackDays === 1 && result.value.size === 0)) {
       const source = i === 0 ? 'AMFI' : 'NSE';
       problems.push(
         `${source} had no price for ${lacking === 1 ? '1 investment' : `${lacking} investments`}. Check the ISIN in each one.`,
@@ -135,20 +137,22 @@ export async function setAutoPrices(on: boolean): Promise<PriceResult> {
 const pastSchema = z.string().refine(isValidDate, 'Choose a valid date.');
 
 /**
- * Fill in one month-end's prices for "Fetch past prices". The page calls this once per
- * month-end so the owner sees progress and can stop; a month already filled is skipped.
- * ponytail: an ISIN AMFI or NSE never lists (a merged fund) keeps its month on the list.
+ * Fill in one daily or weekly price target for "Fetch past prices". The page calls this once
+ * per date so the owner sees progress and can stop; a date already filled is skipped.
+ * ponytail: an ISIN AMFI or NSE never lists keeps its date on the list.
  */
 export async function fetchPastPrices(date: string): Promise<PriceResult> {
   const parsed = pastSchema.safeParse(date);
   if (!parsed.success) return invalid(parsed.error);
   const day = parsed.data as IsoDate;
-  const need = pastPriceNeeds(portfolioData(), addMonths(currentMonth(), -1)).find(
-    (n) => n.date === day,
-  );
+  const need = pastPriceNeeds(portfolioData(), today()).find((n) => n.date === day);
   if (!need) return { ok: true, updated: 0 };
-  const { updated, problems } = await fetchAndSave(need.linked, day, (isins) =>
-    amfiFor(day, isins),
+  const lookBackDays = need.cadence === 'daily' ? 1 : LOOK_BACK_DAYS;
+  const { updated, problems } = await fetchAndSave(
+    need.linked,
+    day,
+    (isins) => amfiFor(day, isins, lookBackDays),
+    lookBackDays,
   );
   revalidate();
   return problems.length ? failed(problems.join(' ')) : { ok: true, updated };

@@ -166,11 +166,13 @@ updated, with **Update now** to fetch them again.
 - Each price is saved under the date in the file, so you keep one price per
   day for the days you open the app. Prices you enter or import are never
   replaced.
-- **Settings → Prices → Fetch past prices** fills in month-end prices back to
-  your first purchase (about 0.5 MB a month). You can stop it and carry on
-  later.
-- Switch it off under **Settings → Prices**. Then the app makes no requests at
-  all.
+- **Settings → Prices → Fetch past prices** fills missing weekday prices for
+  the last 30 days and weekly prices before that, back to your first purchase.
+  Older weeks end on Sunday and look back up to seven days for a trading price;
+  the estimated maximum download size appears before you start. You can stop it
+  and carry on later.
+- Turn off automatic prices under **Settings → Prices** to stop downloads on
+  open. A manual update or past-price fetch downloads only when you request it.
 
 ## Privacy
 

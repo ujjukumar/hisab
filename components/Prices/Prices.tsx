@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/Button/Button';
 import { useToast } from '@/components/Toast/Toast';
 import { fetchPastPrices, refreshPrices, setAutoPrices } from '@/lib/actions/prices';
-import { monthOf, shortMonthLabel, type IsoDate } from '@/lib/domain/dates';
+import type { IsoDate } from '@/lib/domain/dates';
+import { formatDate } from '@/lib/domain/format';
 import styles from './Prices.module.css';
 
 /**
@@ -80,20 +81,23 @@ export function AutoPricesSwitch({ on }: { on: boolean }) {
   );
 }
 
-export type PastDate = { date: IsoDate; funds: boolean; listed: boolean };
+export type PastDate = { date: IsoDate; funds: boolean; listed: boolean; cadence: 'daily' | 'weekly' };
 
 // Measured in September 2026: one day of AMFI NAVs is about 0.3 MB compressed, NSE's about 0.2 MB.
 const size = (dates: PastDate[]) =>
-  dates.reduce((mb, d) => mb + (d.funds ? 0.3 : 0) + (d.listed ? 0.2 : 0), 0);
+  dates.reduce(
+    (mb, d) => mb + ((d.funds ? 0.3 : 0) + (d.listed ? 0.2 : 0)) * (d.cadence === 'weekly' ? 7 : 1),
+    0,
+  );
 
-/** "Fetch past prices": one month-end at a time, with progress and a way to stop. */
+/** "Fetch past prices": one scheduled date at a time, with progress and a way to stop. */
 export function PastPrices({ dates }: { dates: PastDate[] }) {
   const toast = useToast();
-  const [progress, setProgress] = useState<{ month: string; at: number; total: number } | null>(
+  const [progress, setProgress] = useState<{ date: string; at: number; total: number } | null>(
     null,
   );
   const stop = useRef(false);
-  // When the last month is filled the button goes away, so focus moves to the message instead.
+  // When the last date is filled the button goes away, so focus moves to the message instead.
   const [ran, setRan] = useState(false);
   const doneRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -107,7 +111,7 @@ export function PastPrices({ dates }: { dates: PastDate[] }) {
     let problem = '';
     for (const [i, d] of list.entries()) {
       if (stop.current) break;
-      setProgress({ month: shortMonthLabel(monthOf(d.date)), at: i + 1, total: list.length });
+      setProgress({ date: formatDate(d.date), at: i + 1, total: list.length });
       try {
         const r = await fetchPastPrices(d.date);
         if (r.ok) saved += r.updated;
@@ -125,7 +129,7 @@ export function PastPrices({ dates }: { dates: PastDate[] }) {
   if (dates.length === 0 && !progress) {
     return (
       <p className="muted" ref={doneRef} tabIndex={-1}>
-        Nothing to fetch: every month-end already has a price, or no investment has an ISIN yet.
+        Nothing to fetch: scheduled prices are filled, or no investment has an ISIN yet.
       </p>
     );
   }
@@ -134,8 +138,8 @@ export function PastPrices({ dates }: { dates: PastDate[] }) {
     <div className={styles.past}>
       <p className="muted" role="status">
         {progress
-          ? `Fetching ${progress.month} (${progress.at} of ${progress.total})`
-          : `${dates.length === 1 ? '1 month' : `${dates.length} months`}, about ${Math.max(0.1, size(dates)).toFixed(1)} MB`}
+          ? `Fetching ${progress.date} (${progress.at} of ${progress.total})`
+          : `${dates.length === 1 ? '1 date' : `${dates.length} dates`} to check, up to ${Math.max(0.1, size(dates)).toFixed(1)} MB`}
       </p>
       <Button
         type="button"
