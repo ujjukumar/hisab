@@ -48,6 +48,7 @@ import {
   investmentPeriodRows,
   linePoints,
   performanceSeries,
+  seriesCadence,
   PERIOD_LABELS,
   periodRows,
   PERIODS,
@@ -191,16 +192,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     );
 
   /* ---------- portfolio performance ---------- */
-  const series = performanceSeries(portfolioData(), asOf);
   const perfChart = (period: Period) => {
     const start = periodStart(period, asOf, 1);
+    const points = performanceSeries(portfolioData(), asOf, start);
     return (
       <>
         <LegendInline>
           <LegendKey color="var(--c1)">Amount invested</LegendKey>
           <LegendKey color="var(--c2)">Current worth</LegendKey>
         </LegendInline>
-        <LineChart points={linePoints(series.filter((p) => !start || p.date > start))} />
+        <LineChart points={linePoints(points, seriesCadence(start, asOf))} />
       </>
     );
   };
@@ -452,7 +453,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               id="perf-range"
               label="Time range"
               title="Portfolio performance"
-              sub="Amount invested against current worth, at each month-end. YTD starts on 1 January."
+              sub="Amount invested against current worth, with detail to match the range. YTD starts on 1 January."
               span={8}
               options={(
                 [

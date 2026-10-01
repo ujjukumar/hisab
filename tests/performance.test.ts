@@ -5,6 +5,8 @@ import {
   investmentPeriodRows,
   linePoints,
   performanceSeries,
+  sampleHistoryDates,
+  seriesCadence,
   periodRows,
   periodStart,
   periodTotals,
@@ -100,6 +102,42 @@ describe('performanceSeries', () => {
   it('has a single point when everything happened this month', () => {
     const points = performanceSeries(data, '2025-01-25');
     expect(points).toEqual([{ date: '2025-01-25', invested: 200000, worth: 200000 }]);
+  });
+
+  it('plots available daily prices and transactions for a one-month range', () => {
+    const points = performanceSeries(data, '2025-03-12', '2025-02-10');
+    expect(points.map((point) => point.date)).toEqual([
+      '2025-02-10', '2025-03-10', '2025-03-12',
+    ]);
+    expect(points[1]).toMatchObject({ invested: 160000, worth: 180000 });
+  });
+
+  it('uses weekly checkpoints for medium ranges and month-ends for longer ones', () => {
+    expect(seriesCadence('2025-01-01', '2025-02-15')).toBe('daily');
+    expect(seriesCadence('2025-01-01', '2025-02-16')).toBe('weekly');
+    expect(seriesCadence('2025-01-01', '2026-01-02')).toBe('monthly');
+    expect(performanceSeries(data, '2025-04-01', '2025-01-20').map((p) => p.date)).toEqual([
+      '2025-01-20', '2025-01-26', '2025-02-02', '2025-02-09',
+      '2025-02-16', '2025-02-23', '2025-03-02', '2025-03-09',
+      '2025-03-16', '2025-03-23', '2025-03-30', '2025-04-01',
+    ]);
+    expect(performanceSeries(data, '2026-04-01', '2025-01-01').map((p) => p.date).slice(0, 3))
+      .toEqual(['2025-01-15', '2025-01-31', '2025-02-28']);
+  });
+
+  it('samples a dense month of daily quotes, including the requested start and end', () => {
+    const quoted = {
+      ...data,
+      prices: Array.from({ length: 30 }, (_, index) => ({
+        assetId: 1,
+        date: `2025-09-${String(index + 1).padStart(2, '0')}`,
+        price: '10',
+      })),
+    };
+    const dates = sampleHistoryDates(quoted, '2025-01-15', '2025-10-01', '2025-09-01');
+    expect(dates).toHaveLength(31);
+    expect(dates.slice(0, 3)).toEqual(['2025-09-01', '2025-09-02', '2025-09-03']);
+    expect(dates.at(-1)).toBe('2025-10-01');
   });
 });
 
@@ -263,6 +301,15 @@ describe('periodRows and periodTotals', () => {
 });
 
 describe('linePoints', () => {
+  it('uses full dates for daily tooltips and compact day-month axis labels', () => {
+    const points = linePoints(performanceSeries(data, '2025-03-12', '2025-02-10'), 'daily');
+    expect(points.map((p) => [p.date, p.label, p.short])).toEqual([
+      ['2025-02-10', '10 Feb 2025', '10 Feb'],
+      ['2025-03-10', '10 Mar 2025', '10 Mar'],
+      ['2025-03-12', '12 Mar 2025', '12 Mar'],
+    ]);
+  });
+
   it('labels month-ends by month and the last day by date', () => {
     const points = linePoints(performanceSeries(data, '2025-04-20'));
     expect(points.map((p) => [p.label, p.short])).toEqual([

@@ -2,11 +2,13 @@
 
 import { useRef, useState, type PointerEvent } from 'react';
 import { axisLabel, formatShortINR, formatShortINRSigned, gainClass, niceScale } from '@/lib/domain/format';
+import { daysBetween, type IsoDate } from '@/lib/domain/dates';
 import styles from './Chart.module.css';
 import { Tip, type TipState } from './Tip';
 import { useWidth } from './useWidth';
 
 export type LinePoint = {
+  date?: IsoDate;
   /** Full label for the tooltip, e.g. 'Sep 2026'. */
   label: string;
   /** Short label for the axis, e.g. 'Sep'. */
@@ -36,17 +38,31 @@ export function LineChart({ points }: { points: LinePoint[] }) {
   const n = points.length;
   const peak = Math.max(...points.map((p) => Math.max(p.invested, p.worth))) / 100;
   const sc = niceScale(peak, 5);
-  const x = (i: number) => M.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const start = points.every((point) => point.date) ? points[0]?.date : undefined;
+  const span = start && points[n - 1]?.date ? daysBetween(start, points[n - 1]!.date!) : 0;
+  const x = (i: number) => M.l + (n === 1 ? iw / 2 : span && start
+    ? (daysBetween(start, points[i]!.date!) / span) * iw
+    : (i / (n - 1)) * iw);
   const y = (paise: number) => M.t + ih - (paise / 100 / sc.top) * ih;
   const path = (key: 'invested' | 'worth') =>
     points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join('');
   const labelStep = Math.max(1, Math.ceil(n / (width < 520 ? 4 : 7)));
+  const labelIndexes = new Set(points.reduce<number[]>((shown, _, index) => {
+    const last = shown.at(-1);
+    const visible = span ? last === undefined || x(index) - x(last) >= (width < 520 ? 70 : 100)
+      : index % labelStep === 0;
+    return visible ? [...shown, index] : shown;
+  }, []));
 
   const move = (event: PointerEvent<SVGRectElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     const px = event.clientX - rect.left;
-    setAt(Math.max(0, Math.min(n - 1, Math.round(((px - M.l) / iw) * (n - 1)))));
+    let nearest = 0;
+    for (let i = 1; i < n; i++) {
+      if (Math.abs(x(i) - px) < Math.abs(x(nearest) - px)) nearest = i;
+    }
+    setAt(nearest);
   };
 
   const active = at === null ? null : points[at];
@@ -93,7 +109,7 @@ export function LineChart({ points }: { points: LinePoint[] }) {
         })}
 
         {points.map((p, i) =>
-          i % labelStep === 0 ? (
+          labelIndexes.has(i) ? (
             <g key={`v${i}`}>
               <line x1={x(i)} x2={x(i)} y1={M.t} y2={M.t + ih} stroke="var(--grid)" />
               <text x={x(i)} y={H - 8} textAnchor="middle">

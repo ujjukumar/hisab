@@ -15,8 +15,6 @@ import {
 import { GROUPS, groupOf, maskRef, type GroupKey } from '@/lib/domain/assets';
 import {
   isValidDate,
-  monthEndsBetween,
-  monthOf,
   today,
   type IsoDate,
 } from '@/lib/domain/dates';
@@ -27,6 +25,7 @@ import {
   PERIODS,
   investmentPeriodRows,
   periodStart,
+  sampleHistoryDates,
   type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
@@ -310,7 +309,7 @@ export type HistoryPoint = { date: IsoDate; invested: Paise; worth: Paise };
  * Invested vs worth for one holding: at each price or statement date (month-ends for
  * FDs), plus today. Prices before the first transaction are left out.
  */
-export function holdingHistory(assetId: number): HistoryPoint[] {
+export function holdingHistory(assetId: number, from: IsoDate | null = null): HistoryPoint[] {
   const data = portfolioData();
   const asset = data.assets.find((a) => a.id === assetId);
   const first = data.txns
@@ -325,17 +324,7 @@ export function holdingHistory(assetId: number): HistoryPoint[] {
     valuations: data.valuations.filter((v) => v.assetId === assetId),
   };
   const end = today();
-  const dates = new Set<IsoDate>([
-    first,
-    ...(asset.valuation === 'fd' ? monthEndsBetween(monthOf(first), monthOf(end)) : []),
-    ...own.prices.map((p) => p.date),
-    ...own.valuations.map((v) => v.date),
-    ...own.txns.map((t) => t.date),
-    end,
-  ]);
-  return [...dates]
-    .filter((d) => d >= first && d <= end)
-    .sort()
+  return sampleHistoryDates(own, first, end, from)
     .map((date) => {
       const [row] = buildPortfolio(own, date);
       return { date, invested: row?.holding.cost ?? 0, worth: row?.value ?? 0 };

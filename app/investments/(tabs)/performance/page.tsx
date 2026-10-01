@@ -23,6 +23,7 @@ import {
   PERIODS,
   performanceSeries,
   periodTotals,
+  seriesCadence,
   type Period,
   type PeriodResult,
   type PeriodRow,
@@ -86,8 +87,8 @@ export default async function PerformancePage({
   const yearStart = await financialYearStartMonth();
   const { asOf, period, from, rows } = periodPerformance(params, yearStart);
   const total = periodTotals(rows, asOf);
-  const series = performanceSeries(portfolioData(), asOf);
-  const shown = linePoints(series.filter((p) => !from || p.date > from));
+  const cadence = seriesCadence(from, asOf);
+  const shown = linePoints(performanceSeries(portfolioData(), asOf, from), cadence);
   const query = new URLSearchParams({ asof: asOf, period }).toString();
 
   const span = period === '1d'
@@ -156,9 +157,9 @@ export default async function PerformancePage({
 
         <Card
           title="Invested vs worth"
-          sub={
-            from ? `At each month-end from ${formatDate(addDays(from, 1))}` : 'At each month-end, all time'
-          }
+          sub={from
+            ? `${cadence === 'daily' ? 'Available daily prices and transactions' : cadence === 'weekly' ? 'Weekly' : 'Monthly'} from ${formatDate(from)}`
+            : 'Monthly, all time'}
         >
           <LegendInline>
             <LegendKey color="var(--c1)">Amount invested</LegendKey>

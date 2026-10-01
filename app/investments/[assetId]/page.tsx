@@ -16,14 +16,13 @@ import { ASSET_TYPE_LABELS, COMPOUNDING_LABELS, GROUPS, maskRef } from '@/lib/do
 import { today } from '@/lib/domain/dates';
 import {
   formatDate,
-  formatDay,
   formatINR,
   formatINRSigned,
   formatReturn,
   formatUnits,
   gainClass,
 } from '@/lib/domain/format';
-import { PERIODS, investmentPeriodRows } from '@/lib/domain/performance';
+import { PERIODS, investmentPeriodRows, linePoints, periodStart, seriesCadence, type Period } from '@/lib/domain/performance';
 import { fdValue } from '@/lib/domain/valuation';
 import {
   assetOptions,
@@ -35,7 +34,13 @@ import {
 } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
-export default async function HoldingPage({ params }: { params: Promise<{ assetId: string }> }) {
+export default async function HoldingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ assetId: string }>;
+  searchParams: Promise<{ period?: string }>;
+}) {
   const id = Number((await params).assetId);
   const date = today();
   const row = Number.isInteger(id) ? portfolio(date).find((r) => r.asset.id === id) : undefined;
@@ -43,6 +48,10 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
   if (!row || !option) notFound();
 
   const yearStart = await financialYearStartMonth();
+  const selected = (await searchParams).period;
+  const period: Period = PERIODS.some((choice) => choice === selected) ? selected as Period : '1d';
+  const from = periodStart(period, date, yearStart);
+  const cadence = seriesCadence(from, date);
   const data = portfolioData();
   const changes = PERIODS.map((period) => {
     const result = investmentPeriodRows(data, period, date, yearStart)
@@ -54,12 +63,7 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
   const group = GROUPS.find((g) => g.key === row.group);
   const units = asset.valuation === 'units';
   const { rows } = listInvestmentTxns({ ...parseInvTxnFilters({}), assetId: id }, { all: true });
-  const history = holdingHistory(id).map((p) => ({
-    label: formatDate(p.date),
-    short: formatDay(p.date),
-    invested: p.invested,
-    worth: p.worth,
-  }));
+  const history = linePoints(holdingHistory(id, from), cadence);
   const ref = maskRef(asset.accountRef);
 
   return (
@@ -104,7 +108,7 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
           <Card
             span={asset.valuation === 'fd' ? 8 : 12}
             title="Invested and worth"
-            sub={units ? 'At each recorded price' : 'At each statement and transaction'}
+            sub={`${cadence === 'daily' ? 'Available dates' : cadence === 'weekly' ? 'Weekly' : 'Monthly'}${from ? ` from ${formatDate(from)}` : ', all time'}`}
             action={
               <LegendInline>
                 <LegendKey color="var(--c1)">Invested</LegendKey>

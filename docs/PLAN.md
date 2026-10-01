@@ -430,7 +430,9 @@ Test vector:
 
 ### Performance series (`performance.ts`)
 
-For each month-end from the first investment transaction to today, plus today as the last point:
+For a selected range of up to 45 days, plot available price, statement and transaction dates;
+for up to a year, plot weekly checkpoints; for longer ranges and all time, plot month-ends.
+Include the range start and last day, and position points according to calendar time:
 
 - **Invested** = total cost of holdings on that date (same rules as above).
 - **Worth** = value of holdings on that date, using the latest price or valuation known on or before it.
@@ -761,7 +763,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 - **holdings:** the section 6 vector; sell everything; split; bonus at price 0; oversell rejected; fees.
 - **valuation:** latest price on or before a date; missing price falls back to the buy price; FD vector; simple interest; maturity cap.
 - **xirr:** both section 6 vectors; all-negative flows return `null`; under-365-days produces "abs.".
-- **performance:** month-end points, missing prices carried forward.
+- **performance:** daily available dates for short ranges, weekly for medium ranges, monthly for long/all-time; missing prices carried forward.
 - **linked transactions:** create, edit and delete keep both sides in sync.
 
 ---
@@ -806,6 +808,7 @@ Update this as work happens: one line per phase with the date, status and notes.
 
 | Phase | Status | Date | Notes |
 |---|---|---|---|
+| Chart history detail | Done | 1 Oct 2026 | Performance, Dashboard portfolio, and holding-detail charts now choose available daily, weekly or monthly points from their period length instead of always displaying month-ends or every historical quote. Time-proportional axes and date labels reflect irregular trading days; calculations still carry the last known price. |
 | Investment price buttons | Done | 1 Oct 2026 | Group and holding price actions fetch whole-market AMFI/NSE/BSE prices for selected held investments instead of opening price-entry fields. Manual statement-value updates remain separate; selected fetches do not mark the app-wide daily check complete. |
 | Price backfill and BSE fallback | Done | 1 Oct 2026 | SQLite checkpoints and a single local worker keep progress and Stop available across pages; unfinished work resumes on reopen. Recomputed needs pick up newly linked investments and gaps, with per-run attempts to avoid retry loops. BSE public Equity-with-ISIN CSVs (UDiFF from 8 July 2024) fill ISINs missing from NSE without sending holdings; NSE keeps precedence. No new dependency or migration. |
 | Price history cadence | Done | 1 Oct 2026 | Settings backfill now checks weekdays for the latest 30 days and fixed Sunday week-ends back to the first purchase. Daily downloads require a price on the requested date; weekly downloads can fall back up to seven days for holidays. The existing ISIN-only, whole-market AMFI/NSE requests, Stop control and manual/import price protection remain; no new dependency or schema change. |

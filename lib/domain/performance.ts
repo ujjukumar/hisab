@@ -1,6 +1,8 @@
 import {
   addDays,
   addMonths,
+  dayOfWeek,
+  daysBetween,
   daysInMonth,
   endOfMonth,
   financialYearOf,
@@ -13,7 +15,7 @@ import {
   SHORT_MONTHS,
   type IsoDate,
 } from './dates';
-import { formatDate } from './format';
+import { formatDate, formatDay } from './format';
 import type { Paise } from './money';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from './portfolio';
 import { annualReturn, type CashFlow } from './xirr';
@@ -21,17 +23,49 @@ import { annualReturn, type CashFlow } from './xirr';
 export type PerformancePoint = { date: IsoDate; invested: Paise; worth: Paise };
 
 /**
- * Invested vs worth at each month-end from the first investment transaction to `to`, plus
- * `to` itself (PLAN section 6). Worth uses the latest price or statement on or before each date.
+ * Invested vs worth at monthly, weekly, or available daily dates over the selected range.
+ * Worth uses the latest price or statement on or before each date.
  */
-export function performanceSeries(data: PortfolioData, to: IsoDate): PerformancePoint[] {
+export function seriesCadence(from: IsoDate | null, to: IsoDate): 'daily' | 'weekly' | 'monthly' {
+  if (!from) return 'monthly';
+  const days = daysBetween(from, to);
+  return days <= 45 ? 'daily' : days <= 365 ? 'weekly' : 'monthly';
+}
+
+export function sampleHistoryDates(
+  data: Pick<PortfolioData, 'txns' | 'prices' | 'valuations'>,
+  first: IsoDate,
+  to: IsoDate,
+  from: IsoDate | null = null,
+): IsoDate[] {
+  if (first > to) return [];
+  const start = from && from > first ? from : first;
+  const cadence = seriesCadence(from, to);
+  const dates = new Set<IsoDate>([to]);
+  if (from) dates.add(start);
+  if (cadence === 'daily') {
+    for (const row of [...data.txns, ...data.prices, ...data.valuations]) {
+      if (row.date >= start && row.date <= to) dates.add(row.date);
+    }
+  } else if (cadence === 'weekly') {
+    for (let date = addDays(start, (7 - dayOfWeek(start)) % 7); date < to; date = addDays(date, 7)) {
+      dates.add(date);
+    }
+  } else {
+    for (const date of monthEndsBetween(monthOf(start), monthOf(to))) {
+      if (date >= start && date < to) dates.add(date);
+    }
+  }
+  return [...dates].filter((date) => date <= to).sort();
+}
+
+export function performanceSeries(data: PortfolioData, to: IsoDate, from: IsoDate | null = null): PerformancePoint[] {
   const first = data.txns.reduce<IsoDate | null>(
     (min, t) => (!min || t.date < min ? t.date : min),
     null,
   );
   if (!first || first > to) return [];
-  const dates = [...monthEndsBetween(monthOf(first), monthOf(to)).filter((d) => d < to), to];
-  return dates.map((date) => {
+  return sampleHistoryDates(data, first, to, from).map((date) => {
     let invested = 0;
     let worth = 0;
     for (const r of buildPortfolio(data, date)) {
@@ -195,19 +229,20 @@ export function periodTotals(
 }
 
 /**
- * Chart points: month-ends read as their month ('Sep 2026'), the last day as its date. Axis
- * labels carry the year once the series is over a year long.
+ * Full dates label daily and weekly points; monthly series keep compact month labels.
  */
 export function linePoints(
   points: PerformancePoint[],
-): { label: string; short: string; invested: Paise; worth: Paise }[] {
-  const long = points.length > 13;
+  cadence: ReturnType<typeof seriesCadence> = 'monthly',
+): { date: IsoDate; label: string; short: string; invested: Paise; worth: Paise }[] {
+  const long = cadence === 'monthly' && points.length > 13;
   return points.map(({ date, invested, worth }) => {
     const { year, month } = parts(date);
     const monthEnd = date === endOfMonth(monthOf(date));
     return {
-      label: monthEnd ? shortMonthLabel(monthOf(date)) : formatDate(date),
-      short: long
+      date,
+      label: cadence === 'monthly' && monthEnd ? shortMonthLabel(monthOf(date)) : formatDate(date),
+      short: cadence !== 'monthly' ? formatDay(date) : long
         ? `${SHORT_MONTHS[month - 1]} ’${String(year).slice(2)}`
         : SHORT_MONTHS[month - 1]!,
       invested,
