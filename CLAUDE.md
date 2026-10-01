@@ -9,7 +9,7 @@ starting a phase, and keep its section 15 Progress log current.
 | Command | Does |
 |---|---|
 | `npm run dev` | `next dev -H 127.0.0.1 -p 3000` |
-| `npm run build` / `npm start` | Production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
+| `npm run build` / `npm start` | Serial DB migration then production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
 | `npm run db:generate` | `drizzle-kit generate` after schema changes |
 | `npm run db:migrate` | Apply migrations (the app also applies pending migrations on start, after making a backup) |
 | `npm run seed` | Load sample data into an empty database |
@@ -28,6 +28,7 @@ relative imports inside them need explicit `.ts` extensions.
 - `.gitignore` covers `data/`, `*.db`, `*.db-wal`, `*.db-shm`, `.env*`.
 - The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
 - The database path comes from `DATABASE_PATH` (default `./data/finance.db`). Create the folder if it's missing.
+- Node.js 24+ supplies SQLite through `node:sqlite`; use Drizzle's `node-sqlite` driver. Drizzle ORM and Kit are pinned to matching 1.0 RC versions. Back up an existing database before upgrading legacy migration history, even when no schema SQL is pending.
 - **Never commit anything in `data/`. Never use real personal financial data anywhere in the repo** — not in seed files, fixtures, tests, screenshots or commit messages. All sample data is invented.
 - Do not copy any third-party logo, name, image or asset.
 
@@ -40,7 +41,7 @@ relative imports inside them need explicit `.ts` extensions.
 - Every server action validates with Zod, runs writes in a transaction, revalidates affected paths and returns the standard result shape.
 - Components live in their own folder with a CSS Module. Use CSS variables from `styles/tokens.css` only; no raw hex colours in components.
 - Every function in `lib/domain` has unit tests, including edge cases (zero units, sell everything, split, missing prices, leap years).
-- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, better-sqlite3, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
+- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
 
 ## Copy and design rules
 

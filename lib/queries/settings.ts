@@ -11,7 +11,7 @@ import { formatDay, formatTime } from '@/lib/domain/format';
 
 /** Read one setting. Returns null when it has never been written. */
 export async function getSetting(key: string): Promise<string | null> {
-  const row = await db.query.settings.findFirst({ where: eq(settings.key, key) });
+  const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).get();
   return row?.value ?? null;
 }
 

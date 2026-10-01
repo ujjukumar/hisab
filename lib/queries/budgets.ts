@@ -61,7 +61,7 @@ export function monthBudgets(month: IsoMonth): MonthBudgets {
     )
     .groupBy(transactions.categoryId)
     .all()) {
-    if (r.id !== null) spent.set(r.id, r.total);
+    if (r.id !== null) spent.set(r.id, r.total ?? 0);
   }
 
   const all = db

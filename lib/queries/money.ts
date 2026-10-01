@@ -408,7 +408,7 @@ export function spendingBreakdown(month: IsoMonth): {
     .map((r) => ({
       key: `c${r.id ?? 0}`,
       name: r.name ?? 'Uncategorised',
-      value: r.value,
+      value: r.value ?? 0,
       color: r.color,
     }));
   const byAccount = db
@@ -422,7 +422,7 @@ export function spendingBreakdown(month: IsoMonth): {
     .map((r) => ({
       key: `a${r.id ?? 0}`,
       name: r.name ?? 'No account',
-      value: r.value,
+      value: r.value ?? 0,
       color: null,
     }));
   return { byCategory, byAccount };

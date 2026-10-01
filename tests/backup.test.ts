@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   BackupError,
@@ -21,7 +21,7 @@ import {
 const dir = mkdtempSync(join(tmpdir(), 'hisaab-backup-'));
 let conn: Connection;
 
-const snapshot = (sqlite: Database.Database) =>
+const snapshot = (sqlite: DatabaseSync) =>
   Object.fromEntries(
     [...TABLES, 'sqlite_sequence'].map((t) => [
       t,
@@ -65,7 +65,9 @@ describe('backup and restore', () => {
     prepareBackup(copy);
     restoreFrom(sqlite, copy);
     expect(snapshot(sqlite)).toEqual(before);
-    expect(sqlite.pragma('foreign_key_check')).toEqual([]);
+    expect(sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    expect(sqlite.prepare('SELECT * FROM accounts').columns().map((column) => column.name))
+      .toContain('opening_balance');
   });
 
   it('turns away a file that is not a database', () => {
@@ -76,9 +78,19 @@ describe('backup and restore', () => {
 
   it('turns away a database without Hisaab tables', () => {
     const file = join(dir, 'other.db');
-    const other = new Database(file);
+    const other = new DatabaseSync(file);
     other.exec('CREATE TABLE things (id INTEGER PRIMARY KEY)');
     other.close();
     expect(() => prepareBackup(file)).toThrow(/isn't a Hisaab backup/);
+  });
+
+  it('identifies backups with migrations from a newer app version', () => {
+    const file = backupTo(conn.sqlite, join(dir, 'backups'), '-future');
+    const future = new DatabaseSync(file);
+    future.prepare(
+      'INSERT INTO __drizzle_migrations (hash, created_at, name) VALUES (?, ?, ?)',
+    ).run('future', 1790604646000, '20260928141046_future');
+    future.close();
+    expect(() => prepareBackup(file)).toThrow(/newer version of Hisaab/);
   });
 });

@@ -24,7 +24,7 @@ export function applyFeedPrices(
           set: { price: sql`excluded.price`, updatedAt: now },
           setWhere: eq(prices.source, 'auto'),
         })
-        .run().changes;
+        .run().changes as number;
     }
     return saved;
   });

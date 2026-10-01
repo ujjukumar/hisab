@@ -11,8 +11,9 @@ reads better.
 
 ## Install
 
-Requires Node.js 24 or newer (the scripts use Node's built-in TypeScript
-support) and a C toolchain for `better-sqlite3`'s native build.
+Requires Node.js 24 or newer. The scripts use Node's built-in TypeScript and
+SQLite support; no separate SQLite addon or C++ compiler is needed. Drizzle ORM
+and Kit are pinned to matching 1.0 release candidates for the Node SQLite driver.
 
 ```bash
 npm install
@@ -28,10 +29,10 @@ npx next telemetry disable
 
 ## First run
 
-Copy the example environment file and create the database folder:
+Copy the example environment file (PowerShell):
 
-```bash
-cp .env.example .env
+```powershell
+Copy-Item .env.example .env
 ```
 
 `.env` holds one setting that matters:
@@ -71,6 +72,9 @@ required; without it the script refuses.
 `npm run dev` rebuilds on every request, which is slower than it needs to be for
 everyday use. Build once and run the production server instead:
 
+The build applies migrations in one process before Next starts its parallel workers.
+An existing database is backed up first if migration SQL or history must change.
+
 ```bash
 npm run build
 ```
@@ -96,6 +100,8 @@ npm run backup
 
 Both write a consistent copy (`VACUUM INTO`), so they are safe while the app is
 open. The result is a plain SQLite file you can copy anywhere.
+When moving to another computer, copy this backup rather than the live database
+file while the app is running; recent changes may still be in its WAL file.
 
 **Restore.** In the app, go to Settings → Restore from backup and choose a `.db`
 file. The app checks it first (it must be a Hisaab backup, undamaged, and not
@@ -112,7 +118,7 @@ cp data/backups/finance-20260928-2130.db data/finance.db
 ```
 
 **Automatic backups.** The app also saves a backup in the same folder before it
-applies a pending migration (`…-pre-migrate.db`), before a restore
+applies a pending migration or upgrades migration history (`…-pre-migrate.db`), before a restore
 (`…-pre-restore.db`), before an import (`…-pre-import.db`) and before Settings →
 start fresh (`…-pre-reset.db`).
 Nothing deletes old backups; clear the folder out yourself now and then.

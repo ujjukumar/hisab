@@ -106,8 +106,8 @@ export async function yearReport(
         months: months.map(() => 0),
         total: 0,
       };
-      row.months[months.indexOf(r.month)]! += r.total;
-      row.total += r.total;
+      row.months[months.indexOf(r.month)]! += r.total ?? 0;
+      row.total += r.total ?? 0;
       found.set(key, row);
     }
     return [...found.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));

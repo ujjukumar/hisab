@@ -1,4 +1,5 @@
 import { ensureDefaults, loadEnv, openDatabase } from '../lib/db/connect.ts';
+import { withTransaction } from '../lib/db/transaction.ts';
 import {
   addDays,
   addMonths,
@@ -620,10 +621,10 @@ const WIPE = [
   'settings',
 ];
 
-sqlite.transaction(() => {
+withTransaction(sqlite, () => {
   for (const table of WIPE) sqlite.prepare(`DELETE FROM ${table}`).run();
   sqlite.prepare('DELETE FROM sqlite_sequence').run();
-})();
+});
 ensureDefaults(sqlite);
 
 const insertAccount = sqlite.prepare(
@@ -683,7 +684,7 @@ const txn = (
   ...row,
 });
 
-sqlite.transaction(() => {
+withTransaction(sqlite, () => {
   /* accounts */
   const accountId = new Map<string, number>();
   ACCOUNTS.forEach((a, i) => {
@@ -1078,7 +1079,7 @@ sqlite.transaction(() => {
   }
 
   setSetting.run('sample_data', 'true');
-})();
+});
 
 /* ---------- report ---------- */
 const count = (table: string) =>

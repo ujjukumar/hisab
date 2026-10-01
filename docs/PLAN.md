@@ -105,7 +105,7 @@ Use the current stable version of each package at install time and pin it in `pa
 | Part | Choice |
 |---|---|
 | Framework | Next.js (App Router), React, TypeScript in strict mode |
-| Database | SQLite through `better-sqlite3`, with Drizzle ORM and `drizzle-kit` for migrations |
+| Database | SQLite through Node's built-in `node:sqlite` (Node 24+), with Drizzle ORM and `drizzle-kit` for migrations |
 | Validation | Zod, on every server action |
 | Exact maths | `decimal.js` for anything involving units, prices, rates or division |
 | Styling | Global `styles/tokens.css` + `styles/globals.css` (ported from the mockup) and one CSS Module per component. **No Tailwind and no UI kit.** |
@@ -122,7 +122,7 @@ Architecture:
 - **Client components** only where interaction needs it: drawers, filters, menus, chart hover, chips, toasts.
 - **Route handlers** only for file downloads (CSV export, backup download).
 - `lib/db` imports `server-only`. Use one shared database connection, cached on `globalThis` in development to survive hot reload. On open, set `PRAGMA journal_mode = WAL` and `PRAGMA foreign_keys = ON`.
-- If Next.js has trouble bundling `better-sqlite3`, add it to `serverExternalPackages` in `next.config`.
+- Use Drizzle's `node-sqlite` driver on the server. The matching Drizzle ORM and Kit 1.0 RC versions are pinned because the previous ORM release did not support this driver.
 
 ---
 
@@ -603,7 +603,7 @@ All names are invented: "Meridian", "Banyan", "Saffron", "Harbor" funds, "Kaveri
 | Command | Does |
 |---|---|
 | `npm run dev` | `next dev -H 127.0.0.1 -p 3000` |
-| `npm run build` / `npm start` | Production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
+| `npm run build` / `npm start` | Serial DB migration, then production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
 | `npm run db:generate` | `drizzle-kit generate` after schema changes |
 | `npm run db:migrate` | Apply migrations (the app also applies pending migrations on start, after making a backup) |
 | `npm run seed` | Load sample data into an empty database |
@@ -634,7 +634,7 @@ Write a `README.md` covering install, first run, daily use (`build` + `start`), 
 - Components live in their own folder with a CSS Module. Use CSS variables from `tokens.css` only; no raw hex colours in components.
 - Every function in `lib/domain` has unit tests, including edge cases (zero units, sell everything, split, missing prices, leap years).
 - Follow the copy rules in section 2.4.
-- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, better-sqlite3, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
+- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
 - Never commit anything in `data/`. Never use real personal financial data anywhere in the repo.
 - Keep `docs/PLAN.md`'s Progress log current.
 
@@ -772,6 +772,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 |---|---|---|
 | Language | TypeScript (Next.js) | Owner uses Claude Code; one language across the stack |
 | Hosting | Local only, 127.0.0.1, single user, no login | Personal data stays on the owner's machine |
+| SQLite driver | Node's built-in `node:sqlite`, with Drizzle's official driver | Owner-approved Oct 2026: removes the separate SQLite native build on Windows; pinned Drizzle 1.0 RC and Node SQLite release-candidate APIs need careful upgrade tests |
 | Styling | Port mockup CSS; no Tailwind | The design already exists as CSS |
 | Charts | Custom SVG; no chart library | Matches the design exactly |
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
@@ -805,6 +806,8 @@ Update this as work happens: one line per phase with the date, status and notes.
 
 | Phase | Status | Date | Notes |
 |---|---|---|---|
+| SQLite driver transition | Done | 1 Oct 2026 | Replaced `better-sqlite3` with Node 24+ `node:sqlite` using matching pinned Drizzle ORM/Kit 1.0.0-rc.4. `drizzle-kit up` converted the single migration without changing its SQL; the v1 snapshot was aligned with the current schema so generating migrations has no drift. Existing migration names and hashes are checked, and an existing DB is backed up before legacy history or pending SQL changes. Builds migrate once before Next's parallel workers. Verified on Windows Node 26.7: clean `npm ci`, lint, typecheck, 200 tests, fresh-DB build, temporary legacy upgrade/backup/restore, local dashboard, transaction save/delete/undo and zip export. Node 24 not tested on this machine; both Drizzle and Node SQLite are release candidates. |
+| Copied database compatibility | Done | 1 Oct 2026 | An existing 0.x DB from another PC had a hash of the original LF migration SQL; the tracked SQL uses CRLF, so the strict startup guard rejected it. Accept either line-ending hash while retaining unknown-hash and migration-name rejection. Verified the copied DB's schema, integrity and foreign keys read-only, then upgraded only a consistent temporary copy: all table counts unchanged, pre-migrate backup retains legacy history, repeat open is idempotent, original unchanged. |
 | Planning and mockup | Done | Sep 2026 | Mockup approved by owner |
 | 1 — Foundation | Done | 28 Sep 2026 | Shell, all shared components on `/dev/ui`, schema + migration, seed/reset/backup, domain helpers with 35 tests. Drawer uses native `<dialog>`, Menu uses the popover API. `/dev/ui` not compared in a browser — no preview pane on this install. |
 | 2 — Money | Done | 29 Sep 2026 | Transactions, Accounts and Categories tabs, transaction drawer, Money strip, CSV export; `balances.ts` + validation tests (55 total). Checked in a browser against the seed: strip and September totals match the mockup, transfers excluded. Undo keeps deleted rows in memory for 60 s (lost on restart). Accounts and categories can be deleted only while unused; otherwise archive. Fixed Phase 1 CSS: table alignment, filter spans, page padding. Real-bank balance check is the owner's. |

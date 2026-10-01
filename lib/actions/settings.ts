@@ -16,6 +16,7 @@ import {
   wipeAll,
 } from '@/lib/db/connect';
 import { settings } from '@/lib/db/schema';
+import { withTransaction } from '@/lib/db/transaction';
 import { COMPOUNDING } from '@/lib/domain/assets';
 import { clearUndo } from '@/lib/undo';
 import { failed, invalid, type ActionResult } from '@/lib/validation/money';
@@ -62,10 +63,10 @@ export async function startFresh(input: { confirm: string }): Promise<ActionResu
   if (!parsed.success) return invalid(parsed.error);
 
   backupTo(sqlite, backupsFolder(), '-pre-reset');
-  sqlite.transaction(() => {
+  withTransaction(sqlite, () => {
     wipeAll(sqlite);
     ensureDefaults(sqlite);
-  })();
+  });
   clearUndo();
   revalidatePath('/', 'layout');
   return { ok: true };
