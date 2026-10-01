@@ -403,11 +403,11 @@ Test vector:
 
 - **Total return** (holdings table) = current value − cost. This is the unrealised gain.
 - **All-time returns** (Investments strip) = (current value + all sale and withdrawal proceeds + dividends and interest received) − (all buy and deposit amounts + fees). This equals unrealised + realised gains + income.
-- **Change since last update:** this replaces the mockup's "1 day change" (decision in section 13).
-  - For each `units` holding: units × (latest price − previous price).
-  - Percent = change ÷ value at previous price.
-  - The portfolio figure is the sum across holdings. The label shows the date of the previous price, e.g. "Since 21 Sep".
-  - Holdings with fewer than two prices show "—".
+- **Change in period:** choose 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years or all time.
+  - For each holding, gain = value at the end + money taken out − value at the start − money put in during the period.
+  - Percent = gain ÷ (starting value + money put in); show "—" when there is no starting value or money put in.
+  - The portfolio and group figures combine the selected holdings' gains and cash flows. For 1 day, compare each holding's last two available prices or statements, even when today's price has not arrived; money added or taken out in between is not a gain. With fewer than two prices, fall back to yesterday. Longer periods use calendar dates.
+  - Dashboard 1-day net-worth change keeps bank and cash changes from yesterday, adds the latest investment price gain, and excludes investment purchases already funded by cash.
 
 ### XIRR (`xirr.ts`)
 
@@ -435,7 +435,7 @@ For each month-end from the first investment transaction to today, plus today as
 - **Invested** = total cost of holdings on that date (same rules as above).
 - **Worth** = value of holdings on that date, using the latest price or valuation known on or before it.
 
-Chips select All time, YTD, 6M, 1Y and 3Y. YTD follows the financial year (April start) on the Performance tab and the calendar year on the Dashboard card, and each is labelled clearly.
+Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's net-worth selector uses the calendar year.
 
 ### Allocation
 
@@ -444,7 +444,7 @@ Chips select All time, YTD, 6M, 1Y and 3Y. YTD follows the financial year (April
 
 ### Top gainers and losers
 
-The top 3 holdings each way over a chosen period (since last update, 1, 3 or 6 months, financial year to date, 1 or 3 years, all time), as a value or percent. Filters: period, investment group, and sort by value or %.
+The top 3 holdings each way over a chosen period (1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years, all time), as a value or percent. Filters: period, investment group, and sort by value or %.
 
 ---
 
@@ -456,7 +456,7 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
 
 - **Title:** the month name, with a month picker (`?month=YYYY-MM`, default current month).
 - **Action:** "Add transaction".
-- **Strip:** Net worth (+ change since last update), Investments (+ invested), Spent this month (of budget), Saved this month (% of income).
+- **Strip:** Net worth (+ selectable calendar-period change), Investments (+ invested), Spent this month (of budget), Saved this month (% of income).
 - **Cards, layout as the mockup:**
   - Income vs spending: 6M / 1Y bars, with a tooltip showing income, spending and saved.
   - Where your money went: by category or by account.
@@ -464,7 +464,7 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
   - Allocation.
   - Budgets.
   - Recent transactions: the last 6.
-  - Returns by investment type: duration picks any Performance period ("Since last update" through "All time"). Groups without holdings show "Not added + Add".
+  - Returns by investment type: duration picks any Performance period ("1 day" through "All time"). Groups without holdings show "Not added + Add".
   - Top gainers and losers.
   - Accounts, with an "In bank and cash" total.
 - Each card footer links to the matching page.
@@ -511,14 +511,14 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
 
 ### Investments → Overview `/investments` (mocked)
 
-- **Strip:** Current value (+ invested), Change since last update (+ %), All-time returns (+ % p.a.).
+- **Strip:** Current value (+ invested), selectable change in period (+ %), All-time returns (+ % p.a.).
 - **Tabs:** Overview, Performance, Transactions.
 - **Sub-tabs:** All + one per display group that has holdings.
 - One table card per group. Header actions: "Update prices" (units groups only) and "Download CSV".
 - **Columns:**
   - Name (+ folio/demat, masked)
   - Last price (+ date)
-  - Since last update (+ %)
+  - Change in selected period (+ %)
   - Total cost (+ cost per unit)
   - Current value (+ units)
   - % of portfolio
@@ -534,7 +534,7 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
 
 ### Investments → Performance `/investments/performance`
 
-- **Filter bar:** As of (date), Period (Since last update / 1M / 3M / 6M / 1Y / 3Y / All time).
+- **Filter bar:** As of (date), Period (1 day / 1 week / 1, 3 or 6 months / financial year to date / 1 or 3 years / all time).
 - **Aggregate card:** total return % and XIRR for the period, plus an "Export CSV" button.
 - **Performance graph:** amount invested vs current worth (LineChart).
 - **One table per group, columns:** Name, Current value, Invested, Gain in period, % absolute, % p.a., with a totals row.
@@ -549,7 +549,7 @@ Each Money and Investments page has a PageHead: title, actions, summary strip an
 ### Holding detail `/investments/[assetId]`
 
 - **Page head:** name, type and account ref.
-- **Strip:** Current value (+ invested), Since last update, Total return (+ p.a.).
+- **Strip:** Current value (+ invested), selectable change in period, Total return (+ p.a.).
 - **Actions:** Record transaction, Update price, and ⋮ (Edit investment, Archive).
 - **Cards:**
   - Price history (LineChart of `prices`, or valuations for manual assets).
@@ -589,7 +589,7 @@ Recreate the mockup's invented dataset so the built app looks like the mockup on
   - 2–4 lump-sum buys for stocks, ETFs and gold.
   - A single deposit for the FD (with rate and start date).
   - Yearly deposits and valuations for PPF.
-  - Generate month-end prices with a gentle seeded random walk that ends at the mockup's latest prices (25 Sep 2026 for mutual funds, 28 Sep 2026 for the others). Add one earlier price per holding so "since last update" has values.
+  - Generate month-end prices with a gentle seeded random walk that ends at the mockup's latest prices (25 Sep 2026 for mutual funds, 28 Sep 2026 for the others).
   - Link SIP buys to the Salary account.
 - Set `settings.sample_data = true`.
 - The generated data may differ slightly from the mockup's hard-coded figures. The goal is that it looks and feels the same.
@@ -777,7 +777,7 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 | Charts | Custom SVG; no chart library | Matches the design exactly |
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
 | Dark mode | Follows system setting | Already designed in the mockup |
-| Daily change | "Since last update" instead of "1 day" | Prices come by hand, import or a once-a-day download, so the last two prices may be days apart |
+| Daily change | Each holding's last two available prices for 1 day; calendar dates for 1 week and longer | The latest NAV or close can predate today (weekends, holidays, delayed updates). Each holding can have different quote dates; remove money flows so a purchase is not counted as a gain |
 | Automatic prices | AMFI and NSE whole-market files, once a day on open; past prices at month-ends only | Owner-approved (Oct 2026). Nothing about holdings is sent; daily history for past years would be hundreds of MB |
 | Cost method | Average cost | Simple and standard for tracking; not a tax calculation |
 | Short holdings | Under 365 days show absolute return "abs." | Annualising short periods misleads |
@@ -806,6 +806,9 @@ Update this as work happens: one line per phase with the date, status and notes.
 
 | Phase | Status | Date | Notes |
 |---|---|---|---|
+| Daily investment change correction | Done | 1 Oct 2026 | One-day gains use each holding's two latest quotes or statements instead of comparing two days with the same stale price. Buys and sells remain flow-adjusted; net-worth adds the missed price gain to yesterday's cash and value change without counting a cash-funded purchase twice. Dashboard, Investments, holding detail, Performance and CSV share the calculation; CSV includes each row's comparison date. |
+| Investment change periods | Done | 1 Oct 2026 | Replaced all visible previous-price changes with selectable 1-day, 1-week, longer and all-time flow-adjusted gains. Dashboard returns and movers, Investments header, overview rows and totals, holding detail, Performance filter and CSV share calendar-period calculations; the overview and header keep the period in the URL. No new dependencies. |
+| Dashboard net-worth periods | Done | 1 Oct 2026 | Net-worth strip now compares cash plus investments on the dashboard date with the same total 1 day, 1 week, 1/3/6 months or 1 year earlier. A URL-backed dropdown replaces the previous-price-only “since” figure and keeps its selection across dashboard months. Checked on an invented temporary database in desktop and 360px views; existing chart tooltip overflow is unrelated. |
 | SQLite driver transition | Done | 1 Oct 2026 | Replaced `better-sqlite3` with Node 24+ `node:sqlite` using matching pinned Drizzle ORM/Kit 1.0.0-rc.4. `drizzle-kit up` converted the single migration without changing its SQL; the v1 snapshot was aligned with the current schema so generating migrations has no drift. Existing migration names and hashes are checked, and an existing DB is backed up before legacy history or pending SQL changes. Builds migrate once before Next's parallel workers. Verified on Windows Node 26.7: clean `npm ci`, lint, typecheck, 200 tests, fresh-DB build, temporary legacy upgrade/backup/restore, local dashboard, transaction save/delete/undo and zip export. Node 24 not tested on this machine; both Drizzle and Node SQLite are release candidates. |
 | Copied database compatibility | Done | 1 Oct 2026 | An existing 0.x DB from another PC had a hash of the original LF migration SQL; the tracked SQL uses CRLF, so the strict startup guard rejected it. Accept either line-ending hash while retaining unknown-hash and migration-name rejection. Verified the copied DB's schema, integrity and foreign keys read-only, then upgraded only a consistent temporary copy: all table counts unchanged, pre-migrate backup retains legacy history, repeat open is idempotent, original unchanged. |
 | Planning and mockup | Done | Sep 2026 | Mockup approved by owner |

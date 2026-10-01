@@ -10,17 +10,19 @@ import {
 import { InvestmentTxnTable } from '@/components/InvestmentTxnTable/InvestmentTxnTable';
 import { PageHead } from '@/components/PageHead/PageHead';
 import { Rows } from '@/components/Rows/Rows';
+import { InvestmentChange } from '@/components/StatStrip/InvestmentChange';
 import { ASSET_TYPE_LABELS, COMPOUNDING_LABELS, GROUPS, maskRef } from '@/lib/domain/assets';
+import { today } from '@/lib/domain/dates';
 import {
   formatDate,
   formatDay,
   formatINR,
   formatINRSigned,
-  formatPercentNoPlus,
   formatReturn,
   formatUnits,
   gainClass,
 } from '@/lib/domain/format';
+import { PERIODS, investmentPeriodRows } from '@/lib/domain/performance';
 import { fdValue } from '@/lib/domain/valuation';
 import {
   assetOptions,
@@ -28,13 +30,24 @@ import {
   listInvestmentTxns,
   parseInvTxnFilters,
   portfolio,
+  portfolioData,
 } from '@/lib/queries/investments';
+import { financialYearStartMonth } from '@/lib/queries/settings';
 
 export default async function HoldingPage({ params }: { params: Promise<{ assetId: string }> }) {
   const id = Number((await params).assetId);
-  const row = Number.isInteger(id) ? portfolio().find((r) => r.asset.id === id) : undefined;
+  const date = today();
+  const row = Number.isInteger(id) ? portfolio(date).find((r) => r.asset.id === id) : undefined;
   const option = assetOptions().find((o) => o.id === id);
   if (!row || !option) notFound();
+
+  const yearStart = await financialYearStartMonth();
+  const data = portfolioData();
+  const changes = PERIODS.map((period) => {
+    const result = investmentPeriodRows(data, period, date, yearStart)
+      .find((r) => r.row.asset.id === id);
+    return { period, gain: result?.gain ?? 0, absolute: result?.absolute ?? null };
+  });
 
   const { asset, holding } = row;
   const group = GROUPS.find((g) => g.key === row.group);
@@ -77,21 +90,7 @@ export default async function HoldingPage({ params }: { params: Promise<{ assetI
               ? `${formatUnits(holding.units.toNumber(), holding.units.isInteger() ? 0 : 3)} ${group?.unitWord ?? 'units'}, ${formatINR(row.sold ? 0 : holding.cost)} invested`
               : `${formatINR(holding.cost)} invested`,
           },
-          row.sinceLast
-            ? {
-                label: `Since ${formatDay(row.sinceLast.since)}`,
-                value: formatINRSigned(row.sinceLast.change),
-                aside: formatPercentNoPlus(
-                  (row.sinceLast.change / row.sinceLast.previousValue) * 100,
-                ),
-                tone: gainClass(row.sinceLast.change),
-                asideTone: gainClass(row.sinceLast.change),
-              }
-            : {
-                label: 'Since last update',
-                value: '—',
-                aside: units ? 'Needs two prices' : 'Not priced',
-              },
+          { label: 'Change in period', value: <InvestmentChange changes={changes} /> },
           {
             label: row.sold ? 'Realised gain' : 'Total return',
             value: formatINRSigned(row.totalReturn),

@@ -2,26 +2,27 @@ import type { ReactNode } from 'react';
 import { ButtonLink } from '@/components/Button/Button';
 import { AddInvestmentButton } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { PageHead } from '@/components/PageHead/PageHead';
+import { InvestmentChange } from '@/components/StatStrip/InvestmentChange';
 import { UpdatePricesButton } from '@/components/Prices/Prices';
 import { Tabs } from '@/components/Tabs/Tabs';
 import { INVESTMENT_TABS } from '@/app/nav';
 import { today } from '@/lib/domain/dates';
-import {
-  formatDay,
-  formatINRSigned,
-  formatPercent,
-  formatReturn,
-  formatShortINR,
-  formatShortINRSigned,
-  gainClass,
-} from '@/lib/domain/format';
+import { formatReturn, formatShortINR, formatShortINRSigned, gainClass } from '@/lib/domain/format';
+import { PERIODS, investmentPeriodRows, periodTotals } from '@/lib/domain/performance';
 import { totals } from '@/lib/domain/portfolio';
-import { portfolio } from '@/lib/queries/investments';
-import { priceStatus, priceUpdate } from '@/lib/queries/settings';
+import { portfolio, portfolioData } from '@/lib/queries/investments';
+import { financialYearStartMonth, priceStatus, priceUpdate } from '@/lib/queries/settings';
 
 export default async function InvestmentTabsLayout({ children }: { children: ReactNode }) {
-  const t = totals(portfolio(), today());
+  const date = today();
+  const t = totals(portfolio(date), date);
   const last = await priceUpdate();
+  const yearStart = await financialYearStartMonth();
+  const data = portfolioData();
+  const changes = PERIODS.map((period) => {
+    const result = periodTotals(investmentPeriodRows(data, period, date, yearStart), date);
+    return { period, gain: result.gain, absolute: result.absolute };
+  });
 
   return (
     <>
@@ -48,15 +49,7 @@ export default async function InvestmentTabsLayout({ children }: { children: Rea
             value: formatShortINR(t.value),
             aside: `${formatShortINR(t.invested)} invested`,
           },
-          t.change
-            ? {
-                label: `Change since ${formatDay(t.change.since)}`,
-                value: formatINRSigned(t.change.amount),
-                aside: formatPercent(t.change.percent),
-                tone: gainClass(t.change.amount),
-                asideTone: gainClass(t.change.amount),
-              }
-            : { label: 'Change since last update', value: '—', aside: 'Needs two prices' },
+          { label: 'Change in period', value: <InvestmentChange changes={changes} /> },
           {
             label: 'All-time returns',
             value: formatShortINRSigned(t.allTime),

@@ -23,6 +23,7 @@ import {
   PERIODS,
   performanceSeries,
   periodTotals,
+  type Period,
   type PeriodResult,
   type PeriodRow,
 } from '@/lib/domain/performance';
@@ -46,14 +47,14 @@ function figures(r: PeriodResult) {
   ];
 }
 
-const columns: Column<PeriodRow>[] = [
+const columns = (period: Period): Column<PeriodRow>[] => [
   {
     key: 'name',
     header: 'Name',
     align: 'l',
     cell: ({ row }) => (
       <NameCell
-        href={`/investments/${row.asset.id}`}
+        href={`/investments/${row.asset.id}${period === '1d' ? '' : `?period=${period}`}`}
         name={row.asset.name}
         sub={maskRef(row.asset.accountRef) || ASSET_TYPE_LABELS[row.asset.type]}
       />
@@ -89,12 +90,11 @@ export default async function PerformancePage({
   const shown = linePoints(series.filter((p) => !from || p.date > from));
   const query = new URLSearchParams({ asof: asOf, period }).toString();
 
-  const span =
-    period === 'since'
-      ? "Each holding's change since its previous price"
-      : from
-        ? `${formatDate(addDays(from, 1))} to ${formatDate(asOf)}`
-        : `All time to ${formatDate(asOf)}`;
+  const span = period === '1d'
+    ? `Latest daily prices per holding through ${formatDate(asOf)}`
+    : from
+      ? `${formatDate(addDays(from, 1))} to ${formatDate(asOf)}`
+      : `All time to ${formatDate(asOf)}`;
 
   return (
     <div className="wrap page-body">
@@ -157,33 +157,27 @@ export default async function PerformancePage({
         <Card
           title="Invested vs worth"
           sub={
-            period === 'since' || !from
-              ? 'At each month-end, all time'
-              : `At each month-end from ${formatDate(addDays(from, 1))}`
+            from ? `At each month-end from ${formatDate(addDays(from, 1))}` : 'At each month-end, all time'
           }
         >
           <LegendInline>
             <LegendKey color="var(--c1)">Amount invested</LegendKey>
             <LegendKey color="var(--c2)">Current worth</LegendKey>
           </LegendInline>
-          <LineChart points={period === 'since' ? linePoints(series) : shown} />
+          <LineChart points={shown} />
         </Card>
 
         {rows.length === 0 ? (
           <DataTable
             title="Holdings"
-            columns={columns}
+            columns={columns(period)}
             rows={[]}
             rowKey={(r) => r.row.asset.id}
             empty={
-              period === 'since' ? (
-                <p>No holding has two prices by this date. Update prices to see the change.</p>
-              ) : (
-                <>
-                  <p>No investments in this period. Add one to start tracking its returns.</p>
-                  <AddInvestmentButton />
-                </>
-              )
+              <>
+                <p>No investments in this period. Add one to start tracking its returns.</p>
+                <AddInvestmentButton />
+              </>
             }
           />
         ) : (
@@ -195,7 +189,7 @@ export default async function PerformancePage({
               <DataTable
                 key={g.key}
                 title={`${g.title} (${own.length})`}
-                columns={columns}
+                columns={columns(period)}
                 rows={own}
                 rowKey={(r) => r.row.asset.id}
                 footer={
@@ -224,7 +218,6 @@ export default async function PerformancePage({
         All amounts in ₹. Gain in period is the value at the end, plus money taken out, minus the
         value at the start and money put in. % absolute divides it by the starting value plus money
         put in. % p.a. (XIRR) needs a year or more of history.
-        {period === 'since' && ' Since last update covers holdings with two or more prices.'}
       </p>
     </div>
   );

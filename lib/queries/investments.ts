@@ -27,9 +27,8 @@ import { computeHolding, moneyMoved, OversellError, type HoldingTxn } from '@/li
 import type { Paise } from '@/lib/domain/money';
 import {
   PERIODS,
-  periodRows,
+  investmentPeriodRows,
   periodStart,
-  sinceLastRows,
   type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
@@ -352,10 +351,13 @@ export function periodPerformance(params: Params, yearStartMonth: number) {
   const asked = one('asof');
   const asOf = isValidDate(asked) && asked <= now ? asked : now;
   const p = one('period');
-  const period: Period = (PERIODS as readonly string[]).includes(p) ? (p as Period) : 'all';
-  const from = periodStart(period, asOf, yearStartMonth);
-  const rows =
-    period === 'since' ? sinceLastRows(portfolio(asOf)) : periodRows(portfolioData(), from, asOf);
+  const period: Period = (PERIODS as readonly string[]).includes(p) ? (p as Period) : '1d';
+  const data = portfolioData();
+  const rows = investmentPeriodRows(data, period, asOf, yearStartMonth);
+  const fallback = periodStart(period, asOf, yearStartMonth);
+  const from = period === '1d'
+    ? rows.reduce<IsoDate>((earliest, row) => row.from && row.from < earliest ? row.from : earliest, fallback!)
+    : fallback;
   return { asOf, period, from, rows };
 }
 

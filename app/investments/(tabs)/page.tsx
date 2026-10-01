@@ -26,8 +26,17 @@ import {
 } from '@/lib/domain/format';
 import { unitsAmount } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
+import {
+  PERIOD_LABELS,
+  PERIODS,
+  investmentPeriodRows,
+  periodTotals,
+  type Period,
+  type PeriodRow,
+} from '@/lib/domain/performance';
 import { totals, type HoldingRow } from '@/lib/domain/portfolio';
-import { assetOptions, pickHoldings, portfolio } from '@/lib/queries/investments';
+import { assetOptions, pickHoldings, portfolio, portfolioData } from '@/lib/queries/investments';
+import { financialYearStartMonth } from '@/lib/queries/settings';
 
 type Group = (typeof GROUPS)[number];
 
@@ -38,7 +47,12 @@ const price = (p: string) => formatAmount(unitsAmount('1', p), 2);
 
 const retTone = (r: HoldingRow['ret']) => gainClass((r?.rate ?? 0) * 100);
 
-function columns(g: Group, portfolioValue: Paise): Column<HoldingRow>[] {
+function columns(
+  g: Group,
+  portfolioValue: Paise,
+  changeById: Map<number, PeriodRow>,
+  period: Period,
+): Column<HoldingRow>[] {
   const costSub =
     g.key === 'stock'
       ? 'Cost per share'
@@ -53,7 +67,7 @@ function columns(g: Group, portfolioValue: Paise): Column<HoldingRow>[] {
       align: 'l',
       cell: (r) => (
         <NameCell
-          href={`/investments/${r.asset.id}`}
+          href={`/investments/${r.asset.id}${period === '1d' ? '' : `?period=${period}`}`}
           name={
             <>
               {r.asset.name}
@@ -84,21 +98,23 @@ function columns(g: Group, portfolioValue: Paise): Column<HoldingRow>[] {
         ),
     },
     {
-      key: 'since',
-      header: 'Since last update',
-      sub: '% change',
-      cell: (r) =>
-        r.sinceLast ? (
+      key: 'change',
+      header: 'Change in period',
+      sub: PERIOD_LABELS[period],
+      cell: (r) => {
+        const change = changeById.get(r.asset.id);
+        return change ? (
           <Amount
-            tone={gainClass(r.sinceLast.change)}
-            sub={formatPercentNoPlus((r.sinceLast.change / r.sinceLast.previousValue) * 100)}
-            subTone={gainClass(r.sinceLast.change)}
+            tone={gainClass(change.gain)}
+            sub={change.absolute === null ? '—' : formatPercentNoPlus(change.absolute * 100)}
+            subTone={gainClass(change.gain)}
           >
-            {formatAmountSigned(r.sinceLast.change)}
+            {formatAmountSigned(change.gain)}
           </Amount>
         ) : (
           MUTED
-        ),
+        );
+      },
     },
     {
       key: 'cost',
@@ -171,12 +187,18 @@ export default async function OverviewPage({
   const hiddenSold = all.filter((r) => r.sold).length;
   const portfolioValue = totals(all, date).value;
   const options = new Map(assetOptions().map((o) => [o.id, o]));
+  const period = PERIODS.find((p) => p === params.period) ?? '1d';
+  const yearStart = await financialYearStartMonth();
+  const data = portfolioData();
+  const changes = investmentPeriodRows(data, period, date, yearStart);
+  const changeById = new Map(changes.map((r) => [r.row.asset.id, r]));
 
   const query = (next: { group?: string | null; sold?: boolean }) => {
     const p = new URLSearchParams();
     const g = next.group === undefined ? group : next.group;
     if (g) p.set('group', g);
     if (next.sold ?? showSold) p.set('sold', '1');
+    if (period !== '1d') p.set('period', period);
     const s = p.toString();
     return s ? `?${s}` : '';
   };
@@ -223,7 +245,7 @@ export default async function OverviewPage({
         {shown.length === 0 ? (
           <DataTable
             title="Holdings"
-            columns={columns(GROUPS[0]!, portfolioValue)}
+            columns={columns(GROUPS[0]!, portfolioValue, changeById, period)}
             rows={[]}
             rowKey={(r) => r.asset.id}
             empty={
@@ -248,6 +270,8 @@ export default async function OverviewPage({
             {shown.map((g) => {
               const groupRows = rows.filter((r) => r.group === g.key);
               const t = totals(groupRows, date);
+              const groupIds = new Set(groupRows.map((r) => r.asset.id));
+              const groupChange = periodTotals(changes.filter((r) => groupIds.has(r.row.asset.id)), date);
               const updatable = groupRows.filter((r) => !r.sold && r.asset.valuation !== 'fd');
               const pricesOnly = updatable.every((r) => r.asset.valuation === 'units');
               return (
@@ -268,7 +292,7 @@ export default async function OverviewPage({
                       />
                     </>
                   }
-                  columns={columns(g, portfolioValue)}
+                  columns={columns(g, portfolioValue, changeById, period)}
                   rows={groupRows}
                   rowKey={(r) => r.asset.id}
                   menu={(r) => {
@@ -280,15 +304,13 @@ export default async function OverviewPage({
                       <td className="l">Total</td>
                       <td />
                       <td className="r">
-                        {t.change && (
-                          <Amount
-                            tone={gainClass(t.change.amount)}
-                            sub={formatPercentNoPlus(t.change.percent)}
-                            subTone={gainClass(t.change.amount)}
-                          >
-                            {formatAmountSigned(t.change.amount)}
-                          </Amount>
-                        )}
+                        <Amount
+                          tone={gainClass(groupChange.gain)}
+                          sub={groupChange.absolute === null ? '—' : formatPercentNoPlus(groupChange.absolute * 100)}
+                          subTone={gainClass(groupChange.gain)}
+                        >
+                          {formatAmountSigned(groupChange.gain)}
+                        </Amount>
                       </td>
                       <td className="r">
                         <Amount>{formatAmount(t.invested)}</Amount>
@@ -320,7 +342,8 @@ export default async function OverviewPage({
         )}
         <p className="footnote">
           All amounts in ₹. Total return is current value minus cost; sold investments show the gain
-          they made. Returns under a year are shown as an absolute percentage (abs.).
+          they made. Change in period accounts for money added or withdrawn. Returns under a year
+          are shown as an absolute percentage (abs.).
         </p>
       </div>
     </>

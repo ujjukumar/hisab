@@ -42,7 +42,7 @@ export function performanceSeries(data: PortfolioData, to: IsoDate): Performance
   });
 }
 
-export const PERIODS = ['since', '1m', '3m', '6m', 'ytd', '1y', '3y', 'all'] as const;
+export const PERIODS = ['1d', '1w', '1m', '3m', '6m', 'ytd', '1y', '3y', 'all'] as const;
 export type Period = (typeof PERIODS)[number];
 
 const MONTHS_BACK: Partial<Record<Period, number>> = {
@@ -57,9 +57,11 @@ const MONTHS_BACK: Partial<Record<Period, number>> = {
  * The day a period is measured from: its value that day is the starting point and flows after
  * it count. The same day N months back, clamped to shorter months; for YTD the day before the
  * year starts (`yearStartMonth` 4 for the financial year, 1 for the calendar year).
- * Null for All time and Since last update, which have no start date.
+ * Null for All time, which has no start date.
  */
 export function periodStart(period: Period, asOf: IsoDate, yearStartMonth: number): IsoDate | null {
+  if (period === '1d') return addDays(asOf, -1);
+  if (period === '1w') return addDays(asOf, -7);
   if (period === 'ytd') {
     return addDays(
       financialYearRange(financialYearOf(asOf, yearStartMonth), yearStartMonth).from,
@@ -84,6 +86,7 @@ export type PeriodResult = {
 export type PeriodRow = PeriodResult & {
   /** The holding on the period's last day. */
   row: HoldingRow;
+  from: IsoDate | null;
   start: Paise;
   paidIn: Paise;
   /** −start value, the period's flows, +end value. */
@@ -110,12 +113,18 @@ function result(
  * put in. With no `from` this is the all-time return. Holdings with nothing at either end and no
  * activity in between are left out.
  */
-export function periodRows(data: PortfolioData, from: IsoDate | null, to: IsoDate): PeriodRow[] {
-  const startValues = new Map(
-    from ? buildPortfolio(data, from).map((r) => [r.asset.id, r.value]) : [],
-  );
+function rowsFrom(
+  data: PortfolioData,
+  to: IsoDate,
+  startDate: (row: HoldingRow) => IsoDate | null,
+): PeriodRow[] {
+  const startValues = new Map<IsoDate, Map<number, Paise>>();
   return buildPortfolio(data, to).flatMap((row) => {
-    const start = startValues.get(row.asset.id) ?? 0;
+    const from = startDate(row);
+    if (from && !startValues.has(from)) {
+      startValues.set(from, new Map(buildPortfolio(data, from).map((r) => [r.asset.id, r.value])));
+    }
+    const start = from ? (startValues.get(from)?.get(row.asset.id) ?? 0) : 0;
     const moved = row.holding.flows.filter((f) => !from || f.date > from);
     if (start === 0 && moved.length === 0 && row.value === 0) return [];
     const flows = [
@@ -125,29 +134,34 @@ export function periodRows(data: PortfolioData, from: IsoDate | null, to: IsoDat
     ];
     const paidIn = moved.reduce((sum, f) => sum + (f.amount < 0 ? -f.amount : 0), 0);
     const gain = flows.reduce((sum, f) => sum + f.amount, 0);
-    return [{ row, start, paidIn, flows, ...result(start, paidIn, gain, flows, to) }];
+    return [{ row, from, start, paidIn, flows, ...result(start, paidIn, gain, flows, to) }];
   });
 }
 
-/** Since last update: each holding with two prices, from its previous price to its latest. */
-export function sinceLastRows(rows: HoldingRow[]): PeriodRow[] {
-  return rows.flatMap((row) =>
-    row.sinceLast
-      ? [
-          {
-            row,
-            start: row.sinceLast.previousValue,
-            paidIn: 0,
-            flows: [],
-            gain: row.sinceLast.change,
-            absolute: row.sinceLast.previousValue
-              ? row.sinceLast.change / row.sinceLast.previousValue
-              : null,
-            annual: null,
-          },
-        ]
-      : [],
-  );
+export function periodRows(data: PortfolioData, from: IsoDate | null, to: IsoDate): PeriodRow[] {
+  return rowsFrom(data, to, () => from);
+}
+
+export function investmentPeriodRows(
+  data: PortfolioData,
+  period: Period,
+  to: IsoDate,
+  yearStartMonth: number,
+): PeriodRow[] {
+  if (period !== '1d') return periodRows(data, periodStart(period, to, yearStartMonth), to);
+  const yesterday = addDays(to, -1);
+  return rowsFrom(data, to, (row) => {
+    if (row.sold) return yesterday;
+    const quotes = row.asset.valuation === 'units'
+      ? data.prices
+      : row.asset.valuation === 'manual'
+        ? data.valuations
+        : [];
+    const dates = [...new Set(quotes
+      .filter((quote) => quote.assetId === row.asset.id && quote.date <= to)
+      .map((quote) => quote.date))].sort();
+    return dates.at(-2) ?? yesterday;
+  });
 }
 
 /** A group's or the whole portfolio's figures; XIRR combines every holding's flows. */
@@ -203,7 +217,8 @@ export function linePoints(
 }
 
 export const PERIOD_LABELS: Record<Period, string> = {
-  since: 'Since last update',
+  '1d': '1 day',
+  '1w': '1 week',
   '1m': '1 month',
   '3m': '3 months',
   '6m': '6 months',

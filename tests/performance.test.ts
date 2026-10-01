@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Asset } from '@/lib/db/schema';
 import { unitsAmount, type HoldingTxn } from '@/lib/domain/holdings';
 import {
+  investmentPeriodRows,
   linePoints,
   performanceSeries,
   periodRows,
   periodStart,
   periodTotals,
-  sinceLastRows,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type PortfolioData } from '@/lib/domain/portfolio';
 
@@ -104,6 +104,12 @@ describe('performanceSeries', () => {
 });
 
 describe('periodStart', () => {
+  it('uses the prior day and the prior week across month boundaries', () => {
+    expect(periodStart('1d', '2026-10-01', 4)).toBe('2026-09-30');
+    expect(periodStart('1w', '2026-10-01', 4)).toBe('2026-09-24');
+    expect(periodStart('1d', '2024-03-01', 4)).toBe('2024-02-29');
+  });
+
   it('goes back whole months, clamped to shorter months', () => {
     expect(periodStart('1m', '2026-09-29', 4)).toBe('2026-08-29');
     expect(periodStart('1m', '2026-03-31', 4)).toBe('2026-02-28');
@@ -124,13 +130,93 @@ describe('periodStart', () => {
     expect(periodStart('ytd', '2026-09-29', 1)).toBe('2025-12-31');
   });
 
-  it('has no start for All time or Since last update', () => {
+  it('has no start for All time', () => {
     expect(periodStart('all', '2026-09-29', 4)).toBeNull();
-    expect(periodStart('since', '2026-09-29', 4)).toBeNull();
+  });
+});
+
+describe('one-day investment returns', () => {
+  it('uses the last two available pricing days for 1 day when today has no new price', () => {
+    const quoted: PortfolioData = {
+      assets: [asset(1, 'Example Fund')],
+      txns: [
+        trade(1, 1, '2025-03-06', 'buy', '100', '10'),
+        trade(2, 1, '2025-03-11', 'buy', '10', '12'),
+      ],
+      prices: [
+        { assetId: 1, date: '2025-03-07', price: '11' },
+        { assetId: 1, date: '2025-03-10', price: '12' },
+      ],
+      valuations: [],
+    };
+    const asOf = '2025-03-12';
+    const daily = investmentPeriodRows(quoted, '1d', asOf, 4);
+    expect(daily[0]?.from).toBe('2025-03-07');
+    expect(periodTotals(daily, asOf).gain).toBe(10000);
+
+    const buyDate = '2025-03-11';
+    const yesterday = periodStart('1d', buyDate, 4)!;
+    const before = buildPortfolio(quoted, yesterday)[0]!.value;
+    const after = buildPortfolio(quoted, buyDate)[0]!.value;
+    const calendarGain = periodTotals(periodRows(quoted, yesterday, buyDate), buyDate).gain;
+    const quotedGain = periodTotals(investmentPeriodRows(quoted, '1d', buyDate, 4), buyDate).gain;
+    expect(-12000 + after - before + quotedGain - calendarGain).toBe(10000);
+  });
+
+  it('falls back to yesterday without two prices and leaves longer periods unchanged', () => {
+    const unpriced = { ...data, prices: [] };
+    expect(investmentPeriodRows(unpriced, '1d', '2025-03-12', 4)[0]?.from).toBe('2025-03-11');
+    expect(investmentPeriodRows(data, '1w', '2025-03-12', 4)[0]?.from).toBe('2025-03-05');
+  });
+
+  it('ignores future quotes and prices of investments no longer held', () => {
+    const quoted: PortfolioData = {
+      ...data,
+      prices: [
+        { assetId: 1, date: '2025-03-07', price: '11' },
+        { assetId: 1, date: '2025-03-10', price: '12' },
+        { assetId: 1, date: '2025-03-20', price: '13' },
+        { assetId: 2, date: '2025-03-11', price: '110' },
+      ],
+    };
+    expect(investmentPeriodRows(quoted, '1d', '2025-03-12', 4)[0]?.from).toBe('2025-03-07');
+  });
+});
+
+describe('investmentPeriodRows', () => {
+  it('uses each holding\'s own last two prices for 1 day', () => {
+    const quoted: PortfolioData = {
+      assets: [asset(1, 'Earlier Fund'), asset(2, 'Later Stock')],
+      txns: [
+        trade(1, 1, '2025-03-01', 'buy', '100', '10'),
+        trade(2, 2, '2025-03-01', 'buy', '100', '20'),
+      ],
+      prices: [
+        { assetId: 1, date: '2025-03-06', price: '11' },
+        { assetId: 1, date: '2025-03-07', price: '12' },
+        { assetId: 2, date: '2025-03-07', price: '21' },
+        { assetId: 2, date: '2025-03-10', price: '22' },
+      ],
+      valuations: [],
+    };
+    const rows = investmentPeriodRows(quoted, '1d', '2025-03-12', 4);
+    expect(rows.map(({ from, gain }) => ({ from, gain }))).toEqual([
+      { from: '2025-03-06', gain: 10000 },
+      { from: '2025-03-07', gain: 10000 },
+    ]);
+    expect(periodTotals(rows, '2025-03-12').gain).toBe(20000);
   });
 });
 
 describe('periodRows and periodTotals', () => {
+  it('reports zero after a quiet day and includes purchases over a week', () => {
+    const to = '2025-03-11';
+    const day = periodRows(data, periodStart('1d', to, 4), to);
+    const week = periodRows(data, periodStart('1w', to, 4), to);
+    expect(day.find((row) => row.row.asset.id === 1)?.gain).toBe(0);
+    expect(week.find((row) => row.row.asset.id === 1)?.gain).toBe(10000);
+  });
+
   it('measures a period from the starting value, counting money put in', () => {
     const rows = periodRows(data, '2025-02-28', '2025-04-20');
     // Banyan was sold before the period started, so it is left out.
@@ -173,17 +259,6 @@ describe('periodRows and periodTotals', () => {
       value: 0,
       invested: 0,
     });
-  });
-});
-
-describe('sinceLastRows', () => {
-  it('uses the change between the last two prices, skipping holdings without two', () => {
-    const rows = sinceLastRows(buildPortfolio(data, '2025-04-20'));
-    expect(rows.map((r) => r.row.asset.name)).toEqual(['Meridian Flexi Fund']);
-    expect(rows[0]).toMatchObject({ gain: 15000, start: 165000, annual: null });
-    const t = periodTotals(rows, '2025-04-20');
-    expect(t.gain).toBe(15000);
-    expect(t.absolute).toBeCloseTo(15000 / 165000, 10);
   });
 });
 

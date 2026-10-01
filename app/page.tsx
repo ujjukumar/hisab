@@ -15,6 +15,8 @@ import {
 import { MoversCard } from '@/components/MoversCard/MoversCard';
 import { PageHead } from '@/components/PageHead/PageHead';
 import { Rows, type Row } from '@/components/Rows/Rows';
+import { NetWorthPeriodSelect } from '@/components/StatStrip/NetWorthPeriodSelect';
+import stripStyles from '@/components/StatStrip/StatStrip.module.css';
 import { SwitchCard } from '@/components/SwitchCard/SwitchCard';
 import {
   AddTransactionButton,
@@ -43,6 +45,7 @@ import {
   MINUS,
 } from '@/lib/domain/format';
 import {
+  investmentPeriodRows,
   linePoints,
   performanceSeries,
   PERIOD_LABELS,
@@ -50,7 +53,6 @@ import {
   PERIODS,
   periodStart,
   periodTotals,
-  sinceLastRows,
   type Period,
   type PeriodRow,
 } from '@/lib/domain/performance';
@@ -75,6 +77,15 @@ import styles from './page.module.css';
 
 const color = (i: number) => `var(--c${(i % 8) + 1})`;
 
+const NET_WORTH_PERIODS = [
+  { value: '1d', label: '1 day' },
+  { value: '1w', label: '1 week' },
+  { value: '1m', label: '1 month' },
+  { value: '3m', label: '3 months' },
+  { value: '6m', label: '6 months' },
+  { value: '1y', label: '1 year' },
+] as const;
+
 const slices = (items: { name: string; value: number; color: string | null }[]): Slice[] =>
   items.map((item, i) => ({
     name: item.name,
@@ -84,7 +95,9 @@ const slices = (items: { name: string; value: number; color: string | null }[]):
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Params> }) {
   const now = currentMonth();
-  const asked = paramReader(await searchParams).one('month');
+  const params = paramReader(await searchParams);
+  const asked = params.one('month');
+  const netWorthPeriod = NET_WORTH_PERIODS.find((p) => p.value === params.one('worth')) ?? NET_WORTH_PERIODS[0];
   // Future months have nothing to show yet, so they fall back to this month.
   const month: IsoMonth = isValidMonth(asked) && asked <= now ? asked : now;
   const isNow = month === now;
@@ -93,13 +106,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const range = { from: startOfMonth(month), to: endOfMonth(month) };
   const moneyHref = isNow ? '/money' : `/money?from=${range.from}&to=${range.to}`;
   const budgetsHref = isNow ? '/money/budgets' : `/money/budgets?month=${month}`;
-  const monthHref = (m: IsoMonth) => (m === now ? '/' : `/?month=${m}`);
+  const monthHref = (m: IsoMonth) => {
+    const query = new URLSearchParams();
+    if (m !== now) query.set('month', m);
+    if (netWorthPeriod.value !== '1d') query.set('worth', netWorthPeriod.value);
+    return query.size ? `/?${query}` : '/';
+  };
 
   const s = moneyStrip(month);
   const allAccounts = listAccounts(asOf);
   const accounts = allAccounts.filter((a) => !a.archived);
   const rows = portfolio(asOf);
+  const data = portfolioData();
   const t = totals(rows, asOf);
+  const worthFrom = periodStart(netWorthPeriod.value, asOf, 1)!;
+  const earlierCash = listAccounts(worthFrom)
+    .filter((account) => !account.archived)
+    .reduce((sum, account) => sum + account.balance, 0);
+  const earlierInvestments = portfolio(worthFrom).reduce((sum, row) => sum + row.value, 0);
+  const calendarInvestmentGain = netWorthPeriod.value === '1d'
+    ? periodTotals(periodRows(data, worthFrom, asOf), asOf).gain
+    : 0;
+  const latestPriceGain = netWorthPeriod.value === '1d'
+    ? periodTotals(investmentPeriodRows(data, '1d', asOf, 1), asOf).gain
+    : 0;
+  const worthChange = s.bankAndCash + t.value - earlierCash - earlierInvestments
+    + latestPriceGain - calendarInvestmentGain;
   const options = assetOptions();
 
   /* ---------- get started, for a brand-new app ---------- */
@@ -224,11 +256,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   /* ---------- returns over each period, for the two cards below ---------- */
   const yearStart = await financialYearStartMonth();
   const byPeriod = PERIODS.map((period) => {
-    const from = periodStart(period, asOf, yearStart);
+    const from = period === '1d' ? null : periodStart(period, asOf, yearStart);
     return {
       period,
       from,
-      rows: period === 'since' ? sinceLastRows(rows) : periodRows(portfolioData(), from, asOf),
+      rows: investmentPeriodRows(data, period, asOf, yearStart),
     };
   });
 
@@ -248,7 +280,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         };
       }
       const gt = totals(own, asOf);
-      if (mode !== 'all' && mode !== 'since') {
+      if (mode !== 'all') {
         const mine = periodRowsOf.filter((r) => r.row.group === g.key);
         if (mine.length === 0) {
           return { key: g.key, name: g.title, amount: 'Not held in this period', tone: 'muted' };
@@ -262,23 +294,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           tone: gainClass(pt.gain),
         };
       }
-      if (mode === 'all') {
-        return {
-          key: g.key,
-          name: g.title,
-          amount: `${formatINRSigned(gt.allTime)} (${formatReturn(gt.ret)})`,
-          tone: gainClass(gt.allTime),
-        };
-      }
-      return gt.change
-        ? {
-            key: g.key,
-            name: g.title,
-            sub: `Since ${formatDay(gt.change.since)}`,
-            amount: `${formatINRSigned(gt.change.amount)} (${formatPercent(gt.change.percent)})`,
-            tone: gainClass(gt.change.amount),
-          }
-        : { key: g.key, name: g.title, amount: 'No price change yet', tone: 'muted' };
+      return {
+        key: g.key,
+        name: g.title,
+        amount: `${formatINRSigned(gt.allTime)} (${formatReturn(gt.ret)})`,
+        tone: gainClass(gt.allTime),
+      };
     });
 
   /* ---------- gainers and losers ---------- */
@@ -299,12 +320,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const moverPeriods = byPeriod.map(({ period, from }) => ({
     value: period,
     label: PERIOD_LABELS[period],
-    sub:
-      period === 'since'
-        ? "Change since each holding's previous price"
-        : from
-          ? `Gain from ${formatDate(from)} to ${formatDate(asOf)}, after money added or taken out`
-          : 'Gain since each holding was bought',
+    sub: period === '1d'
+      ? 'Latest daily prices per holding, after money added or taken out'
+      : from
+        ? `Gain from ${formatDate(from)} to ${formatDate(asOf)}, after money added or taken out`
+        : 'Gain since each holding was bought',
   }));
 
   return (
@@ -334,7 +354,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       label={`Next month, ${monthLabel(addMonths(month, 1))}`}
                       href={monthHref(addMonths(month, 1))}
                     />
-                    <Link className="linkish" href="/">
+                    <Link className="linkish" href={monthHref(now)}>
                       This month
                     </Link>
                   </>
@@ -347,10 +367,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {
               label: isNow ? 'Net worth' : `Net worth on ${formatDay(asOf)}`,
               value: formatShortINR(s.bankAndCash + t.value),
-              aside: t.change
-                ? `${formatINRSigned(t.change.amount)} since ${formatDay(t.change.since)}`
-                : undefined,
-              asideTone: t.change ? gainClass(t.change.amount) : '',
+              aside: (
+                <span className={stripStyles.periodChange}>
+                  <span>{formatINRSigned(worthChange)}</span>
+                  <span className={stripStyles.periodGroup}>
+                    over <NetWorthPeriodSelect period={netWorthPeriod.value} options={NET_WORTH_PERIODS} />
+                  </span>
+                </span>
+              ),
+              asideTone: gainClass(worthChange),
             },
             {
               label: 'Investments',
