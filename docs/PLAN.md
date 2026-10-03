@@ -1,27 +1,18 @@
-# Hisaab: personal finance app — context and implementation plan
+# Hisaab: product and calculation reference
 
-This document is the complete brief for building the app. It was written after a planning and mockup phase with the owner. Read all of it before writing code.
+The initial build is complete. This document keeps the durable requirements,
+settled decisions and backlog, not the original scaffolding checklist. Section
+numbers remain stable because code and tests refer to them.
 
----
+## 0. Start here
 
-## 0. Start here (instructions for Claude Code)
-
-1. Read this whole file, then open `docs/mockup.html` in a browser (or read its source). The mockup is the approved visual and interaction design and is the source of truth for look and feel.
-2. Work one phase at a time (section 11). At the end of each phase, run the acceptance checks, then stop and summarise for the owner before starting the next phase.
-3. In Phase 1, create a short `CLAUDE.md` in the repo root from section 10 (Conventions) and the commands in section 9, so the rules load in every session. Keep this file as `docs/PLAN.md`.
-4. Keep the Progress log (section 15) up to date as phases complete.
-5. The decisions in section 13 are settled. If something in this plan turns out to be wrong or impractical, explain why and propose an alternative before deviating.
-6. Never put the owner's real financial data in seed files, fixtures, tests, screenshots or commit messages. All sample data is invented.
-
-Expected starting folder (the owner will create it):
-
-```
-hisaab/
-  PLAN.md              → move to docs/PLAN.md in Phase 1
-  hisaab-mockups.html  → move to docs/mockup.html in Phase 1
-```
-
----
+- Use [README.md](../README.md) for setup, operation and commands, and
+  [CLAUDE.md](../CLAUDE.md) for coding, privacy and design rules.
+- Read this reference before starting a phase. Work one phase at a time, verify
+  the relevant behavior, then summarise results before starting another.
+- Explain and get agreement before changing the settled decisions in section 13.
+- Keep section 15 concise. Git history holds detailed implementation history;
+  update the owning section when behavior changes instead of appending a second spec.
 
 ## 1. Project summary
 
@@ -42,297 +33,87 @@ hisaab/
 
 ### 2.1 Source of truth
 
-`docs/mockup.html` is a single self-contained HTML file with inline CSS and JavaScript and invented sample data. It contains:
+[docs/mockup.html](mockup.html) is the approved visual and interaction reference,
+using invented data. Preserve its visual language; do not copy third-party logos,
+names, images or assets. Reuse existing components for screens it does not cover.
 
-- **Dashboard:** month title, summary strip, and cards for income vs spending (bar chart), where your money went (donut), portfolio performance (line chart), allocation (donut), budgets, recent transactions, returns by investment type, top gainers and losers, accounts.
-- **Money → Transactions:** summary strip, tabs, filter bar, sortable table, totals row, row menus.
-- **Investments → Overview:** summary strip, tabs, sub-tabs by investment type, one table per type with totals.
-- **Add/edit transaction drawer** (Spending / Income / Transfer) and **add investment transaction drawer** (Buy / Sell / Dividend).
-- Row "⋮" menus, toasts, placeholder states for unbuilt tabs.
-- Light theme plus a dark theme that follows the system setting.
+The implemented tokens are in [styles/tokens.css](../styles/tokens.css), base styles
+in [styles/globals.css](../styles/globals.css), and fonts in [app/fonts.ts](../app/fonts.ts).
+Do not duplicate their values here. The interface uses IBM Plex Sans, IBM Plex Mono
+for figures and Fraunces for titles; dark mode follows the system setting.
+The development-only `/dev/ui` route shows shared components with invented props.
 
-**Port the mockup's CSS rather than reinventing it.** Its `:root` tokens, component styles and responsive rules should move into the app nearly unchanged. Its chart functions (`drawBars`, `drawLine`, `donut`) and number formatters are the reference implementations for the React versions.
+Copy, color meanings, accessibility and 360px layout requirements live in
+[CLAUDE.md](../CLAUDE.md#copy-and-design-rules).
 
-The look is inspired by an Indian portfolio tracker's style (warm peach page, flat white cards, one strong blue, green/red only for gains/losses). Do not copy any third-party logo, name, image or asset. "hisaab" (lowercase serif wordmark followed by a small orange dot) is a placeholder brand name.
+## 3. Architecture
 
-### 2.2 Tokens (summary; the mockup CSS is authoritative)
+Exact versions and scripts live in [package.json](../package.json). Use Next.js
+App Router, React, strict TypeScript, Zod, decimal.js, Vitest, ESLint and Prettier.
+Node.js 24+ supplies `node:sqlite`; Drizzle ORM and Kit use matching pinned 1.0 RC
+versions and the `node-sqlite` driver. No Tailwind, UI kit or chart library: use
+CSS Modules and the existing SVG charts. Fonts download at build time and are
+served locally. XLS and ZIP support use the existing local implementations.
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `--page` | `#FEF1E8` | `#17120F` | Page background behind cards |
-| `--surface` | `#FFFFFF` | `#221C18` | Cards, top bar, page head, drawer |
-| `--line` / `--line-strong` | 10% / 24% black | 10% / 24% white | Borders and dividers |
-| `--zebra` | `#F5F5F5` | 3.5% white | Alternate table rows |
-| `--heading` / `--text` | `#000` / `#212529` | `#FFF` / `#ECE6E1` | Text |
-| `--text-2/3/4` | 80% / 60% / 40% black | 80% / 60% / 38% white | Secondary, labels, faint |
-| `--primary` | `#1C509D` | `#8CB0EC` | Links, active tabs, names, outlines |
-| `--primary-btn` | `#1C4DA0` | `#2F63B8` | Filled button background |
-| `--gain` / `--loss` | `#12783C` / `#B91014` | `#5CCB8A` / `#FF7B73` | Gains and losses only |
-| `--accent` | `#FFA500` | same | Brand dot, dot before each holding |
-| `--c1`…`--c8` | muted blue, sage, brown, mauve, olive, slate, ochre, light blue | lighter versions | Charts and category colours |
+- Server Components read through `lib/queries`; there is no separate REST API.
+- Server Actions in `lib/actions` validate with Zod, write in a transaction,
+  revalidate affected paths and return
+  `{ ok: true, id? } | { ok: false, message, fieldErrors }`.
+- Client components handle interactions. Route handlers serve file downloads.
+- `lib/db` is server-only. Share one connection, cached on `globalThis` during
+  development, with WAL and foreign keys enabled.
+- Back up existing databases before pending migrations or legacy-history upgrades.
+  Builds migrate serially before Next's parallel workers. Accept LF/CRLF variants
+  of known migration hashes, but reject unknown history.
 
-Type:
+## 4. Source map
 
-- **IBM Plex Sans** for the interface (400/500/600).
-- **IBM Plex Mono** (500) for figures in tables and lists, right-aligned, tabular numerals.
-- **Fraunces** (variable, `SOFT` 100, `WONK` 0, weight ~400) for card, table and drawer titles.
-- Sizes: 10px uppercase semibold labels above figures and on field borders; 13–14px body and tables; 20–25px titles; 30px headline figures (23px on mobile).
-
-Shapes: cards 5px radius, table cards 10px, 1px borders, no card shadows. The top bar has a faint 1px shadow. Buttons are 5px radius; the secondary button has a 2px primary-coloured border.
-
-### 2.3 Components to build (all visible in the mockup)
-
-TopBar, PageHead (title, actions, StatStrip, Tabs), SubTabs, Card (title, subtitle, footer "See … ›" link), Chips (time-range and grouping toggles), Field (floating label on the border; text, number, date, select, search, date range), Button (primary, secondary, icon), DataTable (sortable headers with small uppercase sub-labels, two-line cells, zebra rows, totals footer, row menu, horizontal scroll on small screens, empty state), Drawer (focus trap, Esc closes, backdrop click closes), Menu (keyboard accessible), Toast (with optional Undo action), Segmented control, BudgetBar, LegendList, Donut, BarChart, LineChart (hover crosshair and tooltip), GainLoseTiles.
-
-### 2.4 Rules the design follows
-
-- **Colour meaning:** green and red are only for gains/losses and over-budget warnings. Spending amounts are shown in the normal text colour with a minus sign (−, U+2212), not red. Transfers are grey.
-- **Tables** show plain numbers without ₹ and a footnote "All amounts in ₹." Cards and strips show ₹.
-- **Copy:** sentence case, plain words, active verbs. A button says what it does ("Save transaction"), and the toast uses the same words ("Transaction saved"). Errors say what's wrong and how to fix it, without apologising ("Enter an amount greater than zero."). Empty states invite an action ("No transactions match these filters." + "Clear filters").
-- **Accessibility:** visible keyboard focus, tabs use `role="tab"` with `aria-selected`, sortable headers use `aria-sort`, menus are keyboard reachable, drawers trap focus and return focus on close, `prefers-reduced-motion` disables transitions, colour is never the only signal (signs and labels too).
-- **Responsive:** works down to ~360px. Grids collapse to one column, the main nav wraps to a scrollable second row, tables scroll horizontally inside their card.
-
-### 2.5 Screens that were not mocked
-
-Budgets, Accounts, Categories, Investments → Performance, Investments → Transactions, holding detail, Reports and Settings were not mocked. Build them from the same components and patterns (page head + strip + tabs, filter bar, table cards, drawers). Section 7 describes each one.
-
----
-
-## 3. Tech stack
-
-Use the current stable version of each package at install time and pin it in `package.json`.
-
-| Part | Choice |
+| Location | Owns |
 |---|---|
-| Framework | Next.js (App Router), React, TypeScript in strict mode |
-| Database | SQLite through Node's built-in `node:sqlite` (Node 24+), with Drizzle ORM and `drizzle-kit` for migrations |
-| Validation | Zod, on every server action |
-| Exact maths | `decimal.js` for anything involving units, prices, rates or division |
-| Styling | Global `styles/tokens.css` + `styles/globals.css` (ported from the mockup) and one CSS Module per component. **No Tailwind and no UI kit.** |
-| Charts | Custom SVG React components ported from the mockup. **No chart library.** |
-| Fonts | `next/font/google` (downloads fonts at build time and serves them locally) |
-| Tests | Vitest for domain logic. Playwright smoke tests are optional (Phase 6). |
-| Lint/format | ESLint (Next.js config) + Prettier |
-| Package manager / runtime | npm, Node.js LTS |
+| `app/` | Routes, layouts and page composition |
+| `components/` | Shared controls, drawers, tables and charts |
+| `lib/db/` | Schema, migrations and connection |
+| `lib/domain/` | Pure calculations and parsers |
+| `lib/queries/`, `lib/actions/` | Application database reads and writes |
+| `lib/validation/` | Shared Zod schemas |
+| `lib/feeds.ts` | The only runtime network requests |
+| `scripts/` | Seed, reset, backup and migration tools |
+| `tests/` | Unit/integration tests and invented fixtures |
+| `data/` | Local database and backups; never committed |
 
-Architecture:
+## 5. Data contracts
 
-- **Reads:** Server Components call functions in `lib/queries/*`, which use the database directly. There is no separate REST API.
-- **Writes:** Server Actions in `lib/actions/*`. They validate with Zod, write inside a DB transaction, call `revalidatePath` for affected pages, and return `{ ok: true, id? } | { ok: false, message, fieldErrors }`.
-- **Client components** only where interaction needs it: drawers, filters, menus, chart hover, chips, toasts.
-- **Route handlers** only for file downloads (CSV export, backup download).
-- `lib/db` imports `server-only`. Use one shared database connection, cached on `globalThis` in development to survive hot reload. On open, set `PRAGMA journal_mode = WAL` and `PRAGMA foreign_keys = ON`.
-- Use Drizzle's `node-sqlite` driver on the server. The matching Drizzle ORM and Kit 1.0 RC versions are pinned because the previous ORM release did not support this driver.
+[lib/db/schema.ts](../lib/db/schema.ts) defines the tables, columns, enums,
+constraints and indexes. [lib/domain/assets.ts](../lib/domain/assets.ts) defines
+asset groups and defaults. Do not maintain parallel copies of these definitions.
 
----
+- Money is integer paise; units, prices and percentage rates are decimal strings
+  calculated with decimal.js. Dates are `YYYY-MM-DD`, months `YYYY-MM`, timestamps
+  ISO 8601. Use the date helpers, not timezone-dependent date parsing.
+- Money amounts are positive; transaction type determines direction. Income and
+  expense need an account and matching category. Transfers have no category and
+  different source/destination accounts. A missing side is allowed only for a
+  linked investment transaction, where it means "Investments".
+- Budgets apply to spending categories. The latest `start_month <= month` carries
+  forward; zero disables the budget from that month. Copying last month's budgets
+  replaces this month's overrides. A value equal to the carried amount needs no row.
+- Accounts and categories with transactions are archived, not deleted. Investments
+  can be archived once sold. Mask account references in the UI.
+- Prices and valuations have one row per asset/date. Downloaded prices have
+  `source = 'auto'`; downloads must never overwrite `manual` or `import` prices.
+- Settings are JSON values keyed by name. Default financial year starts in April,
+  default FD compounding is quarterly, and `sample_data` controls the sample pill.
 
-## 4. Project layout
+### Linked money transactions
 
-```
-hisaab/
-  app/
-    layout.tsx                  fonts, tokens, TopBar, Toast provider
-    page.tsx                    Dashboard (?month=YYYY-MM)
-    money/
-      layout.tsx                PageHead + strip + tabs for Money
-      page.tsx                  Transactions
-      budgets/page.tsx
-      accounts/page.tsx
-      categories/page.tsx
-    investments/
-      layout.tsx                PageHead + strip + tabs for Investments
-      page.tsx                  Overview (?group=…&sold=1)
-      performance/page.tsx
-      transactions/page.tsx
-      [assetId]/page.tsx        Holding detail
-    reports/page.tsx
-    settings/page.tsx
-    api/export/…                CSV and backup downloads (route handlers)
-    dev/ui/page.tsx             Component showcase (only renders in development)
-  components/                   one folder per component: Name.tsx + Name.module.css
-    charts/                     BarChart, LineChart, Donut
-  lib/
-    db/
-      schema.ts                 Drizzle tables
-      client.ts                 connection, pragmas, auto-migrate with backup
-      migrations/               generated by drizzle-kit
-    queries/                    money.ts, budgets.ts, investments.ts, dashboard.ts, reports.ts
-    actions/                    transactions.ts, accounts.ts, categories.ts, budgets.ts, assets.ts, investmentTransactions.ts, prices.ts, settings.ts
-    domain/                     pure functions, fully unit-tested
-      money.ts                  paise helpers, parsing user input
-      format.ts                 INR, Lakh/Crore, signs, percents, dates
-      dates.ts                  date-only helpers (no timezone bugs)
-      balances.ts
-      budgets.ts
-      holdings.ts               average cost, realised gains, splits
-      valuation.ts              prices, manual valuations, FD maths
-      xirr.ts
-      performance.ts            monthly invested vs worth series
-    validation/                 Zod schemas shared by actions and forms
-  styles/
-    tokens.css
-    globals.css
-  scripts/
-    seed.ts                     loads the invented sample data
-    reset.ts                    wipes data, restores default categories
-    backup.ts
-  tests/                        mirrors lib/domain
-  data/                         finance.db and backups/ (gitignored)
-  docs/
-    PLAN.md
-    mockup.html
-  CLAUDE.md
-```
+Picking "Paid from" or "Received in" creates a Money row in the same transaction:
 
----
+- Buy/deposit/fee: transfer from the account to Investments, amount plus fees.
+- Sell/withdrawal: transfer from Investments to the account, amount minus fees.
+- Dividend/interest: income in the matching Dividends/Interest category.
 
-## 5. Data model
-
-General rules:
-
-- **Money** is stored as INTEGER paise. ₹1,250.50 → `125050`.
-- **Units and prices** are stored as TEXT decimal strings (up to 4 decimal places, e.g. `"1660.1200"`, `"231.4600"`). Parse them with `decimal.js`. Never multiply units by prices using plain JavaScript numbers.
-- **Interest rates** are stored as TEXT decimals in percent (e.g. `"7.10"`).
-- **Dates** are TEXT `YYYY-MM-DD` (local date, owner is in India). Timestamps are TEXT ISO 8601. Months are TEXT `YYYY-MM`.
-- Every table has `id INTEGER PRIMARY KEY`, `created_at`, `updated_at`, unless noted.
-- Records that other records depend on are archived, not deleted.
-
-### accounts
-
-| Column | Type | Notes |
-|---|---|---|
-| name | TEXT NOT NULL UNIQUE | "Salary account" |
-| type | TEXT NOT NULL | `bank` · `card` · `cash` · `wallet` · `other` |
-| opening_balance | INTEGER NOT NULL DEFAULT 0 | paise, signed. Money owed on a card is negative. |
-| opening_date | TEXT NOT NULL | balance is as of this date |
-| note | TEXT | e.g. "due 5th of each month" |
-| archived | INTEGER NOT NULL DEFAULT 0 | |
-| sort_order | INTEGER NOT NULL DEFAULT 0 | |
-
-### categories
-
-| Column | Type | Notes |
-|---|---|---|
-| name | TEXT NOT NULL | |
-| kind | TEXT NOT NULL | `income` · `expense` |
-| color | TEXT NOT NULL | a token name `c1`…`c8` |
-| archived | INTEGER NOT NULL DEFAULT 0 | |
-| sort_order | INTEGER NOT NULL DEFAULT 0 | |
-| | | UNIQUE(name, kind) |
-
-Default categories created on first run and after reset:
-
-- Spending: Housing, Groceries, Dining, Transport, Shopping, Utilities, Health, Entertainment, Education, Travel, Insurance, Personal care, Gifts, Other.
-- Income: Salary, Freelance, Dividends, Interest, Refunds, Other income.
-
-### transactions (money side)
-
-| Column | Type | Notes |
-|---|---|---|
-| date | TEXT NOT NULL | |
-| type | TEXT NOT NULL | `income` · `expense` · `transfer` |
-| amount | INTEGER NOT NULL CHECK (amount > 0) | paise, always positive |
-| account_id | INTEGER NULL → accounts | The account for income/spending; the source account for a transfer |
-| to_account_id | INTEGER NULL → accounts | Destination of a transfer |
-| category_id | INTEGER NULL → categories | Required for income/spending, empty for transfers |
-| description | TEXT NOT NULL | |
-| note | TEXT | |
-| investment_txn_id | INTEGER NULL → investment_transactions ON DELETE CASCADE | Set when created automatically by an investment transaction |
-
-CHECK constraints:
-
-- `income`/`expense`: `account_id` NOT NULL, `category_id` NOT NULL, `to_account_id` IS NULL.
-- `transfer`: `category_id` IS NULL. At least one of `account_id` / `to_account_id` is set. A missing side is only allowed when `investment_txn_id` is set (that side is the investment portfolio, shown as "Investments"). `account_id != to_account_id`.
-
-The app (Zod) also checks that the category's kind matches the type.
-
-Indexes: `(date)`, `(account_id, date)`, `(to_account_id, date)`, `(category_id, date)`.
-
-### budgets
-
-| Column | Type | Notes |
-|---|---|---|
-| category_id | INTEGER NOT NULL → categories | spending categories only |
-| start_month | TEXT NOT NULL | `YYYY-MM` |
-| amount | INTEGER NOT NULL | paise. 0 means "no budget from this month". |
-| | | UNIQUE(category_id, start_month) |
-
-The budget for month M is the row with the latest `start_month <= M`. Budgets therefore carry forward until changed.
-
-### assets (investments)
-
-| Column | Type | Notes |
-|---|---|---|
-| name | TEXT NOT NULL | "Meridian Flexi Cap Direct-G" |
-| type | TEXT NOT NULL | `mutual_fund` · `stock` · `etf` · `gold` · `fixed_deposit` · `ppf` · `epf` · `nps` · `bond` · `other` |
-| asset_class | TEXT NOT NULL | `equity` · `debt` · `gold` · `other`. Default from type, editable (a debt mutual fund is `debt`). |
-| valuation | TEXT NOT NULL | `units` (units × price) · `manual` (entered balances) · `fd` (calculated from rate) |
-| symbol | TEXT | ticker, ISIN or scheme code, optional |
-| account_ref | TEXT | folio or demat number. Show masked as "Folio ••7731". |
-| interest_rate | TEXT | percent, for `fd` and `bond` |
-| compounding | TEXT | `quarterly` (default) · `monthly` · `half_yearly` · `yearly` · `simple` |
-| start_date / maturity_date | TEXT | for `fd`, `bond`, `ppf` |
-| note | TEXT | |
-| archived | INTEGER NOT NULL DEFAULT 0 | |
-
-Display groups (Overview sub-tabs and tables, in this order): **Mutual funds** (`mutual_fund`), **Stocks & ETFs** (`stock`, `etf`), **Gold** (`gold`), **Fixed income** (`fixed_deposit`, `bond`, `ppf`, `epf`), **NPS** (`nps`), **Other** (`other`). Only show groups that have holdings.
-
-Default valuation by type: `units` for mutual_fund, stock, etf, gold; `fd` for fixed_deposit; `manual` for ppf, epf, nps, bond, other.
-
-### investment_transactions
-
-| Column | Type | Notes |
-|---|---|---|
-| asset_id | INTEGER NOT NULL → assets | |
-| date | TEXT NOT NULL | |
-| action | TEXT NOT NULL | `buy` · `sell` · `split` (units assets); `deposit` · `withdrawal` (manual/fd assets); `dividend` · `interest` (cash paid out to you); `fee` |
-| units | TEXT | buy/sell |
-| price | TEXT | per unit, buy/sell |
-| amount | INTEGER | paise. Buy/sell: units × price rounded to paise. Deposit, withdrawal, dividend, interest, fee: the amount. |
-| fees | INTEGER NOT NULL DEFAULT 0 | paise (brokerage, stamp duty) |
-| split_from / split_to | INTEGER | e.g. 1 → 5 for a 1:5 split. Bonus issues are recorded as a buy at price 0. |
-| note | TEXT | |
-
-Index: `(asset_id, date)`.
-
-**Linked money transactions.** When the owner records a buy, deposit or fee and picks a "Paid from" account, or a sell, withdrawal, dividend or interest and picks a "Received in" account, create the matching row in `transactions` in the same DB transaction, with `investment_txn_id` set:
-
-- Buy / deposit / fee → transfer from that account to "Investments" (`to_account_id` NULL). Amount = amount + fees.
-- Sell / withdrawal → transfer from "Investments" (`account_id` NULL) to that account. Amount = amount − fees.
-- Dividend / interest → income, in category Dividends or Interest.
-
-Linked rows are shown on the Money side with a small "Linked" label. Their row menu offers "Open investment transaction" instead of Edit. Editing the investment transaction updates the linked row. Deleting either deletes both, and the toast offers Undo.
-
-### prices
-
-| Column | Type | Notes |
-|---|---|---|
-| asset_id | INTEGER NOT NULL → assets | |
-| date | TEXT NOT NULL | |
-| price | TEXT NOT NULL | |
-| source | TEXT NOT NULL DEFAULT 'manual' | `manual` · `import` · `auto` (downloaded; only `auto` rows are ever replaced by a download) |
-| | | PRIMARY KEY(asset_id, date), no `id` column |
-
-### valuations
-
-| Column | Type | Notes |
-|---|---|---|
-| asset_id | INTEGER NOT NULL → assets | |
-| date | TEXT NOT NULL | |
-| value | INTEGER NOT NULL | paise, balance from a statement |
-| | | PRIMARY KEY(asset_id, date), no `id` column |
-
-### settings
-
-`key TEXT PRIMARY KEY`, `value TEXT` (JSON).
-
-Keys:
-
-- `financial_year_start_month`: `4`, meaning April–March.
-- `default_fd_compounding`: `"quarterly"`.
-- `sample_data`: `true` while sample data is loaded, which shows the "Sample data" pill in the top bar.
-
----
+The Money row stores `investment_txn_id`. Edit through the investment transaction;
+updates keep both rows in sync. Deleting either removes both, with Undo available.
 
 ## 6. Calculations (`lib/domain`, all pure and unit-tested)
 
@@ -394,7 +175,7 @@ Test vector:
 ### Current value (`valuation.ts`)
 
 - **`units`:** units × latest price on or before the date. If no price has been entered, use the last buy price and flag the holding "Price not updated".
-- **`manual`:** latest valuation on or before the date. If there is none, use the net amount invested.
+- **`manual`:** latest valuation on or before the date, plus later deposits minus later withdrawals. If there is none, use the net amount invested. A withdrawal beyond remaining cost counts as realised gain.
 - **`fd`:**
   - Formula: principal × (1 + r/n)^(n × t), where t is in years (days ÷ 365) from start to min(date, maturity). `simple` compounding means principal × (1 + r × t).
   - Test: ₹1,00,000 at 7.10% compounded quarterly for 1 year → ₹1,07,291.28.
@@ -437,7 +218,7 @@ Include the range start and last day, and position points according to calendar 
 - **Invested** = total cost of holdings on that date (same rules as above).
 - **Worth** = value of holdings on that date, using the latest price or valuation known on or before it.
 
-Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's net-worth selector uses the calendar year.
+Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's portfolio YTD chip uses the calendar year.
 
 ### Allocation
 
@@ -450,310 +231,98 @@ The top 3 holdings each way over a chosen period (1 day, 1 week, 1/3/6 months, f
 
 ---
 
-## 7. Screens
+## 7. Screens and interaction
 
-Each Money and Investments page has a PageHead: title, actions, summary strip and tabs. Filters and selected tabs live in the URL so refresh and back/forward work.
-
-### Dashboard `/` (mocked)
-
-- **Title:** the month name, with a month picker (`?month=YYYY-MM`, default current month).
-- **Action:** "Add transaction".
-- **Strip:** Net worth (+ selectable calendar-period change), Investments (+ invested), Spent this month (of budget), Saved this month (% of income).
-- **Cards, layout as the mockup:**
-  - Income vs spending: 6M / 1Y bars, with a tooltip showing income, spending and saved.
-  - Where your money went: by category or by account.
-  - Portfolio performance.
-  - Allocation.
-  - Budgets.
-  - Recent transactions: the last 6.
-  - Returns by investment type: duration picks any Performance period ("1 day" through "All time"). Groups without holdings show "Not added + Add".
-  - Top gainers and losers.
-  - Accounts, with an "In bank and cash" total.
-- Each card footer links to the matching page.
-
-### Money → Transactions `/money` (mocked)
-
-- **Strip:** Income this month (+ number of payments), Spent (of budget), Saved (% of income), In bank and cash (+ number of accounts).
-- **Tabs:** Transactions, Budgets, Accounts, Categories.
-- **Filter bar:** Duration (from–to, defaults to the current month), Type, Category, Account (matches the source or destination), Search (description and note).
-- **Title:**
-  - "September 2026 (n)" when the range is exactly one calendar month.
-  - Otherwise "Transactions (n)".
-- **Table columns:** Date, Description (+ note), Category (dot + name), Account, Amount (+ "to X" for transfers), ⋮.
-  - Sort by date or amount.
-  - Totals row: + income, − spent.
-  - Show 100 rows, then a "Show more" button.
-- **Row menu:** Edit, Duplicate, Delete.
-  - Delete takes effect immediately, and the toast offers Undo for about 6 seconds.
-  - Linked rows: "Open investment transaction", Delete.
-- **Export CSV** downloads the currently filtered rows.
-- **Drawer:** as mocked (segmented type, big amount field, date, category, account / from + to, description, optional note), with inline errors. Enter saves.
-
-### Money → Budgets `/money/budgets`
-
-- A month picker.
-- **Table columns:** Category, Budget (editable inline; saves on blur or Enter), Spent, Left, progress bar.
-  - A totals row.
-  - A "Copy last month's budgets" action.
-  - Categories without a budget are listed below with "Set budget".
-- Over-budget rows use `--loss` for the Left figure and the bar.
-
-### Money → Accounts `/money/accounts`
-
-- **Table columns:** Account (+ type), Opening balance (+ date), Current balance, Last transaction date, ⋮ (Edit, Archive).
-- "Add account" opens a drawer.
-- Accounts with transactions can be archived, not deleted. Archived accounts are hidden behind a "Show archived" toggle.
-
-### Money → Categories `/money/categories`
-
-- Two table cards: Spending and Income.
-- **Columns:** colour dot + name, Transactions this year, Spent/received this year, ⋮ (Rename, Change colour, Archive).
-- "Add category" opens a drawer.
-- A category with transactions can only be archived.
-
-### Investments → Overview `/investments` (mocked)
-
-- **Strip:** Current value (+ invested), selectable change in period (+ %), All-time returns (+ % p.a.).
-- **Tabs:** Overview, Performance, Transactions.
-- **Sub-tabs:** All + one per display group that has holdings.
-- One table card per group. Header actions: "Update prices" (units groups only) and "Download CSV".
-- **Columns:**
-  - Name (+ folio/demat, masked)
-  - Last price (+ date)
-  - Change in selected period (+ %)
-  - Total cost (+ cost per unit)
-  - Current value (+ units)
-  - % of portfolio
-  - Total return (+ % p.a. or abs.)
-  - ⋮ (Record transaction, Update price, See transactions, Edit investment, Archive)
-- Totals row per group.
-- "Show sold investments" toggle (`?sold=1`). Sold rows show their realised gain.
-- The name links to the holding detail page.
-- **Investment updates:** Fetch prices for selected unit-priced holdings from AMFI/NSE/BSE; update statement-based values by hand. Manual/import prices are not replaced.
-- **Add investment:**
-  - Picking "New investment…" in the investment select opens fields for name, type, asset class, account ref, and the rate/dates for FDs.
-  - Then comes the transaction part as mocked: Buy / Sell / Dividend, plus Deposit / Withdrawal for manual and FD assets. Fields: date, units, price, fees, an optional "Paid from" / "Received in" account, and a live total.
-
-### Investments → Performance `/investments/performance`
-
-- **Filter bar:** As of (date), Period (1 day / 1 week / 1, 3 or 6 months / financial year to date / 1 or 3 years / all time).
-- **Aggregate card:** total return % and XIRR for the period, plus an "Export CSV" button.
-- **Performance graph:** amount invested vs current worth (LineChart).
-- **One table per group, columns:** Name, Current value, Invested, Gain in period, % absolute, % p.a., with a totals row.
-- Comparison against an index and inflation-adjusted returns are in the backlog.
-
-### Investments → Transactions `/investments/transactions`
-
-- **Filter bar:** Duration, Action, Group, Search.
-- **Table columns:** Date, Investment (+ account ref), Action, Price, Units (+/−), Balance units (after this transaction), Amount, Linked account, ⋮ (Edit, Delete).
-- Export CSV.
-
-### Holding detail `/investments/[assetId]`
-
-- **Page head:** name, type and account ref.
-- **Strip:** Current value (+ invested), selectable change in period, Total return (+ p.a.).
-- **Actions:** Record transaction, Update price, and ⋮ (Edit investment, Archive).
-- **Cards:**
-  - Price history (LineChart of `prices`, or valuations for manual assets).
-  - Transactions table.
-  - For FDs: principal, rate, compounding, maturity date and maturity value.
-
-### Reports `/reports`
-
-- Year selector with a Financial year (Apr–Mar) / Calendar year toggle; financial year is the default.
-- **Strip:** Income, Spending, Saved, Savings rate, Net invested in the year.
-- **Cards:**
-  - Monthly income vs spending (BarChart).
-  - Spending by category: a table of categories × months with a total column.
-  - Income by category.
-- Export CSV.
-
-### Settings `/settings`
-
-- **Data:**
-  - "Back up now" (downloads a copy and also saves one to `data/backups/`).
-  - "Restore from backup" (upload a `.db`; validate it before replacing; back up the current file first).
-  - "Export everything as CSV" (zip).
-  - "Remove sample data and start fresh": requires typing `DELETE`, then wipes all tables and recreates the default categories.
-- **Preferences:** financial year start month, default FD compounding.
-- **About:** database file path and size, app version.
-
----
-
-## 8. Sample data (`scripts/seed.ts`)
-
-Recreate the mockup's invented dataset so the built app looks like the mockup on first run. The exact values are in the mockup's `<script>`: arrays `ACCOUNTS`, `TX` (23 transactions dated 1–28 Sep 2026), `CASH_HIST` (monthly totals Oct 2025 – Aug 2026) and `HOLD` (13 holdings).
-
-- **Accounts:** Salary account, Savings account, Credit card, Cash. Pick opening balances and dates so the balances on 28 Sep 2026 equal the mockup: ₹2,18,450, ₹3,42,000, −₹18,640, ₹4,200.
-- **Money history:** for Oct 2025 – Aug 2026, generate realistic monthly transactions (salary, rent, groceries, dining, bills, occasional larger spends) whose monthly income and spending totals match `CASH_HIST`. Use a seeded random generator so the output is the same every run.
-- **Investments:** for each `HOLD` entry, create an asset and generate buys whose final units and total cost equal the mockup values:
-  - Monthly SIPs for mutual funds, starting between Jan 2023 and 2025.
-  - 2–4 lump-sum buys for stocks, ETFs and gold.
-  - A single deposit for the FD (with rate and start date).
-  - Yearly deposits and valuations for PPF.
-  - Generate month-end prices with a gentle seeded random walk that ends at the mockup's latest prices (25 Sep 2026 for mutual funds, 28 Sep 2026 for the others).
-  - Link SIP buys to the Salary account.
-- Set `settings.sample_data = true`.
-- The generated data may differ slightly from the mockup's hard-coded figures. The goal is that it looks and feels the same.
-
-All names are invented: "Meridian", "Banyan", "Saffron", "Harbor" funds, "Kaveri Power", "Sahyadri Foods", "Deccan Bank", "Fresh Basket" and so on. Do not replace them with real companies or with the owner's real holdings.
-
----
-
-## 9. Commands and local setup
-
-| Command | Does |
+| Route | Purpose |
 |---|---|
-| `npm run dev` | `next dev -H 127.0.0.1 -p 3000` |
-| `npm run build` / `npm start` | Serial DB migration, then production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
-| `npm run db:generate` | `drizzle-kit generate` after schema changes |
-| `npm run db:migrate` | Apply migrations (the app also applies pending migrations on start, after making a backup) |
-| `npm run seed` | Load sample data into an empty database |
-| `npm run reset -- --yes` | Wipe all data and recreate default categories |
-| `npm run backup` | `VACUUM INTO data/backups/finance-YYYYMMDD-HHmm.db` |
-| `npm test` / `npm run test:watch` | Vitest |
-| `npm run lint` / `npm run typecheck` | ESLint / `tsc --noEmit` |
+| `/` | Month-based dashboard, cash flow, portfolio, budgets, recent activity and accounts |
+| `/money` | Transactions with date/type/category/account/search filters, totals and CSV |
+| `/money/budgets` | Monthly budgets, inline editing, carry-forward and copy previous month |
+| `/money/accounts`, `/money/categories` | Create, edit and archive accounts/categories |
+| `/investments` | Grouped holdings, sold toggle, price fetches and statement updates |
+| `/investments/performance` | As-of date and period, flow-adjusted returns, chart, tables and CSV |
+| `/investments/transactions` | Filtered investment activity, running units and CSV |
+| `/investments/[assetId]` | Holding summary, period chart, transactions and FD details |
+| `/investments/import` | Check and import Value Research transaction history |
+| `/reports` | Financial/calendar-year cash flow and category totals with CSV |
+| `/settings` | Backup, restore, full export, reset, prices, preferences and database details |
 
-Privacy and local-only defaults:
+Page heads, strips, tabs, drawers and tables reuse existing components. Filters and
+selected tabs belong in the URL for refresh/back/forward. Deletes offer Undo;
+the in-memory undo store does not survive a server restart. Linked Money rows open
+their investment transaction instead of offering an independent edit.
 
-- Always bind to `127.0.0.1`, never `0.0.0.0`, so other devices on the network can't reach the app.
-- Disable Next.js telemetry: add `NEXT_TELEMETRY_DISABLED=1` to `.env` and document `npx next telemetry disable` in the README.
-- `.gitignore` must include `data/`, `*.db`, `*.db-wal`, `*.db-shm`, `.env*`.
-- The only network use is `npm install`, the build-time font download and, while the app runs, AMFI's NAV files and NSE's and BSE's bhavcopy for automatic prices (`lib/feeds.ts`, the only file that may go online). Those are whole-market files: nothing about the owner's holdings is ever sent. The owner can switch them off in Settings. Add no other external request.
-- The database path comes from `DATABASE_PATH` (default `./data/finance.db`). Create the folder if it's missing.
+## 8. Sample data
 
-Write a `README.md` covering install, first run, daily use (`build` + `start`), backup and restore, and the privacy notes above.
+[scripts/seed.ts](../scripts/seed.ts) owns the deterministic invented dataset;
+it sets the Sample data pill. Do not reproduce the dataset here or replace it with
+real personal data. [tests/fixtures/portfolio-check.csv](../tests/fixtures/portfolio-check.csv)
+is the hand-checked investment reference. Use isolated temporary databases for
+automated tests and previews, not the owner's database.
 
----
+## 9. Commands and operation
 
-## 10. Conventions (copy the essentials into CLAUDE.md)
+[README.md](../README.md) owns installation, environment setup, daily use,
+backups/restores, reset, imports and price-fetch instructions. Its
+[command table](../README.md#commands) reflects [package.json](../package.json).
 
-- TypeScript strict. No `any`, no `@ts-ignore` without a comment explaining why.
-- Money is integer paise in all code. Use a `Paise` type alias and convert only at input parsing and display. Units, prices and rates are decimal strings and are calculated with `decimal.js`.
-- Dates are `YYYY-MM-DD` strings. Use the helpers in `lib/domain/dates.ts`; never create a `Date` for date-only values without them (avoids timezone shifts).
-- Only `lib/queries` and `lib/actions` touch the database. Components never import `lib/db`.
-- Every server action validates with Zod, runs writes in a transaction, revalidates affected paths and returns the standard result shape.
-- Components live in their own folder with a CSS Module. Use CSS variables from `tokens.css` only; no raw hex colours in components.
-- Every function in `lib/domain` has unit tests, including edge cases (zero units, sell everything, split, missing prices, leap years).
-- Follow the copy rules in section 2.4.
-- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
-- Never commit anything in `data/`. Never use real personal financial data anywhere in the repo.
-- Keep `docs/PLAN.md`'s Progress log current.
+## 10. Contributor conventions
 
----
+[CLAUDE.md](../CLAUDE.md) owns always-on coding, privacy, dependencies, copy and
+accessibility rules. Keep them there rather than duplicating them in this reference.
 
-## 11. Phases
+## 11. Completed phases and integration contracts
 
-Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typecheck`, `npm test`, plus the listed manual checks) and a short summary for the owner, including anything that deviated from this plan.
+Phases 1-8 are implemented. Retain these numbers for existing code/test references:
 
-### Phase 1 — Foundation
+| Phase | Delivered scope and enduring check |
+|---|---|
+| 1 | Foundation: shell, shared components, schema, seed/reset/backup, formatting and dates |
+| 2 | Money: transactions, accounts, categories, balances; transfers excluded from cash-flow totals |
+| 3 | Budgets: carry-forward, inline editing, copy and consistent Dashboard/Money totals |
+| 4 | Investments: holdings, valuation, XIRR, linked Money rows; invented portfolio fixture agrees |
+| 5 | Dashboard and Performance: matching cross-page figures, charts with zero/one/many points |
+| 6 | Reports and Settings: validated backup/reset/restore round trip, full export, empty states |
+| 7 | Value Research import: contracts below |
+| 8 | Automatic prices: contracts below |
 
-- Initialise git and the Next.js + TypeScript project. Move `PLAN.md` and the mockup into `docs/`. Create `CLAUDE.md`, `.gitignore`, `.env.example` and `README.md`.
-- Port the mockup's tokens and base styles into `styles/`. Set up the three fonts with `next/font`, including the Fraunces `SOFT` axis.
-- Build the app shell: TopBar with nav and the "Sample data" pill, PageHead, StatStrip, Tabs, SubTabs.
-- Build all shared components from section 2.3, including the three charts. Show them on `/dev/ui` with sample props, in light and dark.
-- Database: schema, first migration, connection with pragmas and auto-migrate (backup first), default categories, `seed`, `reset` and `backup` scripts.
-- Domain groundwork: `format.ts`, `money.ts`, `dates.ts` with tests.
-- Every route exists and renders its PageHead with a placeholder body.
+### Phase 7: Value Research import
 
-*Done when:*
+- Read Transaction History `.xls` (BIFF8/OLE), both fund and stock sheets. Check
+  without writing, then import buys/sales; list unsupported transaction types.
+- Parse `DD-Mon-YY`, negative sales and charges from amount minus units times price.
+  Adjust price when necessary to avoid negative charges while preserving money moved.
+  Validate each sheet's Total against its rows.
+- Match ISIN, offer same-name suggestions and manual mapping, allow asset-class
+  correction. Count duplicates by investment/date/action/units so repeated all-time
+  imports add only new rows. Oversells block import.
+- Optionally link one Money account. Back up as `-pre-import` first, then apply all
+  changes in one transaction. Tests construct invented XLS fixtures in memory.
 
-- `npm run dev` serves the app at 127.0.0.1:3000 and navigation works.
-- `/dev/ui` matches the mockup's building blocks side by side.
-- `npm run seed` fills the database, and `npm run reset -- --yes` empties it.
-- All tests pass.
+### Phase 8: Automatic prices
 
-### Phase 2 — Money
-
-- Accounts tab and Categories tab, with create, edit and archive.
-- Transactions tab: filter bar synced to the URL, sorting, search, totals row, "Show more", empty state, CSV export.
-- Transaction drawer: add, edit, duplicate, delete with Undo toast, and validation messages.
-- Money strip. Balances in `balances.ts`, with tests.
-
-*Done when:*
-
-- With sample data, the Money page matches the mockup.
-- The owner can enter a month of real transactions and the balances match their bank.
-- Transfers never change income or spending totals.
-
-### Phase 3 — Budgets
-
-- Budgets tab: inline editing, carry-forward, "Copy last month's budgets", over-budget states.
-- Tests for `budgets.ts`, including carry-forward and "0 means no budget".
-
-*Done when:* the budget figures on the Budgets tab and the Dashboard's budget card agree for any month.
-
-### Phase 4 — Investments
-
-- Assets: create, edit, archive; the "New investment…" flow.
-- Investment transaction drawer: every action, "Paid from" / "Received in" linking, live total, oversell check.
-- Prices and valuations: feed fetch for unit-priced holdings and manual update for statement values.
-- `holdings.ts`, `valuation.ts` (including FD maths) and `xirr.ts`, with the test vectors from section 6.
-- Overview tab: groups, sub-tabs, totals, sold toggle, CSV.
-- Investments → Transactions tab, including balance units.
-- Holding detail page.
-- Linked money transactions shown correctly on the Money side.
-
-*Done when:*
-
-- The seeded portfolio's figures match a hand-checked spreadsheet (include it as `tests/fixtures/portfolio-check.csv`, built from invented data).
-- Deleting a linked transaction on either side removes both.
-- XIRR tests pass.
-
-### Phase 5 — Dashboard and Performance
-
-- Connect every Dashboard card to real queries, including the month picker.
-- `performance.ts` with tests. Performance tab: filter bar, aggregate card, graph, group tables.
-- Gainers/losers and allocation queries.
-
-*Done when:*
-
-- Every Dashboard figure matches the equivalent figure on the Money or Investments pages for the same month.
-- Charts render correctly with 0, 1 and many data points.
-
-### Phase 6 — Reports, Settings and polish
-
-- Reports page (financial year and calendar year).
-- Settings: backup, restore (with validation), full export, remove sample data, preferences.
-- Empty states on every page for a brand-new database (no accounts, no transactions, no investments) that guide the owner to the first action.
-- Keyboard and screen-reader pass; responsive pass at 360px, 768px and 1440px; dark-mode pass.
-- Optional Playwright smoke test: add a transaction, see it on the Dashboard.
-
-*Done when:*
-
-- Backup → reset → restore brings everything back exactly.
-- A fresh database leads the owner from an empty app to a first account, a first transaction and a first investment without confusion.
-
-### Phase 7 — Import from Value Research
-
-- `/investments/import`: choose the Transaction History `.xls` that Value Research downloads, check it, then import. Checking changes nothing.
-- `lib/xls.ts` reads Excel 97–2003 files (BIFF8 in an OLE container) without a dependency. `lib/domain/valueResearch.ts` turns both sheets (Mutual Funds & SIFs, Stocks & ETFs) into buys and sales: dates `DD-Mon-YY`, sells negative, charges = amount − units × price (stamp duty, brokerage). A price that would make the charges negative is worked out from the amount instead, so money moved always equals the file. Other transaction types are listed as not imported.
-- The sheet's Total row must equal the sum of its rows.
-- Each fund or stock is matched by ISIN (stored as the asset's symbol). An unmatched one becomes a new investment, or the owner maps it to an existing one; same-name investments without an ISIN are suggested. Asset class is guessed from the name and can be changed.
-- Rows already in Hisaab (same investment, date, action and units) are skipped, so the same All-time file can be imported again safely. A sale larger than the units held blocks the import.
-- Optional: one account to record the buys and sales in Money as linked transfers.
-- A `-pre-import` backup is saved first; everything is written in one transaction.
-
-*Done when:*
-
-- A real download imports with net invested equal to the file's totals, and importing it again adds nothing.
-
-### Phase 8 — Automatic prices
-
-- Owner-approved exception to "no external requests": only AMFI's, NSE's and BSE's public whole-market price files, all fetched by `lib/feeds.ts`. Requests are the same whatever the owner holds.
-- Funds use AMFI `NAVAll.txt` (latest NAV) and the NAV history report for one date (past prices). Stocks and ETFs use NSE's daily bhavcopy zip (UDiFF from 2024, the older format before), falling back to BSE's Equity-with-ISIN CSV (UDiFF from 8 July 2024) for ISINs absent from NSE. Weekly history looks back up to 7 days for weekends and holidays; recent daily history uses the exact trading date.
-- Only `units` funds, stocks and ETFs whose symbol is an ISIN take part. Downloaded prices are stored with `source = 'auto'` under the file's own date; a `manual` or `import` price on the same day is never replaced.
-- On open, at most once a day (setting `auto_prices`, on by default; last result in `price_update`). "Update now" on Investments and Settings forces it. A failed check still counts for the day.
-- Settings → Prices → Fetch past prices fills missing weekdays in the latest 30 calendar days, then fixed Sunday week-ends back to the first purchase for held, linked investments. A local worker checkpoints dates and investments in SQLite, resumes interrupted work when the app reopens, and shows progress and Stop across routes. A new run retries missing prices and catches newly linked investments. The once-a-day automatic refresh still fetches only the latest prices.
-- No migration: `source` is a TypeScript-only enum.
-
-*Done when:*
-
-- Opening the app once a day stores that day's prices, a reload doesn't download again, and switching it off stops all downloads.
-
----
+- Only [lib/feeds.ts](../lib/feeds.ts) may make runtime network requests: public
+  AMFI NAV and NSE/BSE whole-market files, never requests containing owner holdings.
+  Use AMFI latest/history reports, NSE UDiFF/legacy bhavcopy, and BSE Equity-with-ISIN
+  CSV (UDiFF from 8 July 2024) for ISINs absent from NSE. NSE takes precedence.
+- Eligible investments are unit-valued funds, stocks and ETFs identified by ISIN.
+  Save the file's date, not the download date; preserve manual/import prices.
+- On open, check at most once per day when `auto_prices` is enabled (default).
+  Record results in `price_update`; failed checks also count. Manual updates can
+  force a fetch. Holding/group fetches do not mark the app-wide daily check complete.
+- Backfill missing weekdays in the latest 30 days and Sunday week-ends before that,
+  back to the first purchase of held, linked investments. Daily quotes must match
+  the date; weekly lookback is at most seven days. Show a download estimate first.
+- A single local worker checkpoints dates/assets in SQLite. Show progress and Stop
+  across pages; resume interruptions on reopen, not while the server is stopped.
+  A new run retries gaps and newly linked assets; do not retry failures forever
+  within a run. Disabling automatic prices stops on-open fetches; explicit manual
+  updates/backfills still download when requested.
 
 ## 12. Testing checklist (minimum)
+
+For code changes, run `npm run lint`, `npm run typecheck` and `npm test`.
+Use [tests/](../tests/) as the executable reference, including:
 
 - **format:** Indian grouping, Lakh/Crore thresholds, negative and zero signs, `0.00%` not `−0.00%`.
 - **money:** parsing "1,250.50", "₹ 1250", "1250.555" (reject more than 2 decimals), and empty input.
@@ -765,6 +334,14 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 - **xirr:** both section 6 vectors; all-negative flows return `null`; under-365-days produces "abs.".
 - **performance:** daily available dates for short ranges, weekly for medium ranges, monthly for long/all-time; missing prices carried forward.
 - **linked transactions:** create, edit and delete keep both sides in sync.
+
+- **integrations:** duplicate import/oversells, price-source protection, interrupted
+  backfill, migration compatibility, backup/reset/restore and ZIP round trips.
+
+For UI work, check empty/populated states, keyboard focus and drawers, light/dark
+themes and 360/768/1440px layouts using invented data. Charts need zero, one and
+many points with readable labels/tooltips. Playwright is optional, not a required
+new dependency. Documentation-only edits need link/reference and diff checks.
 
 ---
 
@@ -804,26 +381,17 @@ Each phase ends with the acceptance checks passing (`npm run lint`, `npm run typ
 
 ## 15. Progress log
 
-Update this as work happens: one line per phase with the date, status and notes.
+Keep outcomes brief; details and superseded decisions belong in Git history.
 
-| Phase | Status | Date | Notes |
+| Work | Status | Date | Outcome |
 |---|---|---|---|
-| Chart history detail | Done | 1 Oct 2026 | Performance, Dashboard portfolio, and holding-detail charts now choose available daily, weekly or monthly points from their period length instead of always displaying month-ends or every historical quote. Time-proportional axes and date labels reflect irregular trading days; calculations still carry the last known price. |
-| Investment price buttons | Done | 1 Oct 2026 | Group and holding price actions fetch whole-market AMFI/NSE/BSE prices for selected held investments instead of opening price-entry fields. Manual statement-value updates remain separate; selected fetches do not mark the app-wide daily check complete. |
-| Price backfill and BSE fallback | Done | 1 Oct 2026 | SQLite checkpoints and a single local worker keep progress and Stop available across pages; unfinished work resumes on reopen. Recomputed needs pick up newly linked investments and gaps, with per-run attempts to avoid retry loops. BSE public Equity-with-ISIN CSVs (UDiFF from 8 July 2024) fill ISINs missing from NSE without sending holdings; NSE keeps precedence. No new dependency or migration. |
-| Price history cadence | Done | 1 Oct 2026 | Settings backfill now checks weekdays for the latest 30 days and fixed Sunday week-ends back to the first purchase. Daily downloads require a price on the requested date; weekly downloads can fall back up to seven days for holidays. The existing ISIN-only, whole-market AMFI/NSE requests, Stop control and manual/import price protection remain; no new dependency or schema change. |
-| Daily investment change correction | Done | 1 Oct 2026 | One-day gains use each holding's two latest quotes or statements instead of comparing two days with the same stale price. Buys and sells remain flow-adjusted; net-worth adds the missed price gain to yesterday's cash and value change without counting a cash-funded purchase twice. Dashboard, Investments, holding detail, Performance and CSV share the calculation; CSV includes each row's comparison date. |
-| Investment change periods | Done | 1 Oct 2026 | Replaced all visible previous-price changes with selectable 1-day, 1-week, longer and all-time flow-adjusted gains. Dashboard returns and movers, Investments header, overview rows and totals, holding detail, Performance filter and CSV share calendar-period calculations; the overview and header keep the period in the URL. No new dependencies. |
-| Dashboard net-worth periods | Done | 1 Oct 2026 | Net-worth strip now compares cash plus investments on the dashboard date with the same total 1 day, 1 week, 1/3/6 months or 1 year earlier. A URL-backed dropdown replaces the previous-price-only “since” figure and keeps its selection across dashboard months. Checked on an invented temporary database in desktop and 360px views; existing chart tooltip overflow is unrelated. |
-| SQLite driver transition | Done | 1 Oct 2026 | Replaced `better-sqlite3` with Node 24+ `node:sqlite` using matching pinned Drizzle ORM/Kit 1.0.0-rc.4. `drizzle-kit up` converted the single migration without changing its SQL; the v1 snapshot was aligned with the current schema so generating migrations has no drift. Existing migration names and hashes are checked, and an existing DB is backed up before legacy history or pending SQL changes. Builds migrate once before Next's parallel workers. Verified on Windows Node 26.7: clean `npm ci`, lint, typecheck, 200 tests, fresh-DB build, temporary legacy upgrade/backup/restore, local dashboard, transaction save/delete/undo and zip export. Node 24 not tested on this machine; both Drizzle and Node SQLite are release candidates. |
-| Copied database compatibility | Done | 1 Oct 2026 | An existing 0.x DB from another PC had a hash of the original LF migration SQL; the tracked SQL uses CRLF, so the strict startup guard rejected it. Accept either line-ending hash while retaining unknown-hash and migration-name rejection. Verified the copied DB's schema, integrity and foreign keys read-only, then upgraded only a consistent temporary copy: all table counts unchanged, pre-migrate backup retains legacy history, repeat open is idempotent, original unchanged. |
-| Planning and mockup | Done | Sep 2026 | Mockup approved by owner |
-| 1 — Foundation | Done | 28 Sep 2026 | Shell, all shared components on `/dev/ui`, schema + migration, seed/reset/backup, domain helpers with 35 tests. Drawer uses native `<dialog>`, Menu uses the popover API. `/dev/ui` not compared in a browser — no preview pane on this install. |
-| 2 — Money | Done | 29 Sep 2026 | Transactions, Accounts and Categories tabs, transaction drawer, Money strip, CSV export; `balances.ts` + validation tests (55 total). Checked in a browser against the seed: strip and September totals match the mockup, transfers excluded. Undo keeps deleted rows in memory for 60 s (lost on restart). Accounts and categories can be deleted only while unused; otherwise archive. Fixed Phase 1 CSS: table alignment, filter spans, page padding. Real-bank balance check is the owner's. |
-| 3 — Budgets | Done | 29 Sep 2026 | Budgets tab with month picker, inline editing (blur/Enter saves, Escape reverts), "Without a budget" list with Set budget, totals row, over-budget states, copy last month with Undo. Budgets, the Money strip and (from Phase 5) the Dashboard card all read `monthBudgets()`, so they agree. "Copy last month's budgets" removes this month's own changes, since budgets carry forward. A value equal to what carries in stores no row. Undo store moved to `lib/undo.ts`. 64 tests. |
-| 4 — Investments | Done | 29 Sep 2026 | Overview (groups, sub-tabs, totals, sold toggle, CSV), Investments → Transactions (filters, balance units, CSV), holding detail page (invested-vs-worth chart, FD deposit details), investment drawer with every action, "Paid from"/"Received in" linking, live total, oversell check and inline "New investment…", one Update prices drawer for prices and values, asset edit/archive (archive only once sold). `holdings.ts`, `valuation.ts`, `xirr.ts`, `portfolio.ts` with tests; `tests/portfolio-check.test.ts` seeds a temp DB and matches `tests/fixtures/portfolio-check.csv`. Linked delete checked in the browser from both sides. Manual-asset value = last statement ± later deposits/withdrawals; a withdrawal beyond cost counts as realised gain. Seed fix: SIP prices are scaled so the last buy no longer takes an odd price, and SIP amounts are exact. `FilterForm` pulled out of `TransactionFilters`; `PageHead` gained `sub`. No holdings column sorting yet. 122 tests. |
-| 5 — Dashboard and Performance | Done | 29 Sep 2026 | Dashboard on real queries with a month picker (past months show balances and holdings at month-end; future or invalid months fall back to this month): strip, income vs spending, where money went, portfolio performance, allocation, budgets, recent transactions, returns by type, top gainers & losers, accounts. Performance tab: as-of date and period filter, returns card with XIRR, invested-vs-worth chart, one table per investment type with totals, CSV export. `performance.ts` with 16 tests (138 total). Checked in a browser: September and August figures match the Money, Budgets and Investments pages; charts render with 0, 1 and many points (single points now draw dots); 360px layout. Performance adds a "Financial year to date" period; the Dashboard's YTD chip uses the calendar year, as in the mockup. "Since last update" covers holdings with two or more prices. |
-| 6 — Reports, Settings and polish | Done | 30 Sep 2026 | Reports: financial or calendar year, strip (income, spent, saved with savings rate, net invested), monthly income vs spending chart, spending and income by category × month tables with totals, CSV. Settings: Back up now (saved to `data/backups/` and downloaded), restore with validation (SQLite header, integrity check, Hisaab tables, not from a newer version, migrated, foreign keys) after a `-pre-restore` backup, full CSV export as a zip (hand-written with `node:zlib`, no new dependency), start fresh (type DELETE, `-pre-reset` backup), preferences (FY start month, default FD compounding, now used by the investment drawer), About (paths, size, backup count, version). Empty states: Dashboard "Get started" card with three steps that tick off; the transaction drawer sends a new owner to add an account first. Passes: accessibility audit of 12 page variants (names, labels, ids, headings), mobile button labels now visually hidden instead of removed; 360/768/1440 and dark mode checked in a browser. `tests/backup.test.ts` proves seed → backup → reset → restore gives identical tables; zip round-trip test. Playwright skipped (would add a dependency). Placeholder component removed. 145 tests. |
-| 7 — Import from Value Research | Done | 30 Sep 2026 | `/investments/import` with check-then-import, entry points on Investments (head and empty state) and Settings. Hand-written `.xls` reader (`lib/xls.ts`, no dependency; SheetJS on npm is stale and not approved), `valueResearch.ts` parser, `planImport` (ISIN match, same-name suggestion, count-based duplicate check, oversell check) and `applyImport` (one transaction, `-pre-import` backup, prices from real NAVs only, optional linked Money transfers). `linkedFields` moved to `holdings.ts` as `linkedMoneyRow`. Tests build `.xls` fixtures in memory from invented data (`tests/helpers/xlsWriter.ts`). Parser checked against the owner's real download locally (not committed): 103 rows, 34 ISINs, totals match, one sale gets a worked-out price. Browser check with the real file still to do. Dividends, switches and bonus rows in future files are listed as not imported. |
-| 8 — Automatic prices | Done | 1 Oct 2026 | Owner-approved downloads of AMFI NAVs and NSE bhavcopy only (`lib/feeds.ts`, global `fetch`, 20 s timeout). Probed sizes: AMFI `NAVAll.txt` 1.5 MB text / 0.26 MB gzipped in about 1 s; AMFI history for one date about 0.27 MB gzipped; NSE UDiFF zip about 0.2 MB (from Jan 2024; older format to Jul 2024). Parsers and `pastPriceNeeds` in `lib/domain/priceFeeds.ts`; `unzipFirst` added to `lib/zip.ts` (reads sizes from the central directory, as NSE's older zips use data descriptors). `applyFeedPrices` upserts `source = 'auto'` and never replaces `manual` or `import`. `PriceRefresher` in the root layout checks once a day on open; status line and Update now on Investments; Settings → Prices card with the switch, Update prices now and Fetch past prices (month-ends only, a deliberate choice: daily history for past years is hundreds of MB). ISIN hint on the investment drawer's symbol field. No migration (TS-only enum), no new dependency. Days the app isn't opened have no stored price; valuation carries the last price forward. |
-| Dashboard periods | Done | 1 Oct 2026 | Owner asked for a time-period choice like Value Research's dashboard. "Returns by investment type" and "Top gainers & losers" now offer every Performance period (since last update, 1/3/6 months, financial year to date, 1/3 years, all time), computed on the server with the existing `periodRows`/`sinceLastRows`/`periodTotals`, so the switch is instant. Period gains are money-weighted like the Performance tab (value at end + money out − value at start − money in); the card subline says the dates. With daily automatic prices, "Since last update" plays the part of VR's "1 day"; a custom range is the Performance tab's as-of date plus period. No new dependencies. |
+| Initial delivery (phases 1-8) | Done | 28 Sep-1 Oct 2026 | Money, budgets, investments, Dashboard, Reports, Settings, import and automatic prices implemented. |
+| SQLite compatibility | Done | 1 Oct 2026 | Node SQLite, serial migration, pre-upgrade backups and LF/CRLF migration-hash compatibility. |
+| Investment periods and prices | Done | 1 Oct 2026 | Flow-adjusted periods, quote-based daily gains, BSE fallback, resumable daily/weekly backfill and targeted fetch actions. |
+| Chart history detail | Done | 1 Oct 2026 | Adaptive daily/weekly/monthly investment charts with calendar-time spacing and range-aware labels. |
+| Documentation cleanup | Done | 3 Oct 2026 | Kept three purpose-specific docs; removed duplicate definitions, completed checklists and superseded implementation notes. |
+
+Outstanding verification/limitations from delivery: holdings columns are not yet
+sortable; end-to-end import with the owner's download and real-account balance
+verification remain owner checks. The SQLite transition was tested on Windows
+Node 26.7, not Node 24; do not describe the minimum-version path as tested.

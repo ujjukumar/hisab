@@ -186,7 +186,7 @@ value comes from a statement still use **Update value** for manual entry.
 - The server always binds to `127.0.0.1`, never `0.0.0.0`.
 - Next.js telemetry is disabled.
 - Fonts are downloaded at build time and served from this machine. The running
-  app's only requests are the AMFI and NSE price files above, which you can
+  app's only requests are the AMFI, NSE and BSE price files above, which you can
   switch off.
 - `data/` is never committed. Neither are `*.db`, `*.db-wal`, `*.db-shm` or
   `.env*`.
@@ -210,6 +210,16 @@ value comes from a statement still use **Update value** for manual entry.
 `/dev/ui` shows every shared component with sample props, in light and dark side
 by side. It is not served in a production build.
 
+## Documentation
+
+- [README.md](README.md): setup, daily use, backups, imports, prices and commands.
+- [CLAUDE.md](CLAUDE.md): coding, privacy and design rules for contributors and agents.
+- [docs/PLAN.md](docs/PLAN.md): product decisions, calculation rules, verification and backlog.
+
+Keep each topic in its owning document and link to it elsewhere. Exact package
+versions, table definitions and design tokens live in the source, not copied
+tables in these docs. Completed implementation details remain in Git history.
+
 ## Where things are
 
 ```
@@ -218,7 +228,8 @@ components/      shared UI, one folder per component with its CSS Module
 lib/db/          schema, migrations, connection
 lib/domain/      money, dates, formatting — pure functions, all tested
 lib/queries/     the only place that reads the database
+lib/actions/     validated writes and linked updates
 scripts/         seed, reset, backup, migrate
 styles/          tokens.css and globals.css
-docs/PLAN.md     the full brief
+docs/PLAN.md     product and calculation reference
 ```

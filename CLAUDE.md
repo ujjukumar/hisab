@@ -1,22 +1,15 @@
 # Hisaab
 
 A local-only personal finance app for one owner in India. Everything lives in one
-SQLite file on this machine. The full brief is `docs/PLAN.md` — read it before
-starting a phase, and keep its section 15 Progress log current.
+SQLite file on this machine. Read [docs/PLAN.md](docs/PLAN.md) before starting a
+phase; it holds the product and calculation rules. Keep its section 15 Progress
+log current with a short outcome, not a transcript of implementation steps.
 
-## Commands
+## Setup and checks
 
-| Command | Does |
-|---|---|
-| `npm run dev` | `next dev -H 127.0.0.1 -p 3000` |
-| `npm run build` / `npm start` | Serial DB migration then production build; `next start -H 127.0.0.1 -p 3000` (faster for daily use) |
-| `npm run db:generate` | `drizzle-kit generate` after schema changes |
-| `npm run db:migrate` | Apply migrations (the app also applies pending migrations on start, after making a backup) |
-| `npm run seed` | Load sample data into an empty database |
-| `npm run reset -- --yes` | Wipe all data and recreate default categories |
-| `npm run backup` | `VACUUM INTO data/backups/finance-YYYYMMDD-HHmm.db` |
-| `npm test` / `npm run test:watch` | Vitest |
-| `npm run lint` / `npm run typecheck` | ESLint / `tsc --noEmit` |
+Use [README.md](README.md#commands) for setup and commands. Code changes must pass
+`npm run lint`, `npm run typecheck` and `npm test`, plus the relevant manual checks
+in the plan. Summarise results and any deviations before starting another phase.
 
 Scripts under `scripts/` are plain `.ts` run by Node's own type stripping, so
 relative imports inside them need explicit `.ts` extensions.
