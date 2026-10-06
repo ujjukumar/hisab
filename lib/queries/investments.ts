@@ -7,6 +7,7 @@ import {
   assets,
   investmentTransactions,
   prices,
+  settings,
   transactions,
   valuations,
   type Asset,
@@ -29,7 +30,7 @@ import {
   type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
-import { pastPriceNeeds } from '@/lib/domain/priceFeeds';
+import { NO_MARKET_FILE_DATES_SETTING, pastPriceNeeds } from '@/lib/domain/priceFeeds';
 import { INVESTMENT_ACTIONS } from '@/lib/validation/investments';
 import { PAGE_SIZE, paramReader, type Params } from './money';
 
@@ -124,6 +125,7 @@ export type AssetOption = Pick<
   | 'assetClass'
   | 'valuation'
   | 'symbol'
+  | 'navStartDate'
   | 'accountRef'
   | 'interestRate'
   | 'compounding'
@@ -150,6 +152,7 @@ export function assetOptions(): AssetOption[] {
     assetClass: r.asset.assetClass,
     valuation: r.asset.valuation,
     symbol: r.asset.symbol,
+    navStartDate: r.asset.navStartDate,
     accountRef: r.asset.accountRef,
     interestRate: r.asset.interestRate,
     compounding: r.asset.compounding,
@@ -350,17 +353,32 @@ export function periodPerformance(params: Params, yearStartMonth: number) {
   return { asOf, period, from, rows };
 }
 
-/** Scheduled daily and weekly prices still missing for linked investments. */
+/** Scheduled daily prices still missing for linked investments. */
 export function pastPriceDates(): {
   date: IsoDate;
   funds: boolean;
   listed: boolean;
-  cadence: 'daily' | 'weekly';
+  cadence: 'daily';
 }[] {
-  return pastPriceNeeds(portfolioData(), today()).map((n) => ({
+  return pastPriceNeeds(portfolioData(), today(), noMarketFileDates()).map((n) => ({
     date: n.date,
     cadence: n.cadence,
     funds: n.linked.some((a) => a.feed === 'amfi'),
     listed: n.linked.some((a) => a.feed === 'nse'),
   }));
+}
+
+/** Dates when neither exchange had a whole-market file in a settled backfill run. */
+export function noMarketFileDates(): Set<IsoDate> {
+  const row = db.select({ value: settings.value }).from(settings)
+    .where(eq(settings.key, NO_MARKET_FILE_DATES_SETTING)).get();
+  if (!row?.value) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(row.value);
+    return new Set(Array.isArray(parsed)
+      ? parsed.filter((date): date is IsoDate => typeof date === 'string' && isValidDate(date))
+      : []);
+  } catch {
+    return new Set();
+  }
 }

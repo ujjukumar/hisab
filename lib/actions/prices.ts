@@ -130,7 +130,7 @@ export async function fetchPastPrices(date: string): Promise<PriceResult> {
   const { updated, problems } = await fetchAndSave(
     need.linked,
     day,
-    (isins) => amfiFor(day, isins, lookBackDays),
+    (isins, earliestDates) => amfiFor(day, isins, lookBackDays, earliestDates),
     lookBackDays,
   );
   revalidate();

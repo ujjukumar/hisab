@@ -42,6 +42,7 @@ export const assetSchema = z
     assetClass: z.enum(ASSET_CLASSES, 'Choose an asset class.'),
     accountRef: optionalText(60),
     symbol: optionalText(40),
+    navStartDate: optionalDate('Pick a valid first NAV date.'),
     interestRate: text,
     compounding: z.preprocess(
       (v) => v || null,
@@ -76,6 +77,7 @@ export const assetSchema = z
     return {
       ...a,
       valuation,
+      navStartDate: a.type === 'mutual_fund' ? a.navStartDate : null,
       interestRate,
       compounding: hasRate ? (a.compounding ?? 'quarterly') : null,
       startDate,

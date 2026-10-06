@@ -20,6 +20,7 @@ const asset = (id: number, name: string): Asset => ({
   assetClass: 'equity',
   valuation: 'units',
   symbol: null,
+  navStartDate: null,
   accountRef: null,
   interestRate: null,
   compounding: null,

@@ -101,6 +101,9 @@ asset groups and defaults. Do not maintain parallel copies of these definitions.
   can be archived once sold. Mask account references in the UI.
 - Prices and valuations have one row per asset/date. Downloaded prices have
   `source = 'auto'`; downloads must never overwrite `manual` or `import` prices.
+- Mutual funds may set `nav_start_date` for an NFO. The buy date and its entered
+  price remain the purchase/cash date; historical fetch skips earlier targets and
+  never searches AMFI before this date.
 - Settings are JSON values keyed by name. Default financial year starts in April,
   default FD compounding is quarterly, and `sample_data` controls the sample pill.
 
@@ -310,9 +313,16 @@ Phases 1-8 are implemented. Retain these numbers for existing code/test referenc
 - On open, check at most once per day when `auto_prices` is enabled (default).
   Record results in `price_update`; failed checks also count. Manual updates can
   force a fetch. Holding/group fetches do not mark the app-wide daily check complete.
-- Backfill missing weekdays in the latest 30 days and Sunday week-ends before that,
-  back to the first purchase of held, linked investments. Daily quotes must match
-  the date; weekly lookback is at most seven days. Show a download estimate first.
+- Backfill each missing weekday file, daily from the first eligible purchase date
+  for held, linked investments. Match the requested date exactly and group all
+  held ISINs into one whole-market download per source/date. Show an estimated
+  total size before starting.
+- If both NSE and BSE have no whole-market file for a date older than three days,
+  cache it as a no-file date; do not retry it in later runs. A published file
+  without a requested ISIN is not a no-file date and remains visible as a gap.
+- Mutual-fund NFOs may set the first NAV-history date. Keep the buy and linked cash
+  movement on the payment date at the entered allotment price; carry that price
+  forward before first NAV and do not queue or fetch earlier history.
 - A single local worker checkpoints dates/assets in SQLite. Show progress and Stop
   across pages; resume interruptions on reopen, not while the server is stopped.
   A new run retries gaps and newly linked assets; do not retry failures forever
@@ -357,7 +367,7 @@ new dependency. Documentation-only edits need link/reference and diff checks.
 | Spending colour | Neutral text with −, not red | Red is reserved for losses and overspending |
 | Dark mode | Follows system setting | Already designed in the mockup |
 | Daily change | Each holding's last two available prices for 1 day; calendar dates for 1 week and longer | The latest NAV or close can predate today (weekends, holidays, delayed updates). Each holding can have different quote dates; remove money flows so a purchase is not counted as a gain |
-| Automatic prices | AMFI, NSE and BSE whole-market files, once a day on open; optional backfill daily for the last 30 days and weekly before | Owner-approved (Oct 2026). Nothing about holdings is sent; a manual, stoppable backfill limits historical download volume |
+| Automatic prices | AMFI, NSE and BSE whole-market files, once a day on open; optional daily backfill | Owner-approved (Oct 2026). Nothing about holdings is sent; downloads are estimated and stoppable |
 | Cost method | Average cost | Simple and standard for tracking; not a tax calculation |
 | Short holdings | Under 365 days show absolute return "abs." | Annualising short periods misleads |
 | Investment payments | Optional "Paid from" / "Received in" creates a linked money transaction | Avoids entering SIPs twice |
@@ -389,6 +399,9 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | SQLite compatibility | Done | 1 Oct 2026 | Node SQLite, serial migration, pre-upgrade backups and LF/CRLF migration-hash compatibility. |
 | Investment periods and prices | Done | 1 Oct 2026 | Flow-adjusted periods, quote-based daily gains, BSE fallback, resumable daily/weekly backfill and targeted fetch actions. |
 | Chart history detail | Done | 1 Oct 2026 | Adaptive daily/weekly/monthly investment charts with calendar-time spacing and range-aware labels. |
+| Price backfill retries | Done | 6 Oct 2026 | Weekly NSE/BSE lookup now searches through the lookback window per ISIN instead of stopping at the first published file. |
+| Daily price history | Done | 6 Oct 2026 | Backfill requests each eligible weekday's whole-market file once per source, with a size estimate, three-day no-file grace, and cached absent-file dates. |
+| Mutual-fund NFO history | Done | 6 Oct 2026 | Optional first-NAV date skips pre-launch backfill and caps AMFI lookback while retaining the payment-date buy and its entered NAV. |
 | Documentation cleanup | Done | 3 Oct 2026 | Kept three purpose-specific docs; removed duplicate definitions, completed checklists and superseded implementation notes. |
 
 Outstanding verification/limitations from delivery: holdings columns are not yet

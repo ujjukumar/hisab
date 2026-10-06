@@ -1,0 +1,1 @@
+ALTER TABLE `assets` ADD `nav_start_date` text;

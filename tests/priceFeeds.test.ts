@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Asset } from '@/lib/db/schema';
 import { unitsAmount, type HoldingTxn } from '@/lib/domain/holdings';
 import type { PortfolioData } from '@/lib/domain/portfolio';
+import { zip } from '@/lib/zip';
 import {
   feedAssets,
   isDue,
@@ -11,7 +12,7 @@ import {
   pendingPriceNeeds,
   pricesFor,
 } from '@/lib/domain/priceFeeds';
-import { amfiFor, bseLatest, nseLatest } from '@/lib/feeds';
+import { amfiFor, bseLatest, FeedError, listedPricesOn, nseLatest } from '@/lib/feeds';
 
 vi.mock('server-only', () => ({}));
 
@@ -122,6 +123,28 @@ describe('parseBhavcopy', () => {
 });
 
 describe('historical downloads', () => {
+  it('recognizes a date with no whole-market files from either exchange', async () => {
+    vi.stubGlobal('fetch', async () => new Response('', { status: 404 }));
+    expect(await listedPricesOn('2024-07-08', ['INE000KP0011'])).toEqual({
+      prices: new Map(),
+      marketFileFound: false,
+    });
+  });
+
+  it('does not call a published file without the requested ISIN a market closure', async () => {
+    const file = zip([{
+      name: 'bhavcopy.csv',
+      text: 'TradDt,Src,ISIN,SctySrs,ClsPric\n2024-07-08,NSE,INE000SF0019,EQ,90',
+    }]);
+    vi.stubGlobal('fetch', async (url: string) => url.includes('nsearchives')
+      ? new Response(new Uint8Array(file))
+      : new Response('', { status: 404 }));
+    expect(await listedPricesOn('2024-07-08', ['INE000KP0011'])).toEqual({
+      prices: new Map(),
+      marketFileFound: true,
+    });
+  });
+
   it('only accepts a NAV dated on the requested daily target', async () => {
     const requested: string[] = [];
     vi.stubGlobal('fetch', async (url: string) => {
@@ -142,6 +165,38 @@ describe('historical downloads', () => {
       date: '2024-04-01',
       price: '12',
     });
+  });
+
+  it('does not look for an NFO NAV before its first available date', async () => {
+    const isin = 'INF247L01EJ8';
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      const date = new URL(String(url)).searchParams.get('frmdt') ?? '';
+      requested.push(date);
+      const nav = [
+        'Scheme Code;Scheme Name;ISIN Div Payout/ ISIN Growth;Net Asset Value;Date',
+        `100001;Invented NFO;${isin};10;${date}`,
+      ].join('\n');
+      return new Response(date === '25-Feb-2025' ? nav : '');
+    });
+
+    expect(await amfiFor(
+      '2025-03-02',
+      [isin],
+      7,
+      new Map([[isin, '2025-02-25']]),
+    )).toEqual(new Map([[isin, { date: '2025-02-25', price: '10' }]]));
+    expect(requested).toEqual([
+      '02-Mar-2025', '01-Mar-2025', '28-Feb-2025', '27-Feb-2025', '26-Feb-2025', '25-Feb-2025',
+    ]);
+  });
+
+  it('treats an AMFI HTML error page as unavailable instead of an empty price list', async () => {
+    vi.stubGlobal('fetch', async () => new Response(
+      '<!doctype html><html><body>Request rejected</body></html>',
+      { headers: { 'content-type': 'text/html' } },
+    ));
+    await expect(amfiFor('2026-10-06', ['INF000MF0012'], 1)).rejects.toThrow(FeedError);
   });
 
   it('treats a missing daily NSE file as a day without trading', async () => {
@@ -196,6 +251,35 @@ describe('historical downloads', () => {
     expect(urls).toHaveLength(3);
   });
 
+  it('searches older market files until each requested ISIN has a quote', async () => {
+    const target = 'INE000KP0011';
+    const other = 'INE000SF0019';
+    const nseRequests: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      nseRequests.push(String(url));
+      const day = String(url).match(/_(2024070[89])_F_0000\.csv\.zip/)?.[1];
+      if (url.includes('nsearchives') && day) {
+        const isin = day === '20240709' ? other : target;
+        const price = day === '20240709' ? '20' : '18';
+        const csv = `TradDt,Src,ISIN,SctySrs,ClsPric\n2024-07-${day.slice(-2)},NSE,${isin},EQ,${price}`;
+        return new Response(new Uint8Array(zip([{ name: 'bhavcopy.csv', text: csv }])));
+      }
+      if (url.includes('nsearchives')) return new Response('', { status: 404 });
+      const date = String(url).includes('20240709') ? '2024-07-09' : '2024-07-08';
+      const isin = date === '2024-07-09' ? other : target;
+      const price = date === '2024-07-09' ? '20' : '18';
+      return new Response(`TradDt,Src,ISIN,SctySrs,ClsPric\n${date},BSE,${isin},A,${price}`);
+    });
+
+    expect(await nseLatest('2024-07-09', 2, [target])).toEqual(new Map([
+      [target, { date: '2024-07-08', price: '18' }],
+    ]));
+    expect(await bseLatest('2024-07-09', 2, [target])).toEqual(new Map([
+      [target, { date: '2024-07-08', price: '18' }],
+    ]));
+    expect(nseRequests.filter((url) => url.includes('nsearchives'))).toHaveLength(2);
+  });
+
   it('still rejects a non-HTML BSE file with invalid columns', async () => {
     vi.stubGlobal('fetch', async () => new Response('not,a,bhavcopy\n1,2,3', { status: 200 }));
     await expect(bseLatest('2026-09-30', 1)).rejects.toThrow("BSE's closing prices couldn't be read");
@@ -223,6 +307,7 @@ const asset = (
   assetClass: 'equity',
   valuation,
   symbol,
+  navStartDate: null,
   accountRef: null,
   interestRate: null,
   compounding: null,
@@ -304,7 +389,7 @@ describe('pastPriceNeeds', () => {
     valuations: [],
   };
 
-  it('requests each missing weekday in the latest 30 days, then weekly dates before that', () => {
+  it('requests every missing weekday from the first purchase date', () => {
     const recent: PortfolioData = {
       ...data,
       assets: [asset(1, 'mutual_fund', 'INF000MF0012')],
@@ -315,6 +400,7 @@ describe('pastPriceNeeds', () => {
       ],
     };
     const needs = pastPriceNeeds(recent, '2024-04-30').map((need) => need.date);
+    expect(needs[0]).toBe('2024-02-01');
     expect(needs.filter((date) => date >= '2024-04-01')).toEqual([
       '2024-04-01', '2024-04-02', '2024-04-03', '2024-04-04', '2024-04-05',
       '2024-04-08', '2024-04-09', '2024-04-10', '2024-04-11', '2024-04-12',
@@ -322,22 +408,34 @@ describe('pastPriceNeeds', () => {
       '2024-04-22', '2024-04-23', '2024-04-24', '2024-04-25', '2024-04-26',
       '2024-04-30',
     ]);
-    expect(needs).toContain('2024-03-24');
+    expect(needs).toContain('2024-03-25');
     expect(needs).not.toContain('2024-03-31');
-    expect(needs).not.toContain('2024-02-29');
+    expect(needs).toContain('2024-02-29');
   });
 
-  it('keeps older weekly targets fixed as the 30-day window moves', () => {
+  it('keeps historical weekdays while extending the end date', () => {
     const held: PortfolioData = {
       ...data,
       txns: [trade(1, 1, '2024-01-01', 'buy', '1')],
       prices: [],
     };
-    const weekly = (asOf: string) => pastPriceNeeds(held, asOf)
-      .filter((need) => need.cadence === 'weekly' && need.date <= '2024-03-17')
-      .map((need) => need.date);
-    expect(weekly('2024-04-30')).toEqual(weekly('2024-05-01'));
-    expect(weekly('2024-05-01').slice(-2)).toEqual(['2024-03-10', '2024-03-17']);
+    const dates = (asOf: string) => pastPriceNeeds(held, asOf).map((need) => need.date);
+    expect(dates('2024-04-30')).toContain('2024-03-11');
+    expect(dates('2024-04-30')).toContain('2024-03-15');
+    expect(dates('2024-04-30')).not.toContain('2024-03-16');
+    expect(dates('2024-05-01').slice(0, dates('2024-04-30').length)).toEqual(dates('2024-04-30'));
+  });
+
+  it('skips weekdays before an NFO first-NAV date', () => {
+    const nfo: PortfolioData = {
+      ...data,
+      assets: [{ ...asset(1, 'mutual_fund', 'INF247L01EJ8'), navStartDate: '2025-02-25' }],
+      txns: [trade(1, 1, '2025-02-12', 'buy', '10')],
+      prices: [],
+    };
+    const needs = pastPriceNeeds(nfo, '2025-04-01');
+    expect(needs.find((need) => need.date === '2025-02-24')).toBeUndefined();
+    expect(needs.find((need) => need.date === '2025-02-25')?.linked.map((item) => item.id)).toEqual([1]);
   });
 
   it('rechecks newly linked investments without retrying earlier failed prices in the same run', () => {
@@ -359,14 +457,26 @@ describe('pastPriceNeeds', () => {
       .toEqual([2]);
   });
 
-  it('skips weekly dates with a nearby price and assets after they are sold', () => {
+  it('skips exact-price dates and assets after they are sold', () => {
     const needs = pastPriceNeeds(data, '2024-04-30');
     const ids = (date: string) => needs.find((need) => need.date === date)?.linked.map((a) => a.id);
-    expect(ids('2024-02-25')).toEqual([1, 2]);
-    expect(ids('2024-03-03')).toEqual([2]);
-    expect(ids('2024-03-10')).toEqual([2]);
-    expect(ids('2024-03-31')).toEqual([1]);
+    expect(ids('2024-02-26')).toEqual([2]);
+    expect(ids('2024-03-11')).toEqual([1, 2]);
+    expect(ids('2024-03-21')).toEqual([1]);
+    expect(ids('2024-04-01')).toEqual([1]);
     expect(ids('2024-04-29')).toEqual([1]);
+  });
+
+  it('skips dates learned to have no whole-market files', () => {
+    const listed: PortfolioData = {
+      ...data,
+      assets: [asset(2, 'stock', 'INE000KP0011')],
+      txns: [trade(2, 2, '2024-02-05', 'buy', '5')],
+      prices: [],
+    };
+    expect(pastPriceNeeds(listed, '2024-02-28').some((need) => need.date === '2024-02-26')).toBe(true);
+    expect(pastPriceNeeds(listed, '2024-02-28', new Set(['2024-02-26']))
+      .some((need) => need.date === '2024-02-26')).toBe(false);
   });
 
   it('is empty when nothing is linked or nothing was bought', () => {
@@ -383,8 +493,8 @@ describe('pastPriceNeeds', () => {
       prices: [],
     };
     const needs = pastPriceNeeds(late, '2025-01-31');
-    expect(needs[0]?.date).toBe('2024-12-08');
-    expect(needs.find((need) => need.date === '2024-12-29')?.cadence).toBe('weekly');
+    expect(needs[0]?.date).toBe('2024-12-02');
+    expect(needs.find((need) => need.date === '2024-12-30')?.cadence).toBe('daily');
     expect(needs.find((need) => need.date === '2025-01-02')?.cadence).toBe('daily');
     expect(needs.at(-1)?.date).toBe('2025-01-31');
     expect(needs.map((need) => need.date)).not.toContain('2025-01-04');

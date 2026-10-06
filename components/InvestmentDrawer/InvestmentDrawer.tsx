@@ -509,6 +509,21 @@ function AssetFields({
         {...describe('accountRef')}
       />
       {error('accountRef')}
+      {type === 'mutual_fund' && (
+        <>
+          <TextField
+            label="First NAV date (NFO only)"
+            name="navStartDate"
+            type="date"
+            defaultValue={asset?.navStartDate ?? ''}
+            {...describe('navStartDate')}
+          />
+          <p className={styles.hint}>
+            Leave blank for existing funds. Past-price fetch skips dates before this date.
+          </p>
+          {error('navStartDate')}
+        </>
+      )}
       {hasRate && (
         <>
           <FieldPair>

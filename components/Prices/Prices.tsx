@@ -84,14 +84,11 @@ export function AutoPricesSwitch({ on }: { on: boolean }) {
   );
 }
 
-export type PastDate = { date: IsoDate; funds: boolean; listed: boolean; cadence: 'daily' | 'weekly' };
+export type PastDate = { date: IsoDate; funds: boolean; listed: boolean };
 
 // Measured in September 2026: AMFI ~0.3 MB, NSE ~0.2 MB, BSE ~0.9 MB per day.
 const size = (dates: PastDate[]) =>
-  dates.reduce(
-    (mb, d) => mb + ((d.funds ? 0.3 : 0) + (d.listed ? 1.1 : 0)) * (d.cadence === 'weekly' ? 7 : 1),
-    0,
-  );
+  dates.reduce((mb, d) => mb + (d.funds ? 0.3 : 0) + (d.listed ? 1.1 : 0), 0);
 
 type JobContextValue = {
   status: PriceJobStatus | null;

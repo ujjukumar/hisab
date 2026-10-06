@@ -153,6 +153,7 @@ export const assets = sqliteTable('assets', {
   assetClass: text('asset_class', { enum: ['equity', 'debt', 'gold', 'other'] }).notNull(),
   valuation: text('valuation', { enum: ['units', 'manual', 'fd'] }).notNull(),
   symbol: text('symbol'),
+  navStartDate: text('nav_start_date'),
   accountRef: text('account_ref'),
   interestRate: text('interest_rate'),
   compounding: text('compounding', {

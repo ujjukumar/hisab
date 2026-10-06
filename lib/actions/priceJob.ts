@@ -3,10 +3,11 @@
 import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/client';
-import { today } from '@/lib/domain/dates';
-import { pendingPriceNeeds, priceWorkKey } from '@/lib/domain/priceFeeds';
+import { addDays, today } from '@/lib/domain/dates';
+import { settings } from '@/lib/db/schema';
+import { NO_MARKET_FILE_DATES_SETTING, pendingPriceNeeds, priceWorkKey } from '@/lib/domain/priceFeeds';
 import { amfiFor } from '@/lib/feeds';
-import { freshPortfolioData } from '@/lib/queries/investments';
+import { freshPortfolioData, noMarketFileDates } from '@/lib/queries/investments';
 import { fetchAndSave } from './priceDownloads';
 import {
   claimPriceJob,
@@ -20,6 +21,7 @@ const worker = globalThis as typeof globalThis & {
   hisaabPriceWorker?: { id: string; active: boolean };
 };
 worker.hisaabPriceWorker ??= { id: randomUUID(), active: false };
+const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
 
 function isAlive(pid: number): boolean {
   try {
@@ -49,7 +51,13 @@ async function runJob(id: string, owner: string): Promise<void> {
         if (job.state === 'stopping') writePriceJob(db, { ...job, state: 'stopped', date: null });
         return;
       }
-      const needs = pendingPriceNeeds(freshPortfolioData(), today(), new Set(job.attempted));
+      const asOf = today();
+      const needs = pendingPriceNeeds(
+        freshPortfolioData(),
+        asOf,
+        new Set(job.attempted),
+        noMarketFileDates(),
+      );
       const need = needs[0];
       if (!need) {
         writePriceJob(db, {
@@ -67,17 +75,30 @@ async function runJob(id: string, owner: string): Promise<void> {
         date: need.date,
         total: Math.max(job.total, job.done + needs.length),
       });
-      const lookBack = need.cadence === 'daily' ? 1 : 7;
+      const lookBack = 1;
       const result = await fetchAndSave(
         need.linked,
         need.date,
-        (isins) => amfiFor(need.date, isins, lookBack),
+        (isins, earliestDates) => amfiFor(need.date, isins, lookBack, earliestDates),
         lookBack,
         () => current(id, owner)?.state === 'running',
+        true,
       );
       const latest = current(id, owner);
       if (!latest) return;
       if (latest.state !== 'running') continue;
+      if (result.noMarketFile && need.date <= addDays(asOf, -3)) {
+        const noFileDates = noMarketFileDates();
+        noFileDates.add(need.date);
+        const value = JSON.stringify([...noFileDates].sort());
+        db.insert(settings)
+          .values({ key: NO_MARKET_FILE_DATES_SETTING, value })
+          .onConflictDoUpdate({
+            target: settings.key,
+            set: { value, updatedAt: new Date().toISOString() },
+          })
+          .run();
+      }
       const message = result.problems.join(' ');
       if (result.unavailable) {
         writePriceJob(db, {
@@ -113,7 +134,8 @@ function kickJob(): void {
   local.active = true;
   setImmediate(() => {
     void runJob(job.id, local.id)
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (DEBUG_FEEDS) console.error('[price-backfill] worker failed', error);
         const latest = current(job.id, local.id);
         if (latest?.state === 'running') {
           writePriceJob(db, {

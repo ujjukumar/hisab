@@ -120,10 +120,10 @@ export default async function SettingsPage() {
             </SettingRow>
             <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
               <p>
-                Fetches daily prices for the last 30 days and weekly prices before that, back to
-                your first purchase. Existing prices are skipped. Progress and Stop stay available on every page.
-                An unfinished run resumes when the app reopens; it cannot fetch while the app is closed.
-                Run it again to retry missing dates or newly linked investments.
+                Fetches daily prices for every trading day back to your first purchase. Existing
+                prices, weekends, dates with no exchange files for three days, and pre-NAV NFO
+                dates are skipped. The estimate appears before starting. Progress and Stop stay
+                available on every page; an unfinished run resumes when the app reopens.
               </p>
             </SettingRow>
           </Card>

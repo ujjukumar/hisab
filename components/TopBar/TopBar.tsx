@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/Icon/Icon';
 import { PriceJobProgress } from '@/components/Prices/Prices';
+import { ThemeToggle, type Theme } from '@/components/ThemeToggle/ThemeToggle';
 import styles from './TopBar.module.css';
 
 const NAV = [
@@ -18,7 +19,7 @@ function isCurrent(pathname: string, href: string): boolean {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function TopBar({ sampleData = false }: { sampleData?: boolean }) {
+export function TopBar({ sampleData = false, theme }: { sampleData?: boolean; theme: Theme | null }) {
   const pathname = usePathname();
 
   return (
@@ -40,6 +41,7 @@ export function TopBar({ sampleData = false }: { sampleData?: boolean }) {
           ))}
         </nav>
         <div className={styles.actions}>
+          <ThemeToggle initialTheme={theme} />
           {sampleData && <span className={styles.pill}>Sample data</span>}
           <span className={styles.avatar} aria-hidden="true">
             <Icon name="user" />

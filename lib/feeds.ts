@@ -15,6 +15,7 @@ import { unzipFirst } from '@/lib/zip';
 
 const HEADERS = { 'User-Agent': 'Hisaab (personal use)' };
 const TIMEOUT_MS = 20_000;
+const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
 const AMFI_LATEST = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 const AMFI_HISTORY = 'https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx';
 const NSE = 'https://nsearchives.nseindia.com/content';
@@ -31,13 +32,26 @@ async function download(url: string, source: string): Promise<Buffer | null> {
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    if (DEBUG_FEEDS) console.error('[price-feed] request failed', { source, url, error });
     throw new FeedError(`Couldn't reach ${source}. Check the internet connection and try again.`);
+  }
+  if (DEBUG_FEEDS) {
+    console.info('[price-feed] response', {
+      source,
+      url,
+      status: res.status,
+      contentType: res.headers.get('content-type'),
+      contentEncoding: res.headers.get('content-encoding'),
+      contentLength: res.headers.get('content-length'),
+    });
   }
   if (res.status === 404) return null;
   if (!res.ok)
     throw new FeedError(`${source} didn't send its prices (error ${res.status}). Try again later.`);
-  return Buffer.from(await res.arrayBuffer());
+  const body = Buffer.from(await res.arrayBuffer());
+  if (DEBUG_FEEDS) console.info('[price-feed] body read', { source, bytes: body.byteLength });
+  return body;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -56,7 +70,13 @@ async function amfiOn(date: IsoDate): Promise<PriceMap> {
   const dayText = `${pad(day)}-${SHORT_MONTHS[month - 1]}-${year}`;
   const url = `${AMFI_HISTORY}?frmdt=${dayText}&todt=${dayText}`;
   const file = await download(url, 'AMFI');
-  return file ? parseAmfiNav(file.toString('utf8')) : new Map();
+  if (!file) return new Map();
+  const text = file.toString('utf8');
+  if (/^\s*(?:<!doctype html|<html\b)/i.test(text)) {
+    if (DEBUG_FEEDS) console.error('[price-feed] AMFI returned HTML instead of NAV data', { date });
+    throw new FeedError(`AMFI returned a webpage instead of NAV data for ${date}. Try again later.`);
+  }
+  return parseAmfiNav(text);
 }
 
 /** NAVs on `date`, or the nearest earlier day when a weekly target allows lookback. */
@@ -64,12 +84,26 @@ export async function amfiFor(
   date: IsoDate,
   isins: string[],
   lookBackDays = LOOK_BACK_DAYS,
+  earliestDates: ReadonlyMap<string, IsoDate> = new Map(),
 ): Promise<PriceMap> {
   const out: PriceMap = new Map();
   for (let i = 0; i < lookBackDays && out.size < isins.length; i++) {
     const dayDate = addDays(date, -i);
+    const eligible = isins.filter(
+      (isin) => !out.has(isin) && dayDate >= (earliestDates.get(isin) ?? dayDate),
+    );
+    if (eligible.length === 0) continue;
     const day = await amfiOn(dayDate);
-    for (const isin of isins) {
+    if (DEBUG_FEEDS) {
+      console.info('[price-feed] AMFI history lookup', {
+        targetDate: date,
+        fileDate: dayDate,
+        requested: eligible.length,
+        parsedInstruments: day.size,
+        matched: eligible.filter((isin) => day.has(isin)).length,
+      });
+    }
+    for (const isin of eligible) {
       const found = day.get(isin);
       if (found?.date === dayDate && !out.has(isin)) out.set(isin, found);
     }
@@ -97,7 +131,34 @@ async function nseOn(date: IsoDate): Promise<PriceMap | null> {
 }
 
 /** Closing prices on `date`, or the last trading day within a requested lookback. */
-export async function nseLatest(date: IsoDate, lookBackDays = LOOK_BACK_DAYS): Promise<PriceMap> {
+export async function nseLatest(
+  date: IsoDate,
+  lookBackDays = LOOK_BACK_DAYS,
+  isins?: readonly string[],
+): Promise<PriceMap> {
+  if (isins) {
+    const out: PriceMap = new Map();
+    const requested = new Set(isins);
+    for (let i = 0; i < lookBackDays && out.size < requested.size; i++) {
+      const fileDate = addDays(date, -i);
+      const map = await nseOn(fileDate);
+      if (DEBUG_FEEDS) {
+        console.info('[price-feed] NSE history lookup', {
+          targetDate: date,
+          fileDate,
+          fileFound: map !== null,
+          parsedInstruments: map?.size ?? 0,
+          matched: [...requested].filter((isin) => map?.has(isin)).length,
+        });
+      }
+      if (!map) continue;
+      for (const isin of requested) {
+        const found = map.get(isin);
+        if (found && !out.has(isin)) out.set(isin, found);
+      }
+    }
+    return out;
+  }
   for (let i = 0; i < lookBackDays; i++) {
     const map = await nseOn(addDays(date, -i));
     if (map) return map;
@@ -122,8 +183,60 @@ async function bseOn(date: IsoDate): Promise<PriceMap | null> {
   return map;
 }
 
+/** Exact-day exchange prices and whether either whole-market file was published. */
+export async function listedPricesOn(
+  date: IsoDate,
+  isins: readonly string[],
+): Promise<{ prices: PriceMap; marketFileFound: boolean }> {
+  const prices: PriceMap = new Map();
+  const nse = await nseOn(date);
+  if (nse) {
+    for (const isin of isins) {
+      const price = nse.get(isin);
+      if (price) prices.set(isin, price);
+    }
+  }
+
+  const missing = isins.filter((isin) => !prices.has(isin));
+  const bse = missing.length ? await bseOn(date) : null;
+  if (bse) {
+    for (const isin of missing) {
+      const price = bse.get(isin);
+      if (price) prices.set(isin, price);
+    }
+  }
+  return { prices, marketFileFound: nse !== null || bse !== null };
+}
+
 /** BSE's whole-market closes, used locally for ISINs not present in NSE's file. */
-export async function bseLatest(date: IsoDate, lookBackDays = LOOK_BACK_DAYS): Promise<PriceMap> {
+export async function bseLatest(
+  date: IsoDate,
+  lookBackDays = LOOK_BACK_DAYS,
+  isins?: readonly string[],
+): Promise<PriceMap> {
+  if (isins) {
+    const out: PriceMap = new Map();
+    const requested = new Set(isins);
+    for (let i = 0; i < lookBackDays && out.size < requested.size; i++) {
+      const fileDate = addDays(date, -i);
+      const map = await bseOn(fileDate);
+      if (DEBUG_FEEDS) {
+        console.info('[price-feed] BSE history lookup', {
+          targetDate: date,
+          fileDate,
+          fileFound: map !== null,
+          parsedInstruments: map?.size ?? 0,
+          matched: [...requested].filter((isin) => map?.has(isin)).length,
+        });
+      }
+      if (!map) continue;
+      for (const isin of requested) {
+        const found = map.get(isin);
+        if (found && !out.has(isin)) out.set(isin, found);
+      }
+    }
+    return out;
+  }
   for (let i = 0; i < lookBackDays; i++) {
     const map = await bseOn(addDays(date, -i));
     if (map) return map;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { assetSchema } from '@/lib/validation/investments';
 import { accountSchema, budgetSchema, transactionSchema } from '@/lib/validation/money';
 
 const base = {
@@ -18,6 +19,31 @@ const errors = (input: object) => {
     ? {}
     : Object.fromEntries(r.error.issues.map((i) => [String(i.path[0]), i.message]));
 };
+
+describe('assetSchema', () => {
+  const fund = {
+    name: 'Invented NFO',
+    type: 'mutual_fund',
+    assetClass: 'equity',
+    accountRef: '',
+    symbol: 'INF000MF0012',
+    navStartDate: '2025-02-25',
+    interestRate: '',
+    compounding: '',
+    startDate: '',
+    maturityDate: '',
+    note: '',
+  };
+
+  it('keeps a valid first NAV date for mutual funds and clears it for other kinds', () => {
+    expect(assetSchema.parse(fund).navStartDate).toBe('2025-02-25');
+    expect(assetSchema.parse({ ...fund, type: 'stock' }).navStartDate).toBeNull();
+  });
+
+  it('rejects an invalid first NAV date', () => {
+    expect(assetSchema.safeParse({ ...fund, navStartDate: '2025-02-30' }).success).toBe(false);
+  });
+});
 
 describe('transactionSchema', () => {
   it('parses a spending row and drops the to-account', () => {

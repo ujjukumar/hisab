@@ -13,7 +13,10 @@ vi.mock('@/lib/db/client', () => ({
     return connection.db;
   },
 }));
-vi.mock('@/lib/queries/investments', () => ({ freshPortfolioData: vi.fn() }));
+vi.mock('@/lib/queries/investments', () => ({
+  freshPortfolioData: vi.fn(),
+  noMarketFileDates: () => new Set(),
+}));
 vi.mock('@/lib/actions/priceDownloads', () => ({ fetchAndSave: vi.fn() }));
 vi.mock('@/lib/feeds', () => ({ amfiFor: vi.fn() }));
 vi.mock('@/lib/domain/dates', async (original) => ({
@@ -40,6 +43,7 @@ const asset: Asset = {
   assetClass: 'equity',
   valuation: 'units',
   symbol: 'INE000KP0011',
+  navStartDate: null,
   accountRef: null,
   interestRate: null,
   compounding: null,
@@ -76,19 +80,19 @@ describe('price backfill worker', () => {
     const { fetchAndSave } = await import('@/lib/actions/priceDownloads');
     const { startPriceJob, stopPriceJob, priceJobStatus } = await import('@/lib/actions/priceJob');
     vi.mocked(freshPortfolioData).mockReturnValue(portfolio);
-    type Result = { updated: number; problems: string[]; unavailable: boolean };
+    type Result = { updated: number; problems: string[]; unavailable: boolean; noMarketFile: boolean };
     let finishDownload: (result: Result) => void = () => {};
     const download = new Promise<Result>((resolve) => {
       finishDownload = resolve;
     });
     vi.mocked(fetchAndSave)
       .mockImplementationOnce(() => download)
-      .mockResolvedValue({ updated: 1, problems: [], unavailable: false });
+      .mockResolvedValue({ updated: 1, problems: [], unavailable: false, noMarketFile: false });
 
     expect((await startPriceJob())?.state).toBe('running');
     await vi.waitFor(() => expect(fetchAndSave).toHaveBeenCalledTimes(1));
     expect((await stopPriceJob())?.state).toBe('stopping');
-    finishDownload({ updated: 0, problems: [], unavailable: false });
+    finishDownload({ updated: 0, problems: [], unavailable: false, noMarketFile: false });
     await vi.waitFor(async () => expect((await priceJobStatus())?.state).toBe('stopped'));
     expect((await startPriceJob())?.state).toBe('running');
     await vi.waitFor(async () => expect((await priceJobStatus())?.state).toBe('done'));
@@ -104,7 +108,7 @@ describe('price backfill worker', () => {
     vi.mocked(freshPortfolioData).mockReturnValue(portfolio);
     vi.mocked(fetchAndSave)
       .mockClear()
-      .mockResolvedValue({ updated: 1, problems: [], unavailable: false });
+      .mockResolvedValue({ updated: 1, problems: [], unavailable: false, noMarketFile: false });
     writePriceJob(connection.db, {
       id: 'recovered-run',
       state: 'running',

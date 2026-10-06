@@ -105,14 +105,24 @@ export function isDue(lastCheck: IsoDate | null, today: IsoDate): boolean {
 }
 
 /** An investment whose price can come from a feed: funds from AMFI, stocks and ETFs from NSE. */
-export type FeedAsset = { id: number; isin: string; feed: 'amfi' | 'nse' };
+export type FeedAsset = {
+  id: number;
+  isin: string;
+  feed: 'amfi' | 'nse';
+  navStartDate?: IsoDate;
+};
 
 /** Unit-priced funds, stocks and ETFs whose symbol is an ISIN. Nothing else is ever priced automatically. */
 export function feedAssets(assets: Asset[]): FeedAsset[] {
   return assets.flatMap((a): FeedAsset[] => {
     const isin = (a.symbol ?? '').trim().toUpperCase();
     if (a.valuation !== 'units' || !ISIN_RE.test(isin)) return [];
-    if (a.type === 'mutual_fund') return [{ id: a.id, isin, feed: 'amfi' }];
+    if (a.type === 'mutual_fund') return [{
+      id: a.id,
+      isin,
+      feed: 'amfi',
+      ...(a.navStartDate ? { navStartDate: a.navStartDate as IsoDate } : {}),
+    }];
     if (a.type === 'stock' || a.type === 'etf') return [{ id: a.id, isin, feed: 'nse' }];
     return [];
   });
@@ -129,17 +139,18 @@ export function pricesFor(
   });
 }
 
-/** Weekly price targets look back to the nearest earlier trading day. */
+/** Maximum lookback for a latest-price request or a manually requested weekly target. */
 export const LOOK_BACK_DAYS = 7;
+export const NO_MARKET_FILE_DATES_SETTING = 'price_no_market_file_dates';
 
-export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily' | 'weekly' };
+export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily' };
 
-/**
- * Missing weekday prices in the last 30 days, then weekly prices back to the first purchase.
- * Weekly targets accept the most recent price in the preceding week; daily targets need an
- * actual price for that date. These are the "Fetch past prices" jobs.
- */
-export function pastPriceNeeds(data: PortfolioData, asOf: IsoDate): PriceNeed[] {
+/** Missing daily trading-date prices from each holding's first eligible date through `asOf`. */
+export function pastPriceNeeds(
+  data: PortfolioData,
+  asOf: IsoDate,
+  noFileDates: ReadonlySet<IsoDate> = new Set(),
+): PriceNeed[] {
   const linked = feedAssets(data.assets);
   const ids = new Set(linked.map((a) => a.id));
   const txns = data.txns.filter((t) => ids.has(t.assetId));
@@ -154,31 +165,19 @@ export function pastPriceNeeds(data: PortfolioData, asOf: IsoDate): PriceNeed[] 
       priceDates.set(p.assetId, [...(priceDates.get(p.assetId) ?? []), p.date]);
   }
 
-  const dailyFrom = addDays(asOf, -29);
-  const lastOlderDay = addDays(dailyFrom, -1);
-  const targets: { date: IsoDate; cadence: PriceNeed['cadence'] }[] = [];
-  for (
-    let date = addDays(lastOlderDay, -dayOfWeek(lastOlderDay));
-    date >= first;
-    date = addDays(date, -7)
-  ) {
-    targets.push({ date, cadence: 'weekly' });
-  }
-  for (let date = dailyFrom; date <= asOf; date = addDays(date, 1)) {
+  const needs: PriceNeed[] = [];
+  for (let date = first; date <= asOf; date = addDays(date, 1)) {
     const weekday = dayOfWeek(date);
-    if (weekday !== 0 && weekday !== 6) targets.push({ date, cadence: 'daily' });
-  }
-  targets.sort((a, b) => a.date.localeCompare(b.date));
-
-  return targets.flatMap(({ date, cadence }) => {
-    const from = cadence === 'daily' ? date : addDays(date, 1 - LOOK_BACK_DAYS);
+    if (weekday === 0 || weekday === 6 || noFileDates.has(date)) continue;
     const missing = linked.filter((a) => {
+      if (a.navStartDate && date < a.navStartDate) return false;
       const own = txns.filter((t) => t.assetId === a.id && t.date <= date);
       if (own.length === 0 || computeHolding(own).units.lte(0)) return false;
-      return !(priceDates.get(a.id) ?? []).some((d) => d >= from && d <= date);
+      return !(priceDates.get(a.id) ?? []).includes(date);
     });
-    return missing.length ? [{ date, linked: missing, cadence }] : [];
-  });
+    if (missing.length) needs.push({ date, linked: missing, cadence: 'daily' });
+  }
+  return needs;
 }
 
 export function priceWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, assetId: number): string {
@@ -189,8 +188,9 @@ export function pendingPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   attempted: ReadonlySet<string>,
+  noFileDates: ReadonlySet<IsoDate> = new Set(),
 ): PriceNeed[] {
-  return pastPriceNeeds(data, asOf).flatMap((need) => {
+  return pastPriceNeeds(data, asOf, noFileDates).flatMap((need) => {
     const linked = need.linked.filter((asset) => !attempted.has(priceWorkKey(need, asset.id)));
     return linked.length ? [{ ...need, linked }] : [];
   });

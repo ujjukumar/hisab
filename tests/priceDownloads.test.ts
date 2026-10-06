@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyFeedPrices } from '@/lib/actions/applyPrices';
 import { fetchAndSave } from '@/lib/actions/priceDownloads';
-import { bseLatest, FeedError, nseLatest } from '@/lib/feeds';
+import { bseLatest, FeedError, listedPricesOn, nseLatest } from '@/lib/feeds';
 
 vi.mock('@/lib/db/client', () => ({ db: {} }));
 vi.mock('@/lib/actions/applyPrices', () => ({
@@ -11,6 +11,7 @@ vi.mock('@/lib/feeds', () => ({
   FeedError: class FeedError extends Error {},
   nseLatest: vi.fn(),
   bseLatest: vi.fn(),
+  listedPricesOn: vi.fn(),
 }));
 
 const linked = [
@@ -21,6 +22,17 @@ const linked = [
 beforeEach(() => vi.clearAllMocks());
 
 describe('listed price fallback', () => {
+  it('classifies closed dates only when neither exchange publishes a file', async () => {
+    vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: false });
+    const closed = await fetchAndSave(linked, '2024-07-08', async () => new Map(), 1, () => true, true);
+    expect(closed).toMatchObject({ noMarketFile: true, problems: [], unavailable: false });
+
+    vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: true });
+    const absentIsin = await fetchAndSave(linked, '2024-07-08', async () => new Map(), 1, () => true, true);
+    expect(absentIsin.noMarketFile).toBe(false);
+    expect(absentIsin.problems).toEqual(['No exchange price was found for 2 investments. Check the ISIN.']);
+  });
+
   it('keeps the NSE price for dual-listed shares and adds a BSE-only share', async () => {
     vi.mocked(nseLatest).mockResolvedValue(
       new Map([[linked[0]!.isin, { date: '2024-07-08', price: '100' }]]),
@@ -35,7 +47,7 @@ describe('listed price fallback', () => {
       updated: 2,
       problems: [],
     });
-    expect(bseLatest).toHaveBeenCalledWith('2024-07-08', 1);
+    expect(bseLatest).toHaveBeenCalledWith('2024-07-08', 1, ['INE000SF0019']);
     expect(vi.mocked(applyFeedPrices).mock.calls[0]?.[1]).toEqual([
       { assetId: 1, date: '2024-07-08', price: '100' },
       { assetId: 2, date: '2024-07-08', price: '80' },

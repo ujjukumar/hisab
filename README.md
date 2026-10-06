@@ -169,15 +169,13 @@ value comes from a statement still use **Update value** for manual entry.
 - Each price is saved under the date in the file, so you keep one price per
   day for the days you open the app. Prices you enter or import are never
   replaced.
-- **Settings → Prices → Fetch past prices** fills missing weekday prices for
-  the last 30 days and weekly prices before that, back to your first purchase.
-  Older weeks end on Sunday and look back up to seven days for a trading price;
-  the estimated maximum download size appears before you start. Progress and Stop
-  stay under the header on every page. The local server checkpoints each date,
-  so an interrupted run resumes when you reopen the app. It cannot run while the
-  app is shut down. Run it again to retry missing prices or pick up newly linked
-  investments. Holidays and invalid ISINs are skipped within a run, not retried
-  forever.
+- **Settings → Prices → Fetch past prices** fetches daily files for missing
+  weekdays, back to the first purchase. The estimated download size appears
+  before you start. Progress and Stop stay under the header on every page. The
+  local server checkpoints each date, so an interrupted run resumes when you
+  reopen the app. It cannot run while the app is shut down. Weekends, NFO dates
+  before first NAV, and dates with no exchange files are skipped. A published
+  file without a matching ISIN remains visible as a price gap.
 - Turn off automatic prices under **Settings → Prices** to stop downloads on
   open. A manual update or past-price fetch downloads only when you request it.
 
