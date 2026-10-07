@@ -118,5 +118,7 @@ export function actionsFor(valuation: Asset['valuation']): InvestmentAction[] {
 
 /** 'Folio 12347731' → 'Folio ••7731'. Only runs of 5+ characters that contain a digit are masked. */
 export function maskRef(ref: string | null): string {
-  return (ref ?? '').replace(/\b(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,}\b/g, (m) => `••${m.slice(-4)}`);
+  const value = ref?.trim() ?? '';
+  if (['-', 'n/a', 'na', 'not available', 'not provided'].includes(value.toLowerCase())) return '';
+  return value.replace(/\b(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,}\b/g, (m) => `••${m.slice(-4)}`);
 }

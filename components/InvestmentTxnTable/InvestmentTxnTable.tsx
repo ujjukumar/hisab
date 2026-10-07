@@ -5,6 +5,7 @@ import {
   DateCell,
   NameCell,
   tableStyles,
+  type TableSort,
   type Column,
 } from '@/components/DataTable/DataTable';
 import { InvestmentTxnMenu } from '@/components/InvestmentDrawer/InvestmentDrawer';
@@ -24,6 +25,8 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     key: 'date',
     header: 'Date',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.date,
     cell: (t) => <DateCell>{formatDate(t.date)}</DateCell>,
   },
   ...(showAsset
@@ -33,6 +36,8 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
           header: 'Investment',
           sub: 'Account ref',
           align: 'l',
+          sortable: true,
+          sortValue: (t: InvTxnRow) => t.assetName,
           cell: (t) => (
             <NameCell href={`/investments/${t.assetId}`} name={t.assetName} sub={t.ref || t.note} />
           ),
@@ -43,6 +48,8 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     key: 'action',
     header: 'Action',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.action,
     cell: (t) => (
       <>
         <span className={tableStyles.catChip}>{ACTION_LABELS[t.action]}</span>
@@ -53,12 +60,16 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
   {
     key: 'price',
     header: 'Price',
+    sortable: true,
+    sortValue: (t) => t.price ? Number(t.price) : null,
     cell: (t) => (t.price ? <Amount>{formatAmount(unitsAmount('1', t.price), 2)}</Amount> : MUTED),
   },
   {
     key: 'units',
     header: 'Units',
     sub: '+/−',
+    sortable: true,
+    sortValue: (t) => t.units ? Number(t.units) * (t.action === 'sell' ? -1 : 1) : null,
     cell: (t) =>
       t.action === 'split' ? (
         <Amount sub="Split">
@@ -76,12 +87,26 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
   {
     key: 'balance',
     header: 'Balance units',
+    sortable: true,
+    sortValue: (t) => t.balanceUnits ? Number(t.balanceUnits) : null,
     cell: (t) => (t.balanceUnits === null ? MUTED : <Amount>{units(t.balanceUnits)}</Amount>),
   },
   {
     key: 'amount',
     header: 'Amount',
-    sub: 'Fees',
+    sortOptions: [
+      {
+        key: 'amount',
+        header: 'Amount',
+        sub: 'Fees',
+        sortValue: (t) => t.total === null ? null : t.total * (PAID.has(t.action) ? -1 : 1),
+      },
+      {
+        key: 'fees',
+        header: 'Fees',
+        sortValue: (t) => t.fees,
+      },
+    ],
     cell: (t) =>
       t.total === null ? (
         MUTED
@@ -96,6 +121,8 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     key: 'account',
     header: 'Linked account',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.accountName,
     cell: (t) =>
       t.accountName ? <span className={tableStyles.catChip}>{t.accountName}</span> : MUTED,
   },
@@ -108,12 +135,16 @@ export function InvestmentTxnTable({
   rows,
   empty,
   showAsset = true,
+  sort,
+  sortHref,
 }: {
   title: ReactNode;
   actions?: ReactNode;
   rows: InvTxnRow[];
   empty: ReactNode;
   showAsset?: boolean;
+  sort: TableSort;
+  sortHref: (key: string, dir: 'asc' | 'desc') => string;
 }) {
   return (
     <DataTable
@@ -122,6 +153,8 @@ export function InvestmentTxnTable({
       columns={columns(showAsset)}
       rows={rows}
       rowKey={(t) => t.id}
+      sort={sort}
+      sortHref={sortHref}
       menu={(t) => <InvestmentTxnMenu row={t} />}
       empty={empty}
     />

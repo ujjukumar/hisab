@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useTransition, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/Button/Button';
 import {
   Amount,
   DataTable,
   NameCell,
   tableStyles,
+  tableSortFromParams,
+  tableSortHref,
   type Column,
 } from '@/components/DataTable/DataTable';
 import { Drawer } from '@/components/Drawer/Drawer';
@@ -41,6 +44,7 @@ const KINDS = [
 /** The Spending and Income category tables, sharing one add and edit drawer. */
 export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yearLabel: string }) {
   const toast = useToast();
+  const searchParams = useSearchParams();
   const [editing, setEditing] = useState<{ row?: CategoryRow; kind: Kind; key: number } | null>(
     null,
   );
@@ -52,12 +56,17 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
 
   const table = (kind: Kind) => {
     const list = rows.filter((c) => c.kind === kind);
+    const sortKey = kind === 'expense' ? 'spendingSort' : 'incomeSort';
+    const sortDir = kind === 'expense' ? 'spendingDir' : 'incomeDir';
+    const sort = tableSortFromParams(searchParams, ['name', 'count', 'total'], sortKey, sortDir);
     const noun = kind === 'expense' ? 'Spent' : 'Received';
     const columns: Column<CategoryRow>[] = [
       {
         key: 'name',
         header: 'Category',
         align: 'l',
+        sortable: true,
+        sortValue: (c) => c.name,
         cell: (c) => (
           <NameCell
             color={`var(--${c.color})`}
@@ -74,12 +83,16 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
         key: 'count',
         header: 'Transactions',
         sub: yearLabel,
+        sortable: true,
+        sortValue: (c) => c.count,
         cell: (c) => <Amount>{c.count}</Amount>,
       },
       {
         key: 'total',
         header: noun,
         sub: yearLabel,
+        sortable: true,
+        sortValue: (c) => c.total,
         cell: (c) => <Amount>{formatAmount(c.total)}</Amount>,
       },
     ];
@@ -96,6 +109,8 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
         columns={columns}
         rows={list}
         rowKey={(c) => c.id}
+        sort={sort}
+        sortHref={(key, dir) => tableSortHref('/money/categories', searchParams.toString(), key, dir, sortKey, sortDir)}
         empty={
           <>
             <p>

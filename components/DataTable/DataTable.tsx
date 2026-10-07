@@ -1,9 +1,42 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/Icon/Icon';
+import { sortRows } from './sorting';
 import styles from './DataTable.module.css';
 
 export type SortDirection = 'asc' | 'desc';
+export type TableSort = { key: string; dir: SortDirection };
+export type SortOption<T> = {
+  key: string;
+  header: ReactNode;
+  sub?: ReactNode;
+  sortValue: (row: T) => string | number | null;
+};
+
+export function tableSortFromParams(
+  params: URLSearchParams,
+  keys: readonly string[],
+  keyParam = 'sort',
+  dirParam = 'dir',
+): TableSort | undefined {
+  const key = params.get(keyParam);
+  if (!key || !keys.includes(key)) return undefined;
+  return { key, dir: params.get(dirParam) === 'asc' ? 'asc' : 'desc' };
+}
+
+export function tableSortHref(
+  pathname: string,
+  search: string,
+  key: string,
+  dir: SortDirection,
+  keyParam = 'sort',
+  dirParam = 'dir',
+): string {
+  const params = new URLSearchParams(search);
+  params.set(keyParam, key);
+  params.set(dirParam, dir);
+  return `${pathname}?${params.toString()}`;
+}
 
 export type Column<T> = {
   key: string;
@@ -12,6 +45,8 @@ export type Column<T> = {
   sub?: ReactNode;
   align?: 'l' | 'r';
   sortable?: boolean;
+  sortValue?: (row: T) => string | number | null;
+  sortOptions?: SortOption<T>[];
   cell: (row: T) => ReactNode;
 };
 
@@ -24,6 +59,8 @@ export type DataTableProps<T> = {
   /** Current sort. Headers become links built by `sortHref`. */
   sort?: { key: string; dir: SortDirection };
   sortHref?: (key: string, dir: SortDirection) => string;
+  /** Used for in-place sorting in client-owned preview tables. */
+  onSort?: (key: string, dir: SortDirection) => void;
   /** Shown in place of the body when there are no rows. */
   empty?: ReactNode;
   footer?: ReactNode;
@@ -41,12 +78,20 @@ export function DataTable<T>({
   rowKey,
   sort,
   sortHref,
+  onSort,
   empty,
   footer,
   menu,
   narrow,
 }: DataTableProps<T>) {
   const span = columns.length + (menu ? 1 : 0);
+  const sortColumn = sort && columns.find((column) => column.key === sort.key && column.sortValue);
+  const sortOption = sort && columns
+    .flatMap((column) => column.sortOptions ?? [])
+    .find((option) => option.key === sort.key);
+  const sortedRows = sortColumn || sortOption
+    ? sortRows(rows, sortOption?.sortValue ?? sortColumn!.sortValue!, sort.dir)
+    : rows;
 
   return (
     <div className={styles.tableCard}>
@@ -61,19 +106,18 @@ export function DataTable<T>({
           <thead>
             <tr>
               {columns.map((col) => {
-                const active = sort?.key === col.key;
+                const options = col.sortOptions ?? (col.sortable ? [{
+                  key: col.key,
+                  header: col.header,
+                  sub: col.sub,
+                  sortValue: col.sortValue!,
+                }] : []);
+                const active = options.some((option) => option.key === sort?.key);
                 const ariaSort = active
-                  ? sort.dir === 'asc'
+                  ? sort?.dir === 'asc'
                     ? 'ascending'
                     : 'descending'
                   : undefined;
-                const nextDir: SortDirection = active && sort.dir === 'desc' ? 'asc' : 'desc';
-                const label = (
-                  <>
-                    <span>{col.header}</span>
-                    {col.sub && <span className={styles.sub}>{col.sub}</span>}
-                  </>
-                );
                 return (
                   <th
                     key={col.key}
@@ -81,13 +125,55 @@ export function DataTable<T>({
                     aria-sort={ariaSort}
                     scope="col"
                   >
-                    {col.sortable && sortHref ? (
-                      <Link className={styles.thBtn} href={sortHref(col.key, nextDir)}>
-                        {label}
-                        <Icon name="sort" className={styles.sort} />
-                      </Link>
+                    {options.length > 0 ? (
+                      <span className={options.length > 1 ? styles.sortOptions : undefined}>
+                        {options.map((option) => {
+                          const optionActive = sort?.key === option.key;
+                          const nextDir: SortDirection =
+                            optionActive && sort?.dir === 'desc' ? 'asc' : 'desc';
+                          const label = (
+                            <>
+                              <span>{option.header}</span>
+                              {option.sub && <span className={styles.sub}>{option.sub}</span>}
+                            </>
+                          );
+                          const icon = (
+                            <Icon
+                              name="sort"
+                              className={`${styles.sort} ${
+                                optionActive
+                                  ? sort.dir === 'asc'
+                                    ? styles.sortAscending
+                                    : styles.sortDescending
+                                  : ''
+                              }`}
+                            />
+                          );
+                          return sortHref ? (
+                            <Link key={option.key} className={styles.thBtn} href={sortHref(option.key, nextDir)}>
+                              {label}
+                              {icon}
+                            </Link>
+                          ) : onSort ? (
+                            <button
+                              key={option.key}
+                              className={styles.thBtn}
+                              type="button"
+                              onClick={() => onSort(option.key, nextDir)}
+                            >
+                              {label}
+                              {icon}
+                            </button>
+                          ) : (
+                            <span key={option.key}>{label}</span>
+                          );
+                        })}
+                      </span>
                     ) : (
-                      label
+                      <>
+                        <span>{col.header}</span>
+                        {col.sub && <span className={styles.sub}>{col.sub}</span>}
+                      </>
                     )}
                   </th>
                 );
@@ -105,7 +191,7 @@ export function DataTable<T>({
                 <td colSpan={span}>{empty ?? 'Nothing here yet'}</td>
               </tr>
             ) : (
-              rows.map((row) => (
+              sortedRows.map((row) => (
                 <tr key={rowKey(row)}>
                   {columns.map((col) => (
                     <td key={col.key} className={col.align === 'l' ? 'l' : 'r'}>

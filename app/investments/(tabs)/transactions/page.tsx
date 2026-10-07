@@ -14,6 +14,7 @@ import {
   invTxnFilterParams,
   listInvestmentTxns,
   parseInvTxnFilters,
+  type InvTxnSort,
   type InvTxnFilters,
 } from '@/lib/queries/investments';
 import { paramReader, PAGE_SIZE } from '@/lib/queries/money';
@@ -106,6 +107,8 @@ export default async function InvestmentTransactionsPage({
           )
         }
         rows={rows}
+        sort={{ key: f.sort, dir: f.dir }}
+        sortHref={(key, dir) => href({ ...f, sort: key as InvTxnSort, dir, limit: PAGE_SIZE })}
         empty={
           filtered ? (
             <>

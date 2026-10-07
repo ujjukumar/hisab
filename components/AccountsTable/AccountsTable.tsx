@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/Button/Button';
 import {
   Amount,
@@ -8,6 +9,8 @@ import {
   DateCell,
   NameCell,
   tableStyles,
+  tableSortFromParams,
+  tableSortHref,
   type Column,
 } from '@/components/DataTable/DataTable';
 import { Drawer, FieldPair } from '@/components/Drawer/Drawer';
@@ -23,7 +26,16 @@ import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPES } from '@/lib/validation/money';
 
 export function AccountsTable({ rows }: { rows: AccountRow[] }) {
   const toast = useToast();
+  const searchParams = useSearchParams();
   const [editing, setEditing] = useState<{ row?: AccountRow; key: number } | null>(null);
+  const sort = tableSortFromParams(searchParams, [
+    'name',
+    'opening',
+    'openingDate',
+    'balance',
+    'transactions',
+    'last',
+  ]);
 
   async function run(action: Promise<{ ok: boolean; message?: string }>, done: string) {
     const result = await action;
@@ -36,6 +48,8 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
       header: 'Account',
       sub: 'Type',
       align: 'l',
+      sortable: true,
+      sortValue: (a) => a.name,
       cell: (a) => (
         <NameCell
           name={
@@ -51,7 +65,19 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
     {
       key: 'opening',
       header: 'Opening balance',
-      sub: 'As of',
+      sortOptions: [
+        {
+          key: 'opening',
+          header: 'Opening balance',
+          sub: 'As of',
+          sortValue: (a) => a.openingBalance,
+        },
+        {
+          key: 'openingDate',
+          header: 'As of',
+          sortValue: (a) => a.openingDate,
+        },
+      ],
       cell: (a) => (
         <Amount sub={formatDate(a.openingDate)}>{formatAmount(a.openingBalance)}</Amount>
       ),
@@ -59,12 +85,26 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
     {
       key: 'balance',
       header: 'Current balance',
-      sub: 'Transactions',
+      sortOptions: [
+        {
+          key: 'balance',
+          header: 'Current balance',
+          sub: 'Transactions',
+          sortValue: (a) => a.balance,
+        },
+        {
+          key: 'transactions',
+          header: 'Transactions',
+          sortValue: (a) => a.transactionCount,
+        },
+      ],
       cell: (a) => <Amount sub={a.transactionCount}>{formatAmount(a.balance)}</Amount>,
     },
     {
       key: 'last',
       header: 'Last transaction',
+      sortable: true,
+      sortValue: (a) => a.lastDate,
       cell: (a) => <DateCell>{a.lastDate ? formatDate(a.lastDate) : '—'}</DateCell>,
     },
   ];
@@ -83,6 +123,8 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
         columns={columns}
         rows={rows}
         rowKey={(a) => a.id}
+        sort={sort}
+        sortHref={(key, dir) => tableSortHref('/money/accounts', searchParams.toString(), key, dir)}
         empty={
           <>
             <p>

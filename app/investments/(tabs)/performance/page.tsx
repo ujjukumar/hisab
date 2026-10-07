@@ -2,7 +2,13 @@ import { ButtonLink } from '@/components/Button/Button';
 import { Card } from '@/components/Card/Card';
 import { LineChart } from '@/components/charts/LineChart';
 import { LegendInline, LegendKey } from '@/components/charts/Tip';
-import { Amount, DataTable, NameCell, type Column } from '@/components/DataTable/DataTable';
+import {
+  Amount,
+  DataTable,
+  NameCell,
+  tableSortFromParams,
+  type Column,
+} from '@/components/DataTable/DataTable';
 import { SelectField, TextField } from '@/components/Field/Field';
 import { AddInvestmentButton } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { StatStrip } from '@/components/StatStrip/StatStrip';
@@ -32,6 +38,7 @@ import { periodPerformance, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
 const percent = (rate: number | null) => (rate === null ? '—' : formatPercent(rate * 100, 1));
+const SORT_KEYS = ['name', 'value', 'invested', 'gain', 'absolute', 'annual'] as const;
 
 /** The three period figures, as table cells. */
 function figures(r: PeriodResult) {
@@ -53,6 +60,8 @@ const columns = (period: Period): Column<PeriodRow>[] => [
     key: 'name',
     header: 'Name',
     align: 'l',
+    sortable: true,
+    sortValue: ({ row }) => row.asset.name,
     cell: ({ row }) => (
       <NameCell
         href={`/investments/${row.asset.id}${period === '1d' ? '' : `?period=${period}`}`}
@@ -64,16 +73,26 @@ const columns = (period: Period): Column<PeriodRow>[] => [
   {
     key: 'value',
     header: 'Current value',
+    sortable: true,
+    sortValue: (r) => r.row.value,
     cell: ({ row }) => <Amount>{formatAmount(row.value)}</Amount>,
   },
   {
     key: 'invested',
     header: 'Invested',
+    sortable: true,
+    sortValue: (r) => r.row.sold ? 0 : r.row.holding.cost,
     cell: ({ row }) => <Amount>{formatAmount(row.sold ? 0 : row.holding.cost)}</Amount>,
   },
-  ...(['Gain in period', '% absolute', '% p.a.'] as const).map((header, i) => ({
-    key: header,
+  ...([
+    { key: 'gain', header: 'Gain in period', value: (r: PeriodRow) => r.gain },
+    { key: 'absolute', header: '% absolute', value: (r: PeriodRow) => r.absolute },
+    { key: 'annual', header: '% p.a.', value: (r: PeriodRow) => r.annual },
+  ] as const).map(({ key, header, value }, i) => ({
+    key,
     header,
+    sortable: true,
+    sortValue: value,
     cell: (r: PeriodRow) => figures(r)[i],
   })),
 ];
@@ -87,9 +106,17 @@ export default async function PerformancePage({
   const yearStart = await financialYearStartMonth();
   const { asOf, period, from, rows } = periodPerformance(params, yearStart);
   const total = periodTotals(rows, asOf);
+  const sort = tableSortFromParams(
+    new URLSearchParams({ sort: typeof params.sort === 'string' ? params.sort : '', dir: typeof params.dir === 'string' ? params.dir : '' }),
+    SORT_KEYS,
+  );
   const cadence = seriesCadence(from, asOf);
   const shown = linePoints(performanceSeries(portfolioData(), asOf, from), cadence);
   const query = new URLSearchParams({ asof: asOf, period }).toString();
+  const sortHref = (key: string, dir: 'asc' | 'desc') => {
+    const search = new URLSearchParams({ asof: asOf, period, sort: key, dir });
+    return `/investments/performance?${search}`;
+  };
 
   const span = period === '1d'
     ? `Latest daily prices per holding through ${formatDate(asOf)}`
@@ -174,6 +201,8 @@ export default async function PerformancePage({
             columns={columns(period)}
             rows={[]}
             rowKey={(r) => r.row.asset.id}
+            sort={sort}
+            sortHref={sortHref}
             empty={
               <>
                 <p>No investments in this period. Add one to start tracking its returns.</p>
@@ -193,6 +222,8 @@ export default async function PerformancePage({
                 columns={columns(period)}
                 rows={own}
                 rowKey={(r) => r.row.asset.id}
+                sort={sort}
+                sortHref={sortHref}
                 footer={
                   <tr>
                     <td className="l">Total</td>

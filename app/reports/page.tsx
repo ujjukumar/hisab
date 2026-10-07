@@ -2,7 +2,15 @@ import { ButtonLink } from '@/components/Button/Button';
 import { Card } from '@/components/Card/Card';
 import { BarChart } from '@/components/charts/BarChart';
 import { LegendInline, LegendKey } from '@/components/charts/Tip';
-import { Amount, DataTable, NameCell, type Column } from '@/components/DataTable/DataTable';
+import {
+  Amount,
+  DataTable,
+  NameCell,
+  tableSortFromParams,
+  tableSortHref,
+  type Column,
+  type TableSort,
+} from '@/components/DataTable/DataTable';
 import { SelectField } from '@/components/Field/Field';
 import { PageHead } from '@/components/PageHead/PageHead';
 import {
@@ -22,11 +30,15 @@ function CategoryTable({
   rows,
   months,
   empty,
+  sort,
+  sortHref,
 }: {
   title: string;
   rows: CategoryYear[];
   months: string[];
   empty: string;
+  sort?: TableSort;
+  sortHref: (key: string, dir: 'asc' | 'desc') => string;
 }) {
   const t = monthTotals(rows, months.length);
   const columns: Column<CategoryYear>[] = [
@@ -34,17 +46,21 @@ function CategoryTable({
       key: 'name',
       header: 'Category',
       align: 'l',
+      sortable: true,
+      sortValue: (r) => r.name,
       cell: (r) => <NameCell name={r.name} color={r.color ? `var(--${r.color})` : undefined} />,
     },
     ...months.map((m, i) => ({
       key: m,
       header: short(m),
       sub: m.slice(0, 4),
+      sortable: true,
+      sortValue: (r: CategoryYear) => r.months[i]!,
       cell: (r: CategoryYear) => (
         <Amount tone={r.months[i] ? '' : 'muted'}>{formatAmount(r.months[i]!)}</Amount>
       ),
     })),
-    { key: 'total', header: 'Total', cell: (r) => <Amount>{formatAmount(r.total)}</Amount> },
+    { key: 'total', header: 'Total', sortable: true, sortValue: (r) => r.total, cell: (r) => <Amount>{formatAmount(r.total)}</Amount> },
   ];
   return (
     <DataTable
@@ -52,6 +68,8 @@ function CategoryTable({
       columns={columns}
       rows={rows}
       rowKey={(r) => r.key}
+      sort={sort}
+      sortHref={sortHref}
       empty={
         <>
           <p>{empty}</p>
@@ -82,11 +100,20 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const r = await yearReport(await searchParams);
+  const params = await searchParams;
+  const r = await yearReport(params);
   const spent = monthTotals(r.spending, r.months.length);
   const earned = monthTotals(r.income, r.months.length);
   const saved = earned.total - spent.total;
   const query = new URLSearchParams({ year: String(r.year), basis: r.basis }).toString();
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === 'string') search.set(key, value);
+    else if (Array.isArray(value)) value.forEach((item) => search.append(key, item));
+  }
+  const sortKeys = ['name', 'total', ...r.months];
+  const spendingSort = tableSortFromParams(search, sortKeys, 'spendingSort', 'spendingDir');
+  const incomeSort = tableSortFromParams(search, sortKeys, 'incomeSort', 'incomeDir');
   const accounts = listAccounts().map(({ id, name, archived }) => ({ id, name, archived }));
 
   return (
@@ -168,12 +195,16 @@ export default async function ReportsPage({
             rows={r.spending}
             months={r.months}
             empty={`No spending in ${r.label}. Add a transaction to see it here.`}
+            sort={spendingSort}
+            sortHref={(key, dir) => tableSortHref('/reports', search.toString(), key, dir, 'spendingSort', 'spendingDir')}
           />
           <CategoryTable
             title="Income by category"
             rows={r.income}
             months={r.months}
             empty={`No income in ${r.label}. Add a transaction to see it here.`}
+            sort={incomeSort}
+            sortHref={(key, dir) => tableSortHref('/reports', search.toString(), key, dir, 'incomeSort', 'incomeDir')}
           />
         </div>
 

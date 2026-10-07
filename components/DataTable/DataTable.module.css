@@ -86,10 +86,18 @@
   gap: 7px;
   text-align: inherit;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .thBtn:hover {
   text-decoration: underline;
+}
+
+.sortOptions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
 }
 
 .sort {
@@ -101,8 +109,8 @@
   fill: var(--text-4);
 }
 
-.tbl th[aria-sort='ascending'] .sort :global(.up),
-.tbl th[aria-sort='descending'] .sort :global(.dn) {
+.sortAscending :global(.up),
+.sortDescending :global(.dn) {
   fill: var(--primary);
 }
 

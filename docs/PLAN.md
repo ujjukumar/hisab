@@ -403,8 +403,9 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Daily price history | Done | 6 Oct 2026 | Backfill requests each eligible weekday's whole-market file once per source, with a size estimate, three-day no-file grace, and cached absent-file dates. |
 | Mutual-fund NFO history | Done | 6 Oct 2026 | Optional first-NAV date skips pre-launch backfill and caps AMFI lookback while retaining the payment-date buy and its entered NAV. |
 | Documentation cleanup | Done | 3 Oct 2026 | Kept three purpose-specific docs; removed duplicate definitions, completed checklists and superseded implementation notes. |
+| Sortable tables | Done | 7 Oct 2026 | Added URL-preserving sorting to data tables across Money, Investments, Reports, budgets, categories, accounts and import previews, with accessible direction state and client-side preview sorting. |
 
-Outstanding verification/limitations from delivery: holdings columns are not yet
-sortable; end-to-end import with the owner's download and real-account balance
-verification remain owner checks. The SQLite transition was tested on Windows
-Node 26.7, not Node 24; do not describe the minimum-version path as tested.
+Outstanding verification/limitations from delivery: end-to-end import with the
+owner's download and real-account balance verification remain owner checks. The
+SQLite transition was tested on Windows Node 26.7, not Node 24; do not describe
+the minimum-version path as tested.

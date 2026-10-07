@@ -177,8 +177,13 @@ export type InvTxnFilters = {
   group: GroupKey | null;
   assetId: number | null;
   q: string;
+  sort: InvTxnSort;
+  dir: 'asc' | 'desc';
   limit: number;
 };
+
+export const INV_TXN_SORTS = ['date', 'asset', 'action', 'price', 'units', 'balance', 'amount', 'fees', 'account'] as const;
+export type InvTxnSort = (typeof INV_TXN_SORTS)[number];
 
 export function parseInvTxnFilters(params: Params): InvTxnFilters {
   const { one, id, limit } = paramReader(params);
@@ -196,6 +201,10 @@ export function parseInvTxnFilters(params: Params): InvTxnFilters {
     group: GROUPS.some((g) => g.key === group) ? (group as GroupKey) : null,
     assetId: id('asset'),
     q: one('q').slice(0, 100),
+    sort: (INV_TXN_SORTS as readonly string[]).includes(one('sort'))
+      ? (one('sort') as InvTxnSort)
+      : 'date',
+    dir: one('dir') === 'asc' ? 'asc' : 'desc',
     limit: limit(),
   };
 }
@@ -208,6 +217,8 @@ export function invTxnFilterParams(f: InvTxnFilters): URLSearchParams {
   if (f.group) p.set('group', f.group);
   if (f.assetId) p.set('asset', String(f.assetId));
   if (f.q) p.set('q', f.q);
+  if (f.sort !== 'date') p.set('sort', f.sort);
+  if (f.dir !== 'desc') p.set('dir', f.dir);
   if (f.limit !== PAGE_SIZE) p.set('limit', String(f.limit));
   return p;
 }
@@ -277,7 +288,7 @@ export function listInvestmentTxns(
     )
     .where(where)
     .orderBy(desc(investmentTransactions.date), desc(investmentTransactions.id));
-  const found = options.all ? query.all() : query.limit(f.limit).all();
+  const found = query.all();
 
   // Balance units need every earlier transaction of the asset, not just the filtered ones.
   const unitsAfter = new Map<number, string>();
@@ -296,7 +307,33 @@ export function listInvestmentTxns(
     balanceUnits: r.valuation === 'units' ? (unitsAfter.get(r.id) ?? null) : null,
     total: moneyMoved(r),
   }));
-  return { rows, count: total };
+  const sortValue = (row: InvTxnRow): string | number | null => {
+    switch (f.sort) {
+      case 'date': return row.date;
+      case 'asset': return row.assetName;
+      case 'action': return row.action;
+      case 'price': return row.price ? Number(row.price) : null;
+      case 'units': return row.units ? Number(row.units) : null;
+      case 'balance': return row.balanceUnits ? Number(row.balanceUnits) : null;
+      case 'amount': return row.total;
+      case 'fees': return row.fees;
+      case 'account': return row.accountName;
+    }
+  };
+  const sorted = [...rows].sort((left, right) => {
+    const leftValue = sortValue(left);
+    const rightValue = sortValue(right);
+    if (leftValue === null || rightValue === null) {
+      if (leftValue !== rightValue) return leftValue === null ? 1 : -1;
+    } else {
+      const order = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
+      if (order !== 0) return f.dir === 'asc' ? order : -order;
+    }
+    return right.date.localeCompare(left.date) || right.id - left.id;
+  });
+  return { rows: options.all ? sorted : sorted.slice(0, f.limit), count: total };
 }
 
 /** One investment transaction, for the drawer opened from a Money row's "Open investment transaction". */

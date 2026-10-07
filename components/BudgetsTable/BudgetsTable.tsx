@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState, useTransition, type KeyboardEvent } from 'react';
 import { Bar } from '@/components/BudgetBar/BudgetBar';
 import { Button } from '@/components/Button/Button';
@@ -9,6 +10,8 @@ import {
   DataTable,
   NameCell,
   tableStyles,
+  tableSortFromParams,
+  tableSortHref,
   type Column,
 } from '@/components/DataTable/DataTable';
 import { FieldError } from '@/components/Field/Field';
@@ -50,9 +53,12 @@ function Used({ spent, budget }: { spent: Paise; budget: Paise }) {
 /** The month's budgets with inline editing, then the categories that have none. */
 export function BudgetsTable({ data }: { data: MonthBudgets }) {
   const toast = useToast();
+  const searchParams = useSearchParams();
   const [copying, startCopy] = useTransition();
   const { month } = data;
   const label = monthLabel(month);
+  const sort = tableSortFromParams(searchParams, ['name', 'budget', 'spent', 'left', 'used']);
+  const withoutSort = tableSortFromParams(searchParams, ['name', 'spent'], 'withoutSort', 'withoutDir');
 
   function copy() {
     startCopy(async () => {
@@ -74,31 +80,37 @@ export function BudgetsTable({ data }: { data: MonthBudgets }) {
   }
 
   const columns: Column<Row>[] = [
-    { key: 'name', header: 'Category', align: 'l', cell: name },
+    { key: 'name', header: 'Category', align: 'l', sortable: true, sortValue: (r) => r.name, cell: name },
     {
       key: 'budget',
       header: 'Budget',
+      sortable: true,
+      sortValue: (r) => r.budget,
       cell: (r) => <BudgetInput key={r.budget} category={r} month={month} budget={r.budget} />,
     },
-    { key: 'spent', header: 'Spent', cell: (r) => <Amount>{formatAmount(r.spent)}</Amount> },
+    { key: 'spent', header: 'Spent', sortable: true, sortValue: (r) => r.spent, cell: (r) => <Amount>{formatAmount(r.spent)}</Amount> },
     {
       key: 'left',
       header: 'Left',
+      sortable: true,
+      sortValue: (r) => r.left,
       cell: (r) => (
         <Amount tone={r.over ? 'neg' : ''} sub={r.over ? 'Over budget' : undefined} subTone="neg">
           {formatAmount(r.left)}
         </Amount>
       ),
     },
-    { key: 'used', header: 'Used', cell: (r) => <Used spent={r.spent} budget={r.budget} /> },
+    { key: 'used', header: 'Used', sortable: true, sortValue: (r) => r.budget ? r.spent / r.budget : null, cell: (r) => <Used spent={r.spent} budget={r.budget} /> },
   ];
 
   const withoutColumns: Column<BudgetCategory>[] = [
-    { key: 'name', header: 'Category', align: 'l', cell: name },
+    { key: 'name', header: 'Category', align: 'l', sortable: true, sortValue: (c) => c.name, cell: name },
     {
       key: 'spent',
       header: 'Spent',
       sub: 'this month',
+      sortable: true,
+      sortValue: (c) => c.spent,
       cell: (c) => <Amount>{formatAmount(c.spent)}</Amount>,
     },
     { key: 'budget', header: 'Budget', cell: (c) => <SetBudget category={c} month={month} /> },
@@ -120,6 +132,8 @@ export function BudgetsTable({ data }: { data: MonthBudgets }) {
         columns={columns}
         rows={data.rows}
         rowKey={(r) => r.id}
+        sort={sort}
+        sortHref={(key, dir) => tableSortHref('/money/budgets', searchParams.toString(), key, dir)}
         empty={
           data.without.length > 0 ? (
             <p>No budgets for {label} yet. Set one for a category below to track its spending.</p>
@@ -164,6 +178,8 @@ export function BudgetsTable({ data }: { data: MonthBudgets }) {
           columns={withoutColumns}
           rows={data.without}
           rowKey={(c) => c.id}
+          sort={withoutSort}
+          sortHref={(key, dir) => tableSortHref('/money/budgets', searchParams.toString(), key, dir, 'withoutSort', 'withoutDir')}
         />
       )}
     </>

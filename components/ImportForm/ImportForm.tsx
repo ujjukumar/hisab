@@ -3,7 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition, type FormEvent } from 'react';
 import { Button } from '@/components/Button/Button';
-import { Amount, DataTable, DateCell, NameCell } from '@/components/DataTable/DataTable';
+import {
+  Amount,
+  DataTable,
+  DateCell,
+  NameCell,
+  type TableSort,
+} from '@/components/DataTable/DataTable';
 import { FieldError, SelectField, TextField } from '@/components/Field/Field';
 import { useToast } from '@/components/Toast/Toast';
 import { importTransactions, previewImport } from '@/lib/actions/imports';
@@ -30,6 +36,8 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
   const [error, setError] = useState<{ message: string; field: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
   const [importing, setImporting] = useState(false);
+  const [investmentSort, setInvestmentSort] = useState<TableSort | undefined>();
+  const [transactionSort, setTransactionSort] = useState<TableSort | undefined>();
 
   function check(focusSummary: boolean) {
     const form = formRef.current;
@@ -141,15 +149,19 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                   key: 'name',
                   header: 'Investment',
                   align: 'l',
+                  sortable: true,
+                  sortValue: (i) => i.name,
                   cell: (i) => (
                     <NameCell name={i.name} sub={`${ASSET_TYPE_LABELS[i.type]} · ${i.isin}`} />
                   ),
                 },
-                { key: 'add', header: 'To add', cell: (i) => i.toAdd },
+                { key: 'add', header: 'To add', sortable: true, sortValue: (i) => i.toAdd, cell: (i) => i.toAdd },
                 {
                   key: 'as',
                   header: 'Add as',
                   align: 'l',
+                  sortable: true,
+                  sortValue: (i) => i.assetName ?? 'New investment',
                   cell: (i) =>
                     i.fixed ? (
                       <span className={styles.linked}>{i.assetName}</span>
@@ -174,6 +186,8 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                   key: 'class',
                   header: 'Asset class',
                   align: 'l',
+                  sortable: true,
+                  sortValue: (i) => i.assetClass,
                   cell: (i) =>
                     i.assetId === null ? (
                       <select
@@ -193,6 +207,8 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                     ),
                 },
               ]}
+              sort={investmentSort}
+              onSort={(key, dir) => setInvestmentSort({ key, dir })}
             />
           )}
 
@@ -207,25 +223,33 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                     key: 'date',
                     header: 'Date',
                     align: 'l',
+                    sortable: true,
+                    sortValue: (r) => r.date,
                     cell: (r) => <DateCell>{formatDate(r.date)}</DateCell>,
                   },
                   {
                     key: 'name',
                     header: 'Investment',
                     align: 'l',
+                    sortable: true,
+                    sortValue: (r) => names.get(r.isin) ?? r.name,
                     cell: (r) => names.get(r.isin),
                   },
                   {
                     key: 'action',
                     header: 'Action',
                     align: 'l',
+                    sortable: true,
+                    sortValue: (r) => ACTION_LABELS[r.action],
                     cell: (r) => ACTION_LABELS[r.action],
                   },
-                  { key: 'units', header: 'Units', cell: (r) => formatUnits(r.units) },
+                  { key: 'units', header: 'Units', sortable: true, sortValue: (r) => Number(r.units), cell: (r) => formatUnits(r.units) },
                   {
                     key: 'price',
                     header: 'Price',
                     sub: 'per unit',
+                    sortable: true,
+                    sortValue: (r) => Number(r.price),
                     cell: (r) => (
                       <Amount sub={r.priceAdjusted ? 'from amount' : undefined}>
                         {formatAmount(unitsAmount('1', r.price), 2)}
@@ -236,14 +260,20 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                     key: 'amount',
                     header: 'Amount',
                     sub: 'with charges',
+                    sortable: true,
+                    sortValue: (r) => moneyMoved(r) ?? 0,
                     cell: (r) => <Amount>{formatAmount(moneyMoved(r) ?? 0, 2)}</Amount>,
                   },
                   {
                     key: 'fees',
                     header: 'Charges',
+                    sortable: true,
+                    sortValue: (r) => r.fees,
                     cell: (r) => <Amount>{formatAmount(r.fees, 2)}</Amount>,
                   },
                 ]}
+                sort={transactionSort}
+                onSort={(key, dir) => setTransactionSort({ key, dir })}
               />
               <p className="footnote">
                 All amounts in ₹. “From amount” marks a price worked out from the amount, because

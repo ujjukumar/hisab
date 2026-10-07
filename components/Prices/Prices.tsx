@@ -104,10 +104,12 @@ export function PriceJobProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
   const [status, setStatus] = useState<PriceJobStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pollTrigger, setPollTrigger] = useState(0);
   const previous = useRef<PriceJobStatus | null>(null);
 
   useEffect(() => {
     let mounted = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     async function poll() {
       try {
         const next = await priceJobStatus();
@@ -120,20 +122,27 @@ export function PriceJobProvider({ children }: { children: ReactNode }) {
           router.refresh();
           toast(next?.state === 'failed' ? next.message : next?.state === 'stopped' ? 'Past prices stopped' : 'Past prices fetched');
         }
+        if (next?.state === 'running' || next?.state === 'stopping') {
+          timer = setTimeout(() => void poll(), 2500);
+        }
       } catch {
-        // The next poll will retry once the local server responds.
+        // Retry a transient local-server failure without polling while idle.
+        if (mounted) timer = setTimeout(() => void poll(), 2500);
       }
     }
     void poll();
-    const timer = setInterval(() => void poll(), 2500);
-    return () => { mounted = false; clearInterval(timer); };
-  }, [router, toast]);
+    return () => {
+      mounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [pollTrigger, router, toast]);
 
   async function start() {
     if (busy) return;
     setBusy(true);
     try {
       setStatus(await startPriceJob());
+      setPollTrigger((value) => value + 1);
     } catch {
       toast("Past prices couldn't be started. Try again.");
     } finally {
@@ -146,6 +155,7 @@ export function PriceJobProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     try {
       setStatus(await stopPriceJob());
+      setPollTrigger((value) => value + 1);
     } catch {
       toast("Past prices couldn't be stopped. Try again.");
     } finally {

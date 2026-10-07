@@ -148,6 +148,8 @@ export async function listCategoriesWithTotals(): Promise<{
 /* ---------- transactions ---------- */
 
 export const TYPE_FILTERS = ['income', 'expense', 'transfer'] as const;
+export const TXN_SORTS = ['date', 'desc', 'category', 'account', 'amount'] as const;
+export type TxnSort = (typeof TXN_SORTS)[number];
 
 export type TxnFilters = {
   from: IsoDate;
@@ -156,7 +158,7 @@ export type TxnFilters = {
   categoryId: number | null;
   accountId: number | null;
   q: string;
-  sort: 'date' | 'amount';
+  sort: TxnSort;
   dir: 'asc' | 'desc';
   limit: number;
 };
@@ -196,7 +198,9 @@ export function parseTxnFilters(params: Params): TxnFilters {
     categoryId: id('cat'),
     accountId: id('acct'),
     q: one('q').slice(0, 100),
-    sort: one('sort') === 'amount' ? 'amount' : 'date',
+    sort: (TXN_SORTS as readonly string[]).includes(one('sort'))
+      ? (one('sort') as TxnSort)
+      : 'date',
     dir: one('dir') === 'asc' ? 'asc' : 'desc',
     limit: limit(),
   };
@@ -281,6 +285,13 @@ export function listTransactions(
     .get() ?? { count: 0, income: 0, spending: 0 };
 
   const order = f.dir === 'asc' ? asc : desc;
+  const sortColumn = {
+    date: transactions.date,
+    desc: transactions.description,
+    category: sql`coalesce(${categories.name}, 'Transfer')`,
+    account: sql`coalesce(${accounts.name}, ${toAccount.name}, 'Investments')`,
+    amount: transactions.amount,
+  }[f.sort];
   const query = db
     .select({
       id: transactions.id,
@@ -303,12 +314,7 @@ export function listTransactions(
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(toAccount, eq(transactions.toAccountId, toAccount.id))
     .where(where)
-    .orderBy(
-      ...(f.sort === 'amount'
-        ? [order(transactions.amount), desc(transactions.date)]
-        : [order(transactions.date)]),
-      order(transactions.id),
-    );
+    .orderBy(order(sortColumn), order(transactions.id));
 
   const rows = options.all ? query.all() : query.limit(f.limit).all();
   return { rows, ...totals };

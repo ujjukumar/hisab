@@ -5,6 +5,7 @@ import {
   DataTable,
   NameCell,
   tableStyles,
+  tableSortFromParams,
   type Column,
 } from '@/components/DataTable/DataTable';
 import {
@@ -42,6 +43,20 @@ import { financialYearStartMonth } from '@/lib/queries/settings';
 type Group = (typeof GROUPS)[number];
 
 const MUTED = <Amount tone="muted">—</Amount>;
+const SORT_KEYS = [
+  'name',
+  'price',
+  'priceDate',
+  'change',
+  'changePercent',
+  'cost',
+  'costPerUnit',
+  'value',
+  'units',
+  'share',
+  'return',
+  'returnRate',
+] as const;
 
 /** Price with two decimals, worked out with decimal maths rather than floats. */
 const price = (p: string) => formatAmount(unitsAmount('1', p), 2);
@@ -66,6 +81,8 @@ function columns(
       header: 'Name',
       sub: g.nameSub,
       align: 'l',
+      sortable: true,
+      sortValue: (r) => r.asset.name,
       cell: (r) => (
         <NameCell
           href={`/investments/${r.asset.id}${period === '1d' ? '' : `?period=${period}`}`}
@@ -86,7 +103,21 @@ function columns(
     {
       key: 'price',
       header: 'Last price',
-      sub: 'As of',
+      sortOptions: [
+        {
+          key: 'price',
+          header: 'Last price',
+          sub: 'As of',
+          sortValue: (r) => r.sold || r.asset.valuation !== 'units'
+            ? null
+            : Number(r.price?.price ?? r.holding.lastBuyPrice ?? 0),
+        },
+        {
+          key: 'priceDate',
+          header: 'As of',
+          sortValue: (r) => r.price?.date ?? null,
+        },
+      ],
       cell: (r) =>
         r.sold || r.asset.valuation !== 'units' ? (
           MUTED
@@ -101,7 +132,19 @@ function columns(
     {
       key: 'change',
       header: 'Change in period',
-      sub: PERIOD_LABELS[period],
+      sortOptions: [
+        {
+          key: 'change',
+          header: 'Change in period',
+          sub: PERIOD_LABELS[period],
+          sortValue: (r) => changeById.get(r.asset.id)?.gain ?? null,
+        },
+        {
+          key: 'changePercent',
+          header: '% change',
+          sortValue: (r) => changeById.get(r.asset.id)?.absolute ?? null,
+        },
+      ],
       cell: (r) => {
         const change = changeById.get(r.asset.id);
         return change ? (
@@ -120,7 +163,22 @@ function columns(
     {
       key: 'cost',
       header: 'Total cost',
-      sub: costSub,
+      sortOptions: [
+        {
+          key: 'cost',
+          header: 'Total cost',
+          sub: costSub,
+          sortValue: (r) => r.sold ? null : r.holding.cost,
+        },
+        {
+          key: 'costPerUnit',
+          header: costSub,
+          sortValue: (r) =>
+            r.sold || r.asset.valuation !== 'units' || r.holding.units.isZero()
+              ? null
+              : r.holding.cost / r.holding.units.toNumber(),
+        },
+      ],
       cell: (r) =>
         r.sold ? (
           MUTED
@@ -139,7 +197,19 @@ function columns(
     {
       key: 'value',
       header: 'Current value',
-      sub: g.key === 'mf' || g.key === 'stock' || g.key === 'gold' ? g.unitWord : undefined,
+      sortOptions: [
+        {
+          key: 'value',
+          header: 'Current value',
+          sub: g.key === 'mf' || g.key === 'stock' || g.key === 'gold' ? g.unitWord : undefined,
+          sortValue: (r) => r.value,
+        },
+        {
+          key: 'units',
+          header: 'Units',
+          sortValue: (r) => r.asset.valuation === 'units' ? r.holding.units.toNumber() : null,
+        },
+      ],
       cell: (r) => (
         <Amount
           sub={
@@ -155,6 +225,8 @@ function columns(
     {
       key: 'share',
       header: '% of portfolio',
+      sortable: true,
+      sortValue: (r) => portfolioValue ? (r.value / portfolioValue) * 100 : 0,
       cell: (r) => (
         <Amount>{portfolioValue ? ((r.value / portfolioValue) * 100).toFixed(2) : '0.00'}</Amount>
       ),
@@ -162,7 +234,19 @@ function columns(
     {
       key: 'return',
       header: 'Total return',
-      sub: 'Return % p.a.',
+      sortOptions: [
+        {
+          key: 'return',
+          header: 'Total return',
+          sub: 'Return % p.a.',
+          sortValue: (r) => r.totalReturn,
+        },
+        {
+          key: 'returnRate',
+          header: 'Return % p.a.',
+          sortValue: (r) => r.ret?.rate ?? null,
+        },
+      ],
       cell: (r) => (
         <Amount
           tone={gainClass(r.totalReturn)}
@@ -189,17 +273,29 @@ export default async function OverviewPage({
   const portfolioValue = totals(all, date).value;
   const options = new Map(assetOptions().map((o) => [o.id, o]));
   const period = PERIODS.find((p) => p === params.period) ?? '1d';
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === 'string') search.set(key, value);
+    else if (Array.isArray(value)) value.forEach((item) => search.append(key, item));
+  }
+  const sort = tableSortFromParams(search, SORT_KEYS);
   const yearStart = await financialYearStartMonth();
   const data = portfolioData();
   const changes = investmentPeriodRows(data, period, date, yearStart);
   const changeById = new Map(changes.map((r) => [r.row.asset.id, r]));
 
-  const query = (next: { group?: string | null; sold?: boolean }) => {
+  const query = (next: { group?: string | null; sold?: boolean; sort?: string; dir?: 'asc' | 'desc' }) => {
     const p = new URLSearchParams();
     const g = next.group === undefined ? group : next.group;
     if (g) p.set('group', g);
     if (next.sold ?? showSold) p.set('sold', '1');
     if (period !== '1d') p.set('period', period);
+    const sortKey = next.sort ?? sort?.key;
+    const sortDir = next.dir ?? sort?.dir;
+    if (sortKey && sortDir) {
+      p.set('sort', sortKey);
+      p.set('dir', sortDir);
+    }
     const s = p.toString();
     return s ? `?${s}` : '';
   };
@@ -249,6 +345,8 @@ export default async function OverviewPage({
             columns={columns(GROUPS[0]!, portfolioValue, changeById, period)}
             rows={[]}
             rowKey={(r) => r.asset.id}
+            sort={sort}
+            sortHref={(key, dir) => `/investments${query({ sort: key, dir })}`}
             empty={
               <>
                 <p>
@@ -301,6 +399,8 @@ export default async function OverviewPage({
                   columns={columns(g, portfolioValue, changeById, period)}
                   rows={groupRows}
                   rowKey={(r) => r.asset.id}
+                  sort={sort}
+                  sortHref={(key, dir) => `/investments${query({ sort: key, dir })}`}
                   menu={(r) => {
                     const option = options.get(r.asset.id);
                     return option && <HoldingRowMenu asset={option} />;

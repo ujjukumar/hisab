@@ -41,4 +41,9 @@ describe('maskRef', () => {
     expect(maskRef('Folio ••7731')).toBe('Folio ••7731');
     expect(maskRef(null)).toBe('');
   });
+
+  it('hides unavailable reference placeholders', () => {
+    expect(maskRef('Not Available')).toBe('');
+    expect(maskRef(' n/a ')).toBe('');
+  });
 });

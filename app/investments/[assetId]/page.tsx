@@ -27,10 +27,12 @@ import { fdValue } from '@/lib/domain/valuation';
 import {
   assetOptions,
   holdingHistory,
+  invTxnFilterParams,
   listInvestmentTxns,
   parseInvTxnFilters,
   portfolio,
   portfolioData,
+  type InvTxnSort,
 } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
@@ -39,7 +41,7 @@ export default async function HoldingPage({
   searchParams,
 }: {
   params: Promise<{ assetId: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const id = Number((await params).assetId);
   const date = today();
@@ -48,7 +50,8 @@ export default async function HoldingPage({
   if (!row || !option) notFound();
 
   const yearStart = await financialYearStartMonth();
-  const selected = (await searchParams).period;
+  const queryParams = await searchParams;
+  const selected = typeof queryParams.period === 'string' ? queryParams.period : '';
   const period: Period = PERIODS.some((choice) => choice === selected) ? selected as Period : '1d';
   const from = periodStart(period, date, yearStart);
   const cadence = seriesCadence(from, date);
@@ -62,7 +65,15 @@ export default async function HoldingPage({
   const { asset, holding } = row;
   const group = GROUPS.find((g) => g.key === row.group);
   const units = asset.valuation === 'units';
-  const { rows } = listInvestmentTxns({ ...parseInvTxnFilters({}), assetId: id }, { all: true });
+  const txnFilters = { ...parseInvTxnFilters(queryParams), assetId: id };
+  const { rows } = listInvestmentTxns(txnFilters, { all: true });
+  const transactionSortHref = (key: string, dir: 'asc' | 'desc') => {
+    const params = invTxnFilterParams({ ...txnFilters, sort: key as InvTxnSort, dir });
+    params.delete('asset');
+    if (period !== '1d') params.set('period', period);
+    const query = params.toString();
+    return query ? `/investments/${id}?${query}` : `/investments/${id}`;
+  };
   const history = linePoints(holdingHistory(id, from), cadence);
   const ref = maskRef(asset.accountRef);
 
@@ -171,6 +182,8 @@ export default async function HoldingPage({
           title={`Transactions (${rows.length})`}
           rows={rows}
           showAsset={false}
+          sort={{ key: txnFilters.sort, dir: txnFilters.dir }}
+          sortHref={transactionSortHref}
           empty={
             <>
               <p>No transactions for this investment yet. Record one to start tracking it.</p>

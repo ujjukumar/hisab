@@ -36,6 +36,7 @@ const columns: Column<TxnRow>[] = [
     header: 'Date',
     align: 'l',
     sortable: true,
+    sortValue: (t) => t.date,
     cell: (t) => <DateCell>{formatDate(t.date)}</DateCell>,
   },
   {
@@ -43,6 +44,8 @@ const columns: Column<TxnRow>[] = [
     header: 'Description',
     sub: 'Note',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.description,
     cell: (t) => (
       <DescCell
         desc={
@@ -59,6 +62,8 @@ const columns: Column<TxnRow>[] = [
     key: 'category',
     header: 'Category',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.categoryName ?? 'Transfer',
     cell: (t) =>
       t.type === 'transfer' ? (
         <CategoryChip name="Transfer" color="var(--c-muted)" />
@@ -70,12 +75,15 @@ const columns: Column<TxnRow>[] = [
     key: 'account',
     header: 'Account',
     align: 'l',
+    sortable: true,
+    sortValue: (t) => t.accountName ?? t.toAccountName ?? INVESTMENTS,
     cell: (t) => <span className={tableStyles.catChip}>{t.accountName ?? INVESTMENTS}</span>,
   },
   {
     key: 'amount',
     header: 'Amount',
     sortable: true,
+    sortValue: (t) => t.amount,
     cell: (t) =>
       t.type === 'income' ? (
         <Amount tone="pos">+{formatAmount(t.amount)}</Amount>
@@ -148,9 +156,7 @@ export default async function TransactionsPage({
         rows={rows}
         rowKey={(t) => t.id}
         sort={{ key: f.sort, dir: f.dir }}
-        sortHref={(key, dir) =>
-          href({ ...f, sort: key === 'amount' ? 'amount' : 'date', dir, limit: PAGE_SIZE })
-        }
+        sortHref={(key, dir) => href({ ...f, sort: key as TxnFilters['sort'], dir, limit: PAGE_SIZE })}
         menu={(t) => <TransactionRowMenu row={t} />}
         empty={
           filtered ? (
