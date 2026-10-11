@@ -89,6 +89,9 @@ function migrationState(sqlite: DatabaseSync): { needsMigration: boolean; hasApp
 
 /** Every app table, children before parents, so deleting in this order respects foreign keys. */
 export const TABLES = [
+  'sms_messages',
+  'sms_rules',
+  'sms_devices',
   'transactions',
   'investment_transactions',
   'prices',
@@ -99,6 +102,9 @@ export const TABLES = [
   'accounts',
   'settings',
 ] as const;
+const REQUIRED_BACKUP_TABLES = TABLES.filter(
+  (table) => !(['sms_messages', 'sms_rules', 'sms_devices'] as readonly string[]).includes(table),
+);
 
 /** Delete every row and restart the ids. Call `ensureDefaults` afterwards. */
 export function wipeAll(sqlite: DatabaseSync): void {
@@ -133,7 +139,7 @@ export function prepareBackup(file: string): void {
         }[]
       ).map((r) => r.name),
     );
-    if (!names.has('__drizzle_migrations') || !TABLES.every((t) => names.has(t))) {
+    if (!names.has('__drizzle_migrations') || !REQUIRED_BACKUP_TABLES.every((t) => names.has(t))) {
       throw new BackupError(NOT_A_BACKUP);
     }
     const appliedCount = (backup.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get() as { n: number }).n;

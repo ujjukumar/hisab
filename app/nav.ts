@@ -4,6 +4,7 @@ import type { Tab } from '@/components/Tabs/Tabs';
 
 export const MONEY_TABS: Tab[] = [
   { href: '/money', label: 'Transactions' },
+  { href: '/money/sms', label: 'SMS' },
   { href: '/money/budgets', label: 'Budgets' },
   { href: '/money/accounts', label: 'Accounts' },
   { href: '/money/categories', label: 'Categories' },

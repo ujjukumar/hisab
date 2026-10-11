@@ -58,6 +58,64 @@ npm run dev
 
 Open <http://127.0.0.1:3000>.
 
+## Android SMS imports
+
+The optional SMS receiver accepts financial-message envelopes from the owner's
+Android app. It does not trust the Android app's classification: Hisaab parses
+and validates each message, deduplicates retries, auto-imports only an exact
+learned provider rule, and puts everything else in Money → SMS for approval.
+The first approved message can teach a rule from its sender and
+message structure; amounts, dates and references are treated as variable data.
+Future messages must match that learned structure exactly, or they return to
+review.
+
+Keep the app private. Hisaab still binds to `127.0.0.1`; on a PC or Azure VM,
+use a Tailscale-only reverse proxy or equivalent private service to forward the
+Android app's request to the local Hisaab port. Do not bind Next.js to
+`0.0.0.0`, publish the receiver publicly, or send SMS through a cloud relay.
+
+Set this value outside the repository before enabling the receiver:
+
+```text
+SMS_ENCRYPTION_KEY=<base64-encoded 32-byte key>
+```
+
+Pairing is request-and-approve, so no shared secret is needed. The Android app
+sends `POST /api/sms/pair` with `{"label":"Pixel"}` and gets back a six-character
+code and a `claimToken`. The request does nothing until you open Money → SMS.
+In Connect requests, check the code matches the one shown on the phone, and
+choose **Approve device**. The app then polls `GET /api/sms/pair` with its claim token
+as a bearer credential; once approved, that call returns the device bearer token
+exactly once and the stored copy is deleted. Reject a request you do not
+recognise, and revoke a paired device if the phone is lost.
+
+Store the returned bearer token only in the paired
+Android app. Send SMS envelopes to `POST /api/sms/inbound` with
+`Authorization: Bearer <token>`:
+
+```json
+{
+  "schemaVersion": 1,
+  "messageId": "android-provider-message-id",
+  "sender": "BANK-INFO",
+  "receivedAt": "2026-10-07T08:00:00+05:30",
+  "body": "INR 1,250.50 credited on 07/10/2026. Ref UPI ABC12345"
+}
+```
+
+The Android app should retry transport and 5xx failures, treat `duplicate` as
+success, and never assume `queued` means that a ledger transaction exists.
+Pending raw SMS is encrypted and deleted after approval or rejection. Do not
+put real SMS text in tests, seed data, screenshots or logs.
+
+The Money → SMS tab keeps the review queue separate from device connections and
+learned rules. Open a pending item to see its original text and edit the proposed
+transaction. The original text is not loaded into the queue, and the same edits
+are used whether you approve it once or learn a rule while approving.
+If the SMS does not establish whether money came in or went out, check the
+original text and choose a Spending or Income category to set the direction for
+manual approval. An unclear message cannot teach an automatic import rule.
+
 When you are ready to use it for real, empty it:
 
 ```bash

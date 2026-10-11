@@ -201,6 +201,85 @@ export const settings = sqliteTable('settings', {
   ...stamps,
 });
 
+export const smsDevices = sqliteTable(
+  'sms_devices',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    label: text('label').notNull(),
+    installationId: text('installation_id'),
+    /** Set only once the owner approves the request in Money -> SMS. */
+    tokenHash: text('token_hash').unique(),
+    /** Hash of the one-time secret the phone keeps while waiting for approval. */
+    claimHash: text('claim_hash').notNull().unique(),
+    /** Short code shown on the phone and in Money -> SMS to check the request. */
+    code: text('code').notNull(),
+    tokenCiphertext: text('token_ciphertext'),
+    approvedAt: text('approved_at'),
+    claimedAt: text('claimed_at'),
+    createdAt: text('created_at').notNull().default(now),
+    lastSeenAt: text('last_seen_at'),
+    revokedAt: text('revoked_at'),
+  },
+  (t) => [index('sms_devices_installation').on(t.installationId), index('sms_devices_claim').on(t.claimHash)],
+);
+
+export const smsRules = sqliteTable(
+  'sms_rules',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    senderPattern: text('sender_pattern').notNull(),
+    providerKey: text('provider_key').notNull(),
+    templateFingerprint: text('template_fingerprint').notNull(),
+    enabled: integer('enabled').notNull().default(1),
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    incomeCategoryId: integer('income_category_id').references(() => categories.id),
+    expenseCategoryId: integer('expense_category_id').references(() => categories.id),
+    createdAt: text('created_at').notNull().default(now),
+    updatedAt: text('updated_at').notNull().default(now),
+  },
+  (t) => [index('sms_rules_provider').on(t.providerKey), index('sms_rules_sender').on(t.senderPattern)],
+);
+
+export const smsMessages = sqliteTable(
+  'sms_messages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    deviceId: integer('device_id')
+      .notNull()
+      .references(() => smsDevices.id),
+    providerMessageId: text('provider_message_id'),
+    sender: text('sender').notNull(),
+    receivedAt: text('received_at').notNull(),
+    contentHash: text('content_hash').notNull(),
+    rawCiphertext: text('raw_ciphertext'),
+    status: text('status', { enum: ['pending', 'imported', 'rejected', 'duplicate', 'failed'] })
+      .notNull()
+      .default('pending'),
+    parserVersion: text('parser_version').notNull(),
+    providerKey: text('provider_key'),
+    senderPattern: text('sender_pattern'),
+    templateFingerprint: text('template_fingerprint'),
+    direction: text('direction', { enum: ['income', 'expense'] }),
+    amount: integer('amount'),
+    transactionDate: text('transaction_date'),
+    reference: text('reference'),
+    proposedAccountId: integer('proposed_account_id').references(() => accounts.id),
+    proposedCategoryId: integer('proposed_category_id').references(() => categories.id),
+    transactionId: integer('transaction_id').references(() => transactions.id),
+    reason: text('reason'),
+    createdAt: text('created_at').notNull().default(now),
+    updatedAt: text('updated_at').notNull().default(now),
+  },
+  (t) => [
+    index('sms_messages_status').on(t.status),
+    index('sms_messages_hash').on(t.contentHash),
+    index('sms_messages_provider_id').on(t.deviceId, t.providerMessageId),
+  ],
+);
+
 export type Account = typeof accounts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
@@ -209,6 +288,9 @@ export type Asset = typeof assets.$inferSelect;
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type Price = typeof prices.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
+export type SmsDevice = typeof smsDevices.$inferSelect;
+export type SmsRule = typeof smsRules.$inferSelect;
+export type SmsMessage = typeof smsMessages.$inferSelect;
 
 export type AccountType = Account['type'];
 export type AssetType = Asset['type'];

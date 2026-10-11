@@ -404,6 +404,12 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Mutual-fund NFO history | Done | 6 Oct 2026 | Optional first-NAV date skips pre-launch backfill and caps AMFI lookback while retaining the payment-date buy and its entered NAV. |
 | Documentation cleanup | Done | 3 Oct 2026 | Kept three purpose-specific docs; removed duplicate definitions, completed checklists and superseded implementation notes. |
 | Sortable tables | Done | 7 Oct 2026 | Added URL-preserving sorting to data tables across Money, Investments, Reports, budgets, categories, accounts and import previews, with accessible direction state and client-side preview sorting. |
+| Dashboard hierarchy | Done | 7 Oct 2026 | Dashboard now leads with investments: a "Needs attention" strip for stale prices, unpriced holdings, over-budget categories and overdrawn accounts; portfolio value with its all-time return in the headline strip; portfolio cards first, money cards below; and donut legends showing amounts with a top-five cap on spending. |
+| SMS ingestion foundation | In progress | 7 Oct 2026 | Added the private Tailscale-oriented receiver contract, encrypted pending-message schema, strict parser/deduplication domain, review actions, learned sender/template rules and temporary end-to-end queue/duplicate checks. Android sender integration and live end-to-end checks remain separate work. |
+| SMS pairing by approval | Done | 7 Oct 2026 | Replaced the shared pairing key with a request-and-approve flow: the phone asks to connect, Money → SMS shows a six-character code to compare, and only after approval does the phone collect its bearer token once. Unapproved, rejected and revoked devices cannot post messages. |
+| SMS review workspace | Done | 7 Oct 2026 | Moved reviews, connection requests, paired devices and learned rules into a dedicated Money tab with an accessible review-first layout, on-demand original text and shared editable approval fields. |
+| Unclear SMS review | Done | 7 Oct 2026 | An owner can set the direction of an unclear SMS by choosing a grouped category for manual approval; automatic rules still require a clear direction in the message. |
+| Private VM deployment | Done | 7 Oct 2026 | Deployed the Money SMS workspace to the Tailscale-only VM, kept its database and configuration, and restored systemd as the sole app process. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The
