@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
@@ -14,6 +14,21 @@ const migrationSql = readFileSync(join(MIGRATIONS_FOLDER, migrationName, 'migrat
 const alternateLineEndingHash = createHash('sha256')
   .update(migrationSql.includes('\r\n') ? migrationSql.replaceAll('\r\n', '\n') : migrationSql.replaceAll('\n', '\r\n'))
   .digest('hex');
+
+/** A copy of the migrations folder that stops just before the named migration. */
+function migrationsBefore(directory: string, name: string): string {
+  const stop = readdirSync(MIGRATIONS_FOLDER).find((entry) => entry.endsWith(`_${name}`));
+  if (!stop) throw new Error(`No migration named ${name}.`);
+  const older = join(directory, 'migrations');
+  cpSync(MIGRATIONS_FOLDER, older, {
+    recursive: true,
+    filter: (source) => {
+      const entry = relative(MIGRATIONS_FOLDER, source).split(sep)[0];
+      return !entry || entry < stop;
+    },
+  });
+  return older;
+}
 
 describe('migration history upgrade', () => {
   it('does not claim an existing SQLite file without migration history', () => {
@@ -133,11 +148,7 @@ describe('migration history upgrade', () => {
     const previousPath = process.env.DATABASE_PATH;
     process.env.DATABASE_PATH = join(directory, 'paired.db');
     try {
-      const older = join(directory, 'migrations');
-      cpSync(MIGRATIONS_FOLDER, older, {
-        recursive: true,
-        filter: (source) => !source.includes('sms_pairing_invites'),
-      });
+      const older = migrationsBefore(directory, 'sms_pairing_invites');
       const initial = new DatabaseSync(process.env.DATABASE_PATH);
       migrate(drizzle({ client: initial }), { migrationsFolder: older });
       initial.exec(`
@@ -160,7 +171,14 @@ describe('migration history upgrade', () => {
         const rows = (table: string) =>
           upgraded.sqlite.prepare(`SELECT * FROM ${table} ORDER BY id`).all();
         expect(rows('sms_devices')).toEqual(before.devices);
-        expect(rows('sms_messages')).toEqual(before.messages);
+        expect(rows('sms_messages')).toEqual(
+          before.messages.map((message) => ({
+            ...message,
+            rule_id: null,
+            decided_by: null,
+            decided_at: null,
+          })),
+        );
         expect(upgraded.sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
         const keys = upgraded.sqlite.prepare('PRAGMA foreign_key_list(sms_messages)').all();
         expect(keys).toContainEqual(
@@ -172,6 +190,66 @@ describe('migration history upgrade', () => {
             VALUES ('Invented QR phone', 'token-hash-3',
               '2026-10-11T08:00:00.000Z', '2026-10-11T08:00:00.000Z');
         `);
+      } finally {
+        upgraded.sqlite.close();
+      }
+    } finally {
+      if (previousPath === undefined) delete process.env.DATABASE_PATH;
+      else process.env.DATABASE_PATH = previousPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('records who decided past SMS and which rule they used when adding outcome columns', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hisaab-sms-outcomes-'));
+    const previousPath = process.env.DATABASE_PATH;
+    process.env.DATABASE_PATH = join(directory, 'outcomes.db');
+    try {
+      const initial = new DatabaseSync(process.env.DATABASE_PATH);
+      migrate(drizzle({ client: initial }), {
+        migrationsFolder: migrationsBefore(directory, 'sms_outcomes'),
+      });
+      initial.exec(`
+        INSERT INTO accounts (id, name, type, opening_date) VALUES (1, 'Example bank', 'bank', '2026-01-01');
+        INSERT INTO sms_devices (id, label, token_hash, approved_at) VALUES (1, 'Invented phone', 'token-hash', '2026-10-01T08:00:00.000Z');
+        INSERT INTO sms_rules (id, name, sender_pattern, provider_key, template_fingerprint, account_id)
+          VALUES (1, 'Example shop', '^DEMO-ALERT$', 'Example shop', 'template-1', 1);
+      `);
+      const insert = initial.prepare(`
+        INSERT INTO sms_messages (id, device_id, sender, received_at, content_hash, parser_version,
+          status, sender_pattern, template_fingerprint, reason, updated_at)
+        VALUES (?, 1, 'DEMO-ALERT', '2026-10-07T08:00:00+05:30', ?, '1', ?, '^DEMO-ALERT$', ?, ?, ?)
+      `);
+      insert.run(1, 'hash-1', 'imported', 'template-1', null, '2026-10-07 08:01:00');
+      insert.run(2, 'hash-2', 'imported', 'template-2', 'Learned rule 1.', '2026-10-07 08:02:00');
+      insert.run(3, 'hash-3', 'imported', 'template-3', 'Learned rule 99.', '2026-10-07 08:03:00');
+      insert.run(4, 'hash-4', 'imported', 'template-4', 'Check the account.', '2026-10-07 08:04:00');
+      insert.run(5, 'hash-5', 'rejected', 'template-5', 'Check the account.', '2026-10-07 08:05:00');
+      insert.run(6, 'hash-6', 'pending', 'template-6', 'Check the account.', '2026-10-07 08:06:00');
+      insert.run(7, 'hash-7', 'imported', 'template-7', null, '2026-10-07 08:07:00');
+      initial.close();
+
+      const upgraded = openDatabase();
+      try {
+        expect(
+          upgraded.sqlite
+            .prepare('SELECT id, rule_id, decided_by, decided_at FROM sms_messages ORDER BY id')
+            .all()
+            .map((row) => ({ ...row })),
+        ).toEqual([
+          { id: 1, rule_id: 1, decided_by: 'rule', decided_at: '2026-10-07 08:01:00' },
+          { id: 2, rule_id: 1, decided_by: 'owner', decided_at: '2026-10-07 08:02:00' },
+          { id: 3, rule_id: null, decided_by: 'owner', decided_at: '2026-10-07 08:03:00' },
+          { id: 4, rule_id: null, decided_by: 'owner', decided_at: '2026-10-07 08:04:00' },
+          { id: 5, rule_id: null, decided_by: 'owner', decided_at: '2026-10-07 08:05:00' },
+          { id: 6, rule_id: null, decided_by: null, decided_at: null },
+          { id: 7, rule_id: null, decided_by: 'rule', decided_at: '2026-10-07 08:07:00' },
+        ]);
+        // Deleting a rule keeps the history and only forgets the link.
+        upgraded.sqlite.exec('DELETE FROM sms_rules WHERE id = 1');
+        expect(
+          upgraded.sqlite.prepare('SELECT count(*) AS linked FROM sms_messages WHERE rule_id IS NOT NULL').get(),
+        ).toEqual({ linked: 0 });
       } finally {
         upgraded.sqlite.close();
       }

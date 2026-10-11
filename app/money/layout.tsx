@@ -9,6 +9,7 @@ import { MONEY_TABS } from '@/app/nav';
 import { monthLabel } from '@/lib/domain/dates';
 import { formatINR } from '@/lib/domain/format';
 import { listAccounts, listCategories, moneyStrip } from '@/lib/queries/money';
+import { pendingSmsCount } from '@/lib/queries/sms';
 import { spentAndSaved } from './stats';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -17,6 +18,10 @@ export default function MoneyLayout({ children }: { children: ReactNode }) {
   const s = moneyStrip();
   const month = monthLabel(s.month).split(' ')[0];
   const accounts = listAccounts().map(({ id, name, archived }) => ({ id, name, archived }));
+  const pendingSms = pendingSmsCount();
+  const tabs = MONEY_TABS.map((tab) =>
+    tab.href === '/money/sms' ? { ...tab, count: pendingSms } : tab,
+  );
 
   return (
     <TransactionDrawerProvider accounts={accounts} categories={listCategories()}>
@@ -36,7 +41,7 @@ export default function MoneyLayout({ children }: { children: ReactNode }) {
             aside: plural(s.accountCount, 'account', 'accounts'),
           },
         ]}
-        tabs={<Tabs tabs={MONEY_TABS} label="Money sections" />}
+        tabs={<Tabs tabs={tabs} label="Money sections" />}
       />
       {children}
     </TransactionDrawerProvider>

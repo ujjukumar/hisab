@@ -1,9 +1,8 @@
 'use server';
 
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { db } from '@/lib/db/client';
 import {
@@ -27,6 +26,8 @@ import {
   type SmsEnvelope,
 } from '@/lib/domain/sms';
 import { parsePositivePaise } from '@/lib/domain/money';
+import { isValidDate } from '@/lib/domain/dates';
+import { smsPairingInviteState } from '@/lib/queries/sms';
 import {
   ENCRYPTION_KEY_REQUIRED,
   createSmsToken,
@@ -42,7 +43,8 @@ import {
   smsPairingLink,
   smsPairingUrl,
 } from '@/lib/sms/pairing';
-import { failed, type ActionFailure } from '@/lib/validation/money';
+import { keepForUndo, takeUndo } from '@/lib/undo';
+import { failed, idSchema, optionalId, type ActionFailure } from '@/lib/validation/money';
 
 const envelopeSchema = z.object({
   schemaVersion: z.literal(1),
@@ -63,6 +65,8 @@ const redeemSchema = pairSchema.extend({
   secret: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
+const flowSchema = z.enum(['income', 'expense']);
+
 const reviewSchema = z.object({
   id: z.coerce.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -70,9 +74,101 @@ const reviewSchema = z.object({
   accountId: z.coerce.number().int().positive(),
   categoryId: z.coerce.number().int().positive(),
   description: z.string().trim().min(1).max(200),
+  /** Only sent when the SMS itself does not say; the message's own flow always wins. */
+  direction: z.preprocess((v) => (v === '' || v == null ? undefined : v), flowSchema.optional()),
 });
 
-const learnSchema = reviewSchema;
+const batchApproveSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: idSchema,
+        accountId: optionalId,
+        categoryId: optionalId,
+      }),
+    )
+    .min(1)
+    .max(200),
+  learn: z.boolean().default(false),
+});
+
+const batchIdsSchema = z.array(idSchema).min(1).max(200);
+
+const ruleSchema = z.object({
+  id: idSchema,
+  name: z.string().trim().min(1, 'Enter a rule name.').max(80, 'Keep this under 80 characters.'),
+  accountId: z.coerce.number({ error: 'Choose an account.' }).int().positive('Choose an account.'),
+  incomeCategoryId: optionalId,
+  expenseCategoryId: optionalId,
+});
+
+/** Every SMS change can move the Money tab badge and the dashboard, so refresh both. */
+function revalidateSms() {
+  revalidatePath('/money', 'layout');
+  revalidatePath('/');
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Teach or update the rule for this sender and wording, so the next matching SMS goes
+ * where the owner just sent this one. Turning learning on again also switches the rule on.
+ */
+function learnRule(
+  tx: Tx,
+  message: {
+    senderPattern: string;
+    templateFingerprint: string;
+    providerKey: string;
+    direction: 'income' | 'expense';
+  },
+  accountId: number,
+  categoryId: number,
+): number {
+  const category =
+    message.direction === 'income'
+      ? { incomeCategoryId: categoryId }
+      : { expenseCategoryId: categoryId };
+  const existing = tx
+    .select({ id: smsRules.id })
+    .from(smsRules)
+    .where(
+      and(
+        eq(smsRules.senderPattern, message.senderPattern),
+        eq(smsRules.templateFingerprint, message.templateFingerprint),
+      ),
+    )
+    .get();
+  if (existing) {
+    tx.update(smsRules)
+      .set({ ...category, accountId, enabled: 1, updatedAt: new Date().toISOString() })
+      .where(eq(smsRules.id, existing.id))
+      .run();
+    return existing.id;
+  }
+  return tx
+    .insert(smsRules)
+    .values({
+      name: message.providerKey,
+      senderPattern: message.senderPattern,
+      providerKey: message.providerKey,
+      templateFingerprint: message.templateFingerprint,
+      enabled: 1,
+      accountId,
+      incomeCategoryId: null,
+      expenseCategoryId: null,
+      ...category,
+    })
+    .returning({ id: smsRules.id })
+    .get().id;
+}
+
+function learnable(message: typeof smsMessages.$inferSelect) {
+  const { senderPattern, templateFingerprint, providerKey, direction } = message;
+  return senderPattern && templateFingerprint && providerKey && direction
+    ? { senderPattern, templateFingerprint, providerKey, direction }
+    : null;
+}
 
 /** Pending requests are capped so a reachable receiver cannot be filled with junk. */
 const MAX_PENDING_DEVICES = 5;
@@ -90,7 +186,15 @@ export type SmsClaimResult =
   | { ok: true; status: 'claimed'; deviceId: number }
   | ActionFailure;
 
-export type SmsPairingInviteResult = { ok: true; link: string; expiresAt: string } | ActionFailure;
+export type SmsPairingInviteResult =
+  { ok: true; inviteId: number; link: string; expiresAt: string } | ActionFailure;
+
+export type SmsPairingInviteStatus =
+  { status: 'waiting' } | { status: 'used'; label: string } | { status: 'expired' };
+
+/** What the review form and the bulk panel get back. `undo` restores rejected SMS. */
+export type SmsDecisionResult =
+  { ok: true; message: string; count?: number; undo?: string } | ActionFailure;
 
 /** `invalid` is a malformed request; `expired` covers used, replaced, unknown and old codes. */
 export type SmsRedeemResult =
@@ -135,7 +239,7 @@ export async function requestSmsDevicePairing(input: unknown): Promise<SmsPairRe
       .get();
     return { ok: true, status: 'pending', deviceId: row.id, code, claimToken };
   });
-  if (result.ok) revalidatePath('/money/sms');
+  if (result.ok) revalidateSms();
   return result;
 }
 
@@ -162,7 +266,7 @@ export async function claimSmsDeviceToken(claimToken: string): Promise<SmsClaimR
       .run();
     return { ok: true, status: 'approved', token, deviceId: device.id };
   });
-  if (result.ok && result.status === 'approved') revalidatePath('/money/sms');
+  if (result.ok && result.status === 'approved') revalidateSms();
   return result;
 }
 
@@ -194,7 +298,7 @@ export async function approveSmsDevice(formData: FormData): Promise<ActionFailur
       .run();
     return { ok: true };
   });
-  if (result.ok) revalidatePath('/money/sms');
+  if (result.ok) revalidateSms();
   return result;
 }
 
@@ -210,7 +314,7 @@ export async function rejectSmsDevice(formData: FormData): Promise<ActionFailure
     )
     .run();
   if (!changed.changes) return failed('That pairing request is no longer waiting.');
-  revalidatePath('/money/sms');
+  revalidateSms();
   return { ok: true };
 }
 
@@ -225,16 +329,27 @@ export async function createSmsPairingInvite(): Promise<SmsPairingInviteResult> 
   const now = new Date();
   const createdAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + SMS_PAIRING_LIFETIME_MS).toISOString();
-  db.transaction((tx) => {
+  const inviteId = db.transaction((tx) => {
     tx.update(smsPairingInvites)
       .set({ expiresAt: createdAt })
       .where(and(isNull(smsPairingInvites.usedAt), gt(smsPairingInvites.expiresAt, createdAt)))
       .run();
-    tx.insert(smsPairingInvites)
+    return tx
+      .insert(smsPairingInvites)
       .values({ secretHash: hashSmsToken(secret), createdAt, expiresAt })
-      .run();
+      .returning({ id: smsPairingInvites.id })
+      .get().id;
   });
-  return { ok: true, link: smsPairingLink(baseUrl, secret), expiresAt };
+  return { ok: true, inviteId, link: smsPairingLink(baseUrl, secret), expiresAt };
+}
+
+/** Polled by the pairing drawer while it is open, to show when the phone has connected. */
+export async function smsPairingInviteStatus(id: unknown): Promise<SmsPairingInviteStatus> {
+  const parsed = idSchema.safeParse(id);
+  if (!parsed.success) return { status: 'expired' };
+  const state = smsPairingInviteState(parsed.data);
+  if (state.status === 'used') revalidateSms();
+  return state;
 }
 
 /**
@@ -299,7 +414,7 @@ export async function redeemSmsPairingInvite(input: unknown): Promise<SmsRedeemR
       .run();
     return { ok: true, status: 'approved', token, deviceId: device.id };
   });
-  if (result.ok) revalidatePath('/money/sms');
+  if (result.ok) revalidateSms();
   return result;
 }
 
@@ -431,6 +546,9 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
           proposedCategoryId: result.proposal.categoryId,
           transactionId: transaction.id,
           reason: null,
+          ruleId: result.proposal.ruleId,
+          decidedBy: 'rule',
+          decidedAt: new Date().toISOString(),
         })
         .returning({ id: smsMessages.id })
         .get();
@@ -466,183 +584,420 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
   });
 }
 
-export async function approveSms(formData: FormData): Promise<ActionFailure | { ok: true }> {
+type Decision = { ok: true; ruleId: number | null } | ActionFailure;
+
+/** Approve one pending SMS with the owner's edits, and optionally teach a rule from it. */
+function decideSms(formData: FormData, learn: boolean): Decision {
   const parsed = reviewSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
     return failed('Enter a valid date, amount, account, category and description.');
   const amount = parsePositivePaise(parsed.data.amount);
-  if (!amount.ok) return failed(amount.message);
-  const result = db.transaction((tx): ActionFailure | { ok: true } => {
-    const message = tx.select().from(smsMessages).where(eq(smsMessages.id, parsed.data.id)).get();
+  if (!amount.ok) return failed(amount.message, 'amount');
+  const input = parsed.data;
+  return db.transaction((tx): Decision => {
+    const message = tx.select().from(smsMessages).where(eq(smsMessages.id, input.id)).get();
     if (!message || message.status !== 'pending') return failed('That SMS is no longer pending.');
+    const template = learn ? learnable(message) : null;
+    if (learn && !message.direction) {
+      return failed(
+        'The SMS direction is unclear. Choose a category and approve it manually instead.',
+      );
+    }
+    if (learn && !template) {
+      return failed('This SMS has no learnable template. Approve it manually instead.');
+    }
     const account = tx
       .select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.id, parsed.data.accountId))
+      .where(eq(accounts.id, input.accountId))
       .get();
-    const category = tx
-      .select()
-      .from(categories)
-      .where(eq(categories.id, parsed.data.categoryId))
-      .get();
-    if (!account) return failed('That account no longer exists. Choose another.');
-    if (!category) return failed('That category no longer exists. Choose another.');
-    const type = message.direction ?? category.kind;
+    const category = tx.select().from(categories).where(eq(categories.id, input.categoryId)).get();
+    if (!account) return failed('That account no longer exists. Choose another.', 'accountId');
+    if (!category) return failed('That category no longer exists. Choose another.', 'categoryId');
+    const type = message.direction ?? input.direction ?? category.kind;
     if (category.kind !== type) {
       return failed(
         type === 'income' ? 'Choose an income category.' : 'Choose a spending category.',
+        'categoryId',
       );
     }
 
+    const ruleId = template ? learnRule(tx, template, input.accountId, input.categoryId) : null;
     const transaction = tx
       .insert(transactions)
       .values({
-        date: parsed.data.date,
+        date: input.date,
         type,
         amount: amount.value,
-        accountId: parsed.data.accountId,
-        categoryId: parsed.data.categoryId,
-        description: parsed.data.description,
+        accountId: input.accountId,
+        categoryId: input.categoryId,
+        description: input.description,
       })
       .returning({ id: transactions.id })
       .get();
+    const now = new Date().toISOString();
     tx.update(smsMessages)
       .set({
         status: 'imported',
         direction: type,
         amount: amount.value,
-        transactionDate: parsed.data.date,
-        proposedAccountId: parsed.data.accountId,
-        proposedCategoryId: parsed.data.categoryId,
+        transactionDate: input.date,
+        proposedAccountId: input.accountId,
+        proposedCategoryId: input.categoryId,
         transactionId: transaction.id,
         rawCiphertext: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(smsMessages.id, message.id))
-      .run();
-    return { ok: true };
-  });
-  if (result.ok) {
-    revalidatePath('/money/sms');
-    revalidatePath('/money', 'layout');
-    revalidatePath('/');
-  }
-  return result;
-}
-
-export async function learnSmsRuleAndApprove(
-  formData: FormData,
-): Promise<ActionFailure | { ok: true; ruleId: number }> {
-  const parsed = learnSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success)
-    return failed('Enter a valid date, amount, account, category and description.');
-  const amount = parsePositivePaise(parsed.data.amount);
-  if (!amount.ok) return failed(amount.message);
-  const result = db.transaction((tx): ActionFailure | { ok: true; ruleId: number } => {
-    const message = tx.select().from(smsMessages).where(eq(smsMessages.id, parsed.data.id)).get();
-    if (!message || message.status !== 'pending') return failed('That SMS is no longer pending.');
-    if (!message.senderPattern || !message.templateFingerprint || !message.providerKey) {
-      return failed('This SMS has no learnable template. Approve it manually instead.');
-    }
-    if (!message.direction) {
-      return failed(
-        'The SMS direction is unclear. Choose a category and approve it manually instead.',
-      );
-    }
-    const account = tx
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.id, parsed.data.accountId))
-      .get();
-    const category = tx
-      .select()
-      .from(categories)
-      .where(eq(categories.id, parsed.data.categoryId))
-      .get();
-    if (!account) return failed('That account no longer exists. Choose another.');
-    if (!category || !message.direction || category.kind !== message.direction) {
-      return failed(
-        message.direction === 'income'
-          ? 'Choose an income category.'
-          : 'Choose a spending category.',
-      );
-    }
-    const existing = tx
-      .select({ id: smsRules.id })
-      .from(smsRules)
-      .where(
-        and(
-          eq(smsRules.senderPattern, message.senderPattern),
-          eq(smsRules.templateFingerprint, message.templateFingerprint),
-        ),
-      )
-      .get();
-    const ruleId =
-      existing?.id ??
-      tx
-        .insert(smsRules)
-        .values({
-          name: message.providerKey,
-          senderPattern: message.senderPattern,
-          providerKey: message.providerKey,
-          templateFingerprint: message.templateFingerprint,
-          enabled: 1,
-          accountId: parsed.data.accountId,
-          incomeCategoryId: message.direction === 'income' ? parsed.data.categoryId : null,
-          expenseCategoryId: message.direction === 'expense' ? parsed.data.categoryId : null,
-        })
-        .returning({ id: smsRules.id })
-        .get().id;
-    const transaction = tx
-      .insert(transactions)
-      .values({
-        date: parsed.data.date,
-        type: message.direction,
-        amount: amount.value,
-        accountId: parsed.data.accountId,
-        categoryId: parsed.data.categoryId,
-        description: parsed.data.description,
-      })
-      .returning({ id: transactions.id })
-      .get();
-    tx.update(smsMessages)
-      .set({
-        status: 'imported',
-        amount: amount.value,
-        transactionDate: parsed.data.date,
-        proposedAccountId: parsed.data.accountId,
-        proposedCategoryId: parsed.data.categoryId,
-        transactionId: transaction.id,
-        rawCiphertext: null,
-        reason: `Learned rule ${ruleId}.`,
-        updatedAt: new Date().toISOString(),
+        ...(ruleId ? { ruleId, reason: `Learned rule ${ruleId}.` } : {}),
+        decidedBy: 'owner',
+        decidedAt: now,
+        updatedAt: now,
       })
       .where(eq(smsMessages.id, message.id))
       .run();
     return { ok: true, ruleId };
   });
-  if (result.ok) {
-    revalidatePath('/money/sms');
-    revalidatePath('/money', 'layout');
-    revalidatePath('/');
-  }
+}
+
+export async function approveSms(formData: FormData): Promise<ActionFailure | { ok: true }> {
+  const result = decideSms(formData, false);
+  if (!result.ok) return result;
+  revalidateSms();
+  return { ok: true };
+}
+
+export async function learnSmsRuleAndApprove(
+  formData: FormData,
+): Promise<ActionFailure | { ok: true; ruleId: number }> {
+  const result = decideSms(formData, true);
+  if (!result.ok) return result;
+  revalidateSms();
+  return { ok: true, ruleId: result.ruleId! };
+}
+
+/**
+ * Reject pending SMS and erase their text. The encrypted text is held in memory for
+ * a minute so Undo can put the messages back in the queue exactly as they were.
+ */
+function rejectMessages(ids: number[]): { ok: true; undo: string; count: number } | ActionFailure {
+  const unique = [...new Set(ids)];
+  const now = new Date().toISOString();
+  return db.transaction((tx) => {
+    const rows = tx
+      .select({
+        id: smsMessages.id,
+        rawCiphertext: smsMessages.rawCiphertext,
+        updatedAt: smsMessages.updatedAt,
+      })
+      .from(smsMessages)
+      .where(and(inArray(smsMessages.id, unique), eq(smsMessages.status, 'pending')))
+      .all();
+    if (rows.length !== unique.length) {
+      return failed(
+        unique.length === 1
+          ? 'That SMS is no longer pending.'
+          : 'Some of these SMS are no longer waiting for review. Refresh and try again.',
+      );
+    }
+    tx.update(smsMessages)
+      .set({
+        status: 'rejected',
+        rawCiphertext: null,
+        decidedBy: 'owner',
+        decidedAt: now,
+        updatedAt: now,
+      })
+      .where(inArray(smsMessages.id, unique))
+      .run();
+    const undo = keepForUndo(() =>
+      db.transaction((tx2) => {
+        for (const row of rows) {
+          tx2
+            .update(smsMessages)
+            .set({
+              status: 'pending',
+              rawCiphertext: row.rawCiphertext,
+              decidedBy: null,
+              decidedAt: null,
+              updatedAt: row.updatedAt,
+            })
+            .where(and(eq(smsMessages.id, row.id), eq(smsMessages.status, 'rejected')))
+            .run();
+        }
+      }),
+    );
+    return { ok: true, undo, count: rows.length };
+  });
+}
+
+export async function rejectSms(formData: FormData): Promise<SmsDecisionResult> {
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return failed('That SMS is no longer pending.');
+  const result = rejectMessages([id.data]);
+  if (!result.ok) return result;
+  revalidateSms();
+  return { ok: true, message: 'SMS rejected', count: 1, undo: result.undo };
+}
+
+/** Undo a single or bulk reject within a minute. */
+export async function undoSmsReject(token: unknown): Promise<SmsDecisionResult> {
+  const restore = takeUndo(token);
+  if (!restore) return failed('Too late to undo that. Rejected SMS cannot be restored now.');
+  restore();
+  revalidateSms();
+  return { ok: true, message: 'SMS restored' };
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Approve several SMS in one go, all or nothing. The client sends the account and
+ * category it showed for each; the server checks every item is still ready.
+ */
+export async function approveSmsBatch(input: unknown): Promise<SmsDecisionResult> {
+  const parsed = batchApproveSchema.safeParse(input);
+  if (!parsed.success) return failed('Choose at least one SMS to approve.');
+  const { items, learn } = parsed.data;
+  const result = db.transaction((tx): SmsDecisionResult => {
+    const ids = [...new Set(items.map((item) => item.id))];
+    const messages = new Map(
+      tx
+        .select()
+        .from(smsMessages)
+        .where(inArray(smsMessages.id, ids))
+        .all()
+        .map((message) => [message.id, message]),
+    );
+    const activeAccounts = new Set(
+      tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(eq(accounts.archived, 0))
+        .all()
+        .map((account) => account.id),
+    );
+    const activeCategories = new Map(
+      tx
+        .select({ id: categories.id, kind: categories.kind })
+        .from(categories)
+        .where(eq(categories.archived, 0))
+        .all()
+        .map((category) => [category.id, category.kind]),
+    );
+
+    // Check everything before writing anything, so a problem leaves the queue untouched.
+    const ready = [];
+    for (const id of ids) {
+      const item = items.find((candidate) => candidate.id === id)!;
+      const message = messages.get(id);
+      if (!message || message.status !== 'pending') {
+        return failed('Some of these SMS are no longer waiting for review. Refresh and try again.');
+      }
+      const who = `The SMS from ${message.sender} received ${message.receivedAt.slice(0, 10)}`;
+      const { direction, amount, transactionDate } = message;
+      if (
+        !direction ||
+        amount === null ||
+        amount <= 0 ||
+        !transactionDate ||
+        !isValidDate(transactionDate)
+      ) {
+        return failed(`${who} needs more details. Open it to finish.`);
+      }
+      if (!item.accountId || !activeAccounts.has(item.accountId)) {
+        return failed(`${who} needs an account. Open it to finish.`);
+      }
+      if (!item.categoryId || activeCategories.get(item.categoryId) !== direction) {
+        return failed(
+          `${who} needs ${direction === 'income' ? 'an income' : 'a spending'} category. Open it to finish.`,
+        );
+      }
+      ready.push({
+        message,
+        direction,
+        amount,
+        transactionDate,
+        accountId: item.accountId,
+        categoryId: item.categoryId,
+      });
+    }
+
+    const now = new Date().toISOString();
+    let learned = 0;
+    for (const item of ready) {
+      const template = learn ? learnable(item.message) : null;
+      const ruleId = template ? learnRule(tx, template, item.accountId, item.categoryId) : null;
+      if (ruleId) learned += 1;
+      const transaction = tx
+        .insert(transactions)
+        .values({
+          date: item.transactionDate,
+          type: item.direction,
+          amount: item.amount,
+          accountId: item.accountId,
+          categoryId: item.categoryId,
+          description: item.message.providerKey ?? 'SMS transaction',
+        })
+        .returning({ id: transactions.id })
+        .get();
+      tx.update(smsMessages)
+        .set({
+          status: 'imported',
+          proposedAccountId: item.accountId,
+          proposedCategoryId: item.categoryId,
+          transactionId: transaction.id,
+          rawCiphertext: null,
+          ...(ruleId ? { ruleId, reason: `Learned rule ${ruleId}.` } : {}),
+          decidedBy: 'owner',
+          decidedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(smsMessages.id, item.message.id))
+        .run();
+    }
+    const approved =
+      ready.length === 1 ? 'Transaction approved' : `${ready.length} transactions approved`;
+    return {
+      ok: true,
+      count: ready.length,
+      message: learned ? `${approved} and ${plural(learned, 'rule', 'rules')} learned` : approved,
+    };
+  });
+  if (result.ok) revalidateSms();
   return result;
 }
 
-export async function rejectSms(formData: FormData): Promise<ActionFailure | { ok: true }> {
-  const id = z.coerce.number().int().positive().safeParse(formData.get('id'));
-  if (!id.success) return failed('That SMS is no longer pending.');
-  const changed = db
-    .update(smsMessages)
-    .set({ status: 'rejected', rawCiphertext: null, updatedAt: new Date().toISOString() })
-    .where(and(eq(smsMessages.id, id.data), eq(smsMessages.status, 'pending')))
-    .run();
-  if (changed.changes) {
-    revalidatePath('/money/sms');
-    return { ok: true };
-  }
-  return failed('That SMS is no longer pending.');
+export async function rejectSmsBatch(ids: unknown): Promise<SmsDecisionResult> {
+  const parsed = batchIdsSchema.safeParse(ids);
+  if (!parsed.success) return failed('Choose at least one SMS to reject.');
+  const result = rejectMessages(parsed.data);
+  if (!result.ok) return result;
+  revalidateSms();
+  return {
+    ok: true,
+    message: `${result.count} SMS rejected`,
+    count: result.count,
+    undo: result.undo,
+  };
 }
+
+/* ---------- learned rules ---------- */
+
+export async function setSmsRuleEnabled(id: unknown, enabled: unknown): Promise<SmsDecisionResult> {
+  const parsedId = idSchema.safeParse(id);
+  const on = z.boolean().safeParse(enabled);
+  if (!parsedId.success || !on.success) return failed('That rule no longer exists.');
+  const changed = db
+    .update(smsRules)
+    .set({ enabled: on.data ? 1 : 0, updatedAt: new Date().toISOString() })
+    .where(eq(smsRules.id, parsedId.data))
+    .run();
+  if (!changed.changes) return failed('That rule no longer exists.');
+  revalidateSms();
+  return { ok: true, message: on.data ? 'Rule turned on' : 'Rule turned off' };
+}
+
+/** Change where a rule sends its SMS. Its sender and wording stay as learned. */
+export async function updateSmsRule(formData: FormData): Promise<SmsDecisionResult> {
+  const parsed = ruleSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return failed(issue?.message ?? 'Check the rule and try again.', String(issue?.path[0] ?? ''));
+  }
+  const input = parsed.data;
+  if (!input.incomeCategoryId && !input.expenseCategoryId) {
+    return failed('Choose a category for money in, money out or both.', 'expenseCategoryId');
+  }
+  const result = db.transaction((tx): SmsDecisionResult => {
+    const rule = tx
+      .select({ id: smsRules.id })
+      .from(smsRules)
+      .where(eq(smsRules.id, input.id))
+      .get();
+    if (!rule) return failed('That rule no longer exists.');
+    const account = tx
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.id, input.accountId))
+      .get();
+    if (!account) return failed('That account no longer exists. Choose another.', 'accountId');
+    for (const [field, id, kind] of [
+      ['incomeCategoryId', input.incomeCategoryId, 'income'],
+      ['expenseCategoryId', input.expenseCategoryId, 'expense'],
+    ] as const) {
+      if (!id) continue;
+      const category = tx
+        .select({ kind: categories.kind })
+        .from(categories)
+        .where(eq(categories.id, id))
+        .get();
+      if (category?.kind !== kind) {
+        return failed(
+          kind === 'income' ? 'Choose an income category.' : 'Choose a spending category.',
+          field,
+        );
+      }
+    }
+    tx.update(smsRules)
+      .set({
+        name: input.name,
+        accountId: input.accountId,
+        incomeCategoryId: input.incomeCategoryId,
+        expenseCategoryId: input.expenseCategoryId,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(smsRules.id, rule.id))
+      .run();
+    return { ok: true, message: 'Rule saved' };
+  });
+  if (result.ok) revalidateSms();
+  return result;
+}
+
+/** Delete a rule right away. Past transactions stay; Undo puts the rule and its links back. */
+export async function deleteSmsRule(id: unknown): Promise<SmsDecisionResult> {
+  const parsedId = idSchema.safeParse(id);
+  if (!parsedId.success) return failed('That rule no longer exists.');
+  const result = db.transaction((tx): SmsDecisionResult => {
+    const rule = tx.select().from(smsRules).where(eq(smsRules.id, parsedId.data)).get();
+    if (!rule) return failed('That rule was already deleted.');
+    const linked = tx
+      .select({ id: smsMessages.id })
+      .from(smsMessages)
+      .where(eq(smsMessages.ruleId, rule.id))
+      .all()
+      .map((row) => row.id);
+    // The foreign key clears rule_id on the linked messages.
+    tx.delete(smsRules).where(eq(smsRules.id, rule.id)).run();
+    const undo = keepForUndo(() =>
+      db.transaction((tx2) => {
+        tx2.insert(smsRules).values(rule).run();
+        if (linked.length) {
+          tx2
+            .update(smsMessages)
+            .set({ ruleId: rule.id })
+            .where(and(inArray(smsMessages.id, linked), isNull(smsMessages.ruleId)))
+            .run();
+        }
+      }),
+    );
+    return { ok: true, message: 'Rule deleted', undo };
+  });
+  if (result.ok) revalidateSms();
+  return result;
+}
+
+export async function undoSmsRuleDelete(token: unknown): Promise<SmsDecisionResult> {
+  const restore = takeUndo(token);
+  if (!restore) return failed('Too late to undo that delete.');
+  try {
+    restore();
+  } catch {
+    return failed('Could not undo: the rule’s account or category was deleted in the meantime.');
+  }
+  revalidateSms();
+  return { ok: true, message: 'Rule restored' };
+}
+
+/* ---------- phones ---------- */
 
 export async function revokeSmsDevice(formData: FormData): Promise<ActionFailure | { ok: true }> {
   const id = z.coerce.number().int().positive().safeParse(formData.get('id'));
@@ -653,30 +1008,26 @@ export async function revokeSmsDevice(formData: FormData): Promise<ActionFailure
     .where(and(eq(smsDevices.id, id.data), isNull(smsDevices.revokedAt)))
     .run();
   if (!result.changes) return failed('That SMS device is already revoked.');
-  revalidatePath('/money/sms');
+  revalidateSms();
   return { ok: true };
 }
 
-/** The two review choices submit the same visible fields, not stale hidden copies. */
+/**
+ * The review form's one submit button sends `intent`: `learn` when "Import similar SMS
+ * automatically" is ticked, otherwise `approve`. Both use the same visible fields.
+ */
 export async function reviewSmsFormAction(
-  _previous: ActionFailure | null,
+  _previous: SmsDecisionResult | null,
   formData: FormData,
-): Promise<ActionFailure | null> {
+): Promise<SmsDecisionResult | null> {
   const intent = z.enum(['approve', 'learn']).safeParse(formData.get('intent'));
   if (!intent.success) return failed('Choose how to review this SMS.');
-  const result =
-    intent.data === 'learn' ? await learnSmsRuleAndApprove(formData) : await approveSms(formData);
-  if (!result.ok) return result;
-  redirect('/money/sms');
-}
-
-export async function rejectSmsFormAction(
-  _previous: ActionFailure | null,
-  formData: FormData,
-): Promise<ActionFailure | null> {
-  const result = await rejectSms(formData);
-  if (!result.ok) return result;
-  redirect('/money/sms');
+  if (intent.data === 'learn') {
+    const result = await learnSmsRuleAndApprove(formData);
+    return result.ok ? { ok: true, message: 'Transaction approved and rule learned' } : result;
+  }
+  const result = await approveSms(formData);
+  return result.ok ? { ok: true, message: 'Transaction approved' } : result;
 }
 
 export type SmsDeviceFormState = ActionFailure | { ok: true; message: string } | null;
@@ -696,9 +1047,9 @@ export async function manageSmsDeviceFormAction(
   if (!result.ok) return result;
   const message =
     intent.data === 'approve'
-      ? 'Device approved.'
+      ? 'Phone approved'
       : intent.data === 'reject'
-        ? 'Device rejected.'
-        : 'Device revoked.';
+        ? 'Request rejected'
+        : 'Phone revoked';
   return { ok: true, message };
 }

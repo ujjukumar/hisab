@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import styles from './Chips.module.css';
 
 export type Chip<T extends string> = { value: T; label: string };
@@ -29,5 +30,30 @@ export function Chips<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+/** The same chips as links, for filters kept in the URL. A count follows the label when given. */
+export function ChipLinks({
+  items,
+  label,
+}: {
+  items: { href: string; label: string; count?: number; current: boolean }[];
+  label: string;
+}) {
+  return (
+    <nav className={`${styles.chips} ${styles.links}`} aria-label={label}>
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          aria-current={item.current ? 'true' : undefined}
+          scroll={false}
+        >
+          {item.label}
+          {item.count !== undefined && <span className={styles.count}>{item.count}</span>}
+        </Link>
+      ))}
+    </nav>
   );
 }

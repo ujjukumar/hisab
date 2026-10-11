@@ -1,0 +1,147 @@
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.row:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--heading);
+  overflow-wrap: anywhere;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--text-3);
+}
+
+.dot[data-state='connected'] {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.meta > * + *::before {
+  content: '·';
+  content: '·' / '';
+  margin-inline: 6px;
+}
+
+.code {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0 0;
+}
+
+.codeLabel {
+  font: 600 11px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+.codeValue {
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface-2);
+  font: 600 18px/1.2 var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--heading);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--primary);
+  font-size: 13px;
+}
+
+.empty {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.revoked {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.revoked summary {
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.revoked .row:first-child {
+  padding-top: 12px;
+}

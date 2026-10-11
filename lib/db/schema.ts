@@ -281,6 +281,11 @@ export const smsMessages = sqliteTable(
     proposedCategoryId: integer('proposed_category_id').references(() => categories.id),
     transactionId: integer('transaction_id').references(() => transactions.id),
     reason: text('reason'),
+    /** The rule that imported this SMS, or that the owner taught while approving it. */
+    ruleId: integer('rule_id').references(() => smsRules.id, { onDelete: 'set null' }),
+    /** Who decided: a learned rule or the owner. Null while the SMS waits for review. */
+    decidedBy: text('decided_by', { enum: ['rule', 'owner'] }),
+    decidedAt: text('decided_at'),
     createdAt: text('created_at').notNull().default(now),
     updatedAt: text('updated_at').notNull().default(now),
   },
@@ -288,6 +293,7 @@ export const smsMessages = sqliteTable(
     index('sms_messages_status').on(t.status),
     index('sms_messages_hash').on(t.contentHash),
     index('sms_messages_provider_id').on(t.deviceId, t.providerMessageId),
+    index('sms_messages_rule').on(t.ruleId),
   ],
 );
 

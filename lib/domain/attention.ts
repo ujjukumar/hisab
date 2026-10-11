@@ -11,7 +11,7 @@ import type { Paise } from './money';
  */
 
 export type AttentionItem = {
-  key: 'prices' | 'no-price' | 'budgets' | 'overdrawn';
+  key: 'prices' | 'no-price' | 'budgets' | 'overdrawn' | 'sms';
   /** What is wrong, in one line. */
   text: string;
   /** What the link does about it. */
@@ -31,6 +31,8 @@ export type AttentionInput = {
   accounts: { name: string; type: string; balance: Paise; archived: boolean }[];
   holdings: { name: string; stale: boolean; sold: boolean }[];
   prices: { lastOn: IsoDate | null; ok: boolean; auto: boolean };
+  /** SMS from paired phones waiting for the owner in Money → SMS. */
+  sms?: { pending: number };
 };
 
 /** Prices older than this are worth a nudge. Four days covers a long weekend. */
@@ -120,6 +122,18 @@ export function attentionItems(input: AttentionInput): AttentionItem[] {
       ),
       action: 'Check accounts',
       href: '/money/accounts',
+      tone: '',
+    });
+  }
+
+  const pendingSms = input.sms?.pending ?? 0;
+  if (pendingSms > 0) {
+    items.push({
+      key: 'sms',
+      text:
+        pendingSms === 1 ? '1 SMS import needs review' : `${pendingSms} SMS imports need review`,
+      action: 'Review SMS',
+      href: '/money/sms',
       tone: '',
     });
   }

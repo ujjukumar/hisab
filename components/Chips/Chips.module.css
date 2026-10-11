@@ -28,3 +28,17 @@
   border-color: var(--primary);
   background: var(--surface);
 }
+
+.links {
+  margin-top: 0;
+}
+
+.count {
+  margin-left: 5px;
+  font-family: var(--mono);
+  color: var(--text-3);
+}
+
+.chips a[aria-current='true'] .count {
+  color: var(--primary);
+}

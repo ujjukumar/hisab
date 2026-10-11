@@ -242,6 +242,8 @@ The top 3 holdings each way over a chosen period (1 day, 1 week, 1/3/6 months, f
 | `/money` | Transactions with date/type/category/account/search filters, totals and CSV |
 | `/money/budgets` | Monthly budgets, inline editing, carry-forward and copy previous month |
 | `/money/accounts`, `/money/categories` | Create, edit and archive accounts/categories |
+| `/money/sms` | Review SMS imports one by one or in bulk, with filters and keyboard shortcuts |
+| `/money/sms/history`, `/money/sms/rules`, `/money/sms/devices` | Monthly SMS decisions; learned import rules; paired phones and pairing requests |
 | `/investments` | Grouped holdings, sold toggle, price fetches and statement updates |
 | `/investments/performance` | As-of date and period, flow-adjusted returns, chart, tables and CSV |
 | `/investments/transactions` | Filtered investment activity, running units and CSV |
@@ -411,6 +413,7 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Unclear SMS review | Done | 7 Oct 2026 | An owner can set the direction of an unclear SMS by choosing a grouped category for manual approval; automatic rules still require a clear direction in the message. |
 | Private VM deployment | Done | 7 Oct 2026 | Deployed the Money SMS workspace to the Tailscale-only VM, kept its database and configuration, and restored systemd as the sole app process. |
 | SMS pairing by QR code | Done | 11 Oct 2026 | Money → SMS → Pair a phone shows a one-time QR code and link (from `SMS_PAIRING_URL`) that expires after 10 minutes; the phone redeems it at `/api/sms/pair/redeem` for its bearer token, and only hashes are stored. Pairing the same phone again revokes its earlier device. Added the dependency-free `uqr` package to draw the code. Request-and-approve stays for older app versions. |
+| SMS page redesign | Done | 11 Oct 2026 | Split Money → SMS into Review, History, Rules and Devices. Review is a list-and-detail queue with flow filters, highlighted SMS text, plain-word reasons, bulk approve/reject, keyboard shortcuts and auto-advance. Rules can be renamed, switched off or deleted with Undo. History lists each month's decisions and which rule imported them (the `sms_outcomes` migration records who decided, when and by which rule). The dashboard flags SMS waiting for review. No new dependencies. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

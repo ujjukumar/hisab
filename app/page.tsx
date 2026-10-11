@@ -77,6 +77,7 @@ import {
   type Params,
   paramReader,
 } from '@/lib/queries/money';
+import { pendingSmsCount } from '@/lib/queries/sms';
 import {
   autoPrices,
   defaultCompounding,
@@ -352,6 +353,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ok: lastPrices?.ok ?? false,
           auto: await autoPrices(),
         },
+        sms: { pending: pendingSmsCount() },
       })
     : [];
 

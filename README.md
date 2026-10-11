@@ -86,15 +86,15 @@ Hisaab can't work it out from the request, because it listens on `127.0.0.1`
 and is often opened on this PC. It must be a plain `https://` address with no
 user name, password, query or fragment; a trailing slash is ignored.
 
-Pair a phone with a one-time QR code. In Money → SMS → **Pair a phone**, choose
-**Show pairing code**, then scan the code in SMS Organiser → ⋮ → Hisaab, or copy
-the link and paste it there. The code works once and expires after 10 minutes;
-showing a new code cancels the previous one. The app redeems it with
+Pair a phone with a one-time QR code. In Money → SMS, choose **Pair a phone**,
+then scan the code in SMS Organiser → ⋮ → Hisaab, or copy the link and paste it
+there. The code works once and expires after 10 minutes; **Show a new code**
+cancels the previous one. The app redeems it with
 `POST /api/sms/pair/redeem` and `{"secret":"…","label":"Pixel"}`, and the reply
 carries the device bearer token exactly once. Hisaab stores only hashes of the
-code and the token. Revoke a paired device under Paired devices if the phone is
-lost. Older app versions still use request-and-approve through `/api/sms/pair`,
-which shows their requests under Connect requests.
+code and the token. Revoke a phone under Money → SMS → Devices if it is lost.
+Older app versions still use request-and-approve through `/api/sms/pair`; their
+requests wait under Devices → Waiting to connect.
 
 Store the returned bearer token only in the paired
 Android app. Send SMS envelopes to `POST /api/sms/inbound` with
@@ -115,13 +115,16 @@ success, and never assume `queued` means that a ledger transaction exists.
 Pending raw SMS is encrypted and deleted after approval or rejection. Do not
 put real SMS text in tests, seed data, screenshots or logs.
 
-The Money → SMS tab keeps the review queue separate from device connections and
-learned rules. Open a pending item to see its original text and edit the proposed
-transaction. The original text is not loaded into the queue, and the same edits
-are used whether you approve it once or learn a rule while approving.
-If the SMS does not establish whether money came in or went out, check the
-original text and choose a Spending or Income category to set the direction for
-manual approval. An unclear message cannot teach an automatic import rule.
+Money → SMS has four views. **Review** lists the SMS waiting for you; open one
+to see its original text, with the parts Hisaab read underlined, and edit the
+proposed transaction. The original text is not loaded into the list, and the
+same edits are used whether you approve it once or also tick **Import similar
+SMS automatically** to learn a rule. Tick several to approve or reject them
+together; press <kbd>?</kbd> for keyboard shortcuts. If the SMS does not say
+whether money came in or went out, choose **Money out** or **Money in** before
+approving. An unclear message cannot teach a rule. **History** shows each
+month's decisions, **Rules** lets you rename, switch off or delete learned
+rules, and **Devices** lists paired phones and pairing requests.
 
 When you are ready to use it for real, empty it:
 

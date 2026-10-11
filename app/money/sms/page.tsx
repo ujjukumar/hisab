@@ -1,273 +1,207 @@
 import Link from 'next/link';
 import { Card } from '@/components/Card/Card';
-import { SmsPairing } from '@/components/SmsPairing/SmsPairing';
+import { SmsMessage, SmsMessageEmpty } from '@/components/SmsMessage/SmsMessage';
+import { PairPhoneButton } from '@/components/SmsPairing/SmsPairing';
+import { SmsReviewWorkspace, type SmsQueueItem } from '@/components/SmsReview/SmsReview';
+import { SmsReviewForm } from '@/components/SmsReviewForm/SmsReviewForm';
+import { smsHighlights } from '@/lib/domain/sms';
 import {
-  SmsDeviceActions,
-  SmsRefreshButton,
-  SmsReviewForm,
-} from '@/components/SmsWorkspace/SmsWorkspace';
-import { formatINR } from '@/lib/domain/format';
+  formatReceived,
+  formatReceivedFull,
+  highlightSegments,
+  istDate,
+  parseQueueFilter,
+  parseQueueSort,
+  smsNeighbours,
+  smsQueueView,
+  smsReasons,
+  smsReviewHref,
+  smsSuggestion,
+  type SmsFlow,
+} from '@/lib/domain/smsReview';
 import { listAccounts, listCategories } from '@/lib/queries/money';
 import {
-  pendingSmsDeviceRows,
   pendingSmsMessage,
   pendingSmsMessages,
+  recentSmsApprovals,
   smsDeviceRows,
-  smsRuleRows,
 } from '@/lib/queries/sms';
 import styles from './page.module.css';
 
-const receivedDate = new Intl.DateTimeFormat('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'Asia/Kolkata',
-});
+type Search = {
+  message?: string | string[];
+  filter?: string | string[];
+  sort?: string | string[];
+};
 
-export default async function SmsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ message?: string | string[] }>;
-}) {
-  const param = (await searchParams).message;
-  const hasSelection = param !== undefined;
-  const id = typeof param === 'string' ? Number(param) : NaN;
+type Learnable = {
+  direction: SmsFlow | null;
+  senderPattern: string | null;
+  templateFingerprint: string | null;
+  providerKey: string | null;
+};
+
+/** Approving can only teach a rule when the sender, wording and flow are all known. */
+const canLearn = (m: Learnable) =>
+  Boolean(m.direction && m.senderPattern && m.templateFingerprint && m.providerKey);
+
+export default async function SmsReviewPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const params = await searchParams;
+  const filter = parseQueueFilter(params.filter);
+  const sort = parseQueueSort(params.sort);
+  const asked = params.message !== undefined;
+  const id = typeof params.message === 'string' ? Number(params.message) : NaN;
   const selected = Number.isSafeInteger(id) && id > 0 ? pendingSmsMessage(id) : null;
   const pending = pendingSmsMessages();
-  const requests = pendingSmsDeviceRows();
-  const devices = smsDeviceRows();
-  const rules = smsRuleRows();
-  const accounts = listAccounts();
-  const categories = listCategories();
-  const activeAccounts = accounts.filter((account) => !account.archived);
+
+  if (pending.length === 0) {
+    const paired = smsDeviceRows().some((device) => !device.revokedAt);
+    return (
+      <Card>
+        <div className={styles.empty}>
+          <h3>No SMS imports need review</h3>
+          {paired ? (
+            <p>
+              New unmatched messages will appear here. Messages that match a rule are imported
+              automatically; see them in <Link href="/money/sms/history">History</Link>.
+            </p>
+          ) : (
+            <>
+              <p>Pair your Android phone to send bank SMS to Hisaab for review.</p>
+              <PairPhoneButton />
+            </>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
+  const now = new Date();
+  const accounts = listAccounts().map(({ id, name, archived }) => ({ id, name, archived }));
+  const categories = listCategories().map(({ id, name, kind, archived }) => ({
+    id,
+    name,
+    kind,
+    archived,
+  }));
+  const choices = { accounts, categories };
+  const history = recentSmsApprovals();
+
+  /** The proposal when it still works, else what the owner chose last time for this sender. */
+  function suggestionFor(m: {
+    direction: SmsFlow | null;
+    senderPattern: string | null;
+    proposedAccountId: number | null;
+    proposedCategoryId: number | null;
+  }) {
+    const accountId = accounts.find((a) => a.id === m.proposedAccountId && !a.archived)?.id ?? null;
+    const categoryId =
+      categories.find(
+        (c) =>
+          c.id === m.proposedCategoryId && !c.archived && (!m.direction || c.kind === m.direction),
+      )?.id ?? null;
+    if (accountId && categoryId) return { accountId, categoryId };
+    return smsSuggestion(history, m, choices) ?? { accountId, categoryId };
+  }
+
+  const view = smsQueueView(pending, filter, sort);
+  const items: SmsQueueItem[] = view.rows.map((m) => ({
+    id: m.id,
+    sender: m.sender,
+    received: formatReceived(m.receivedAt, now),
+    direction: m.direction,
+    amount: m.amount,
+    transactionDate: m.transactionDate,
+    description: m.providerKey ?? 'SMS transaction',
+    // The row already shows the amount and the flow, so only say what else is missing.
+    reason:
+      smsReasons(m.reason)
+        .filter((r) => r.key !== 'amount' && r.key !== 'direction')
+        .map((r) => r.short)
+        .join(' · ') || null,
+    ...suggestionFor(m),
+    canLearn: canLearn(m),
+  }));
+
+  const place = smsNeighbours(
+    items.map((item) => item.id),
+    selected?.id ?? null,
+  );
+  const hrefFor = (message: number | null) => smsReviewHref({ message, filter, sort });
+  const listHref = hrefFor(null);
 
   return (
-    <div className="wrap page-body stack">
-      <div className={styles.intro}>
-        <h2>SMS imports</h2>
-        <p>
-          Check messages before adding them to Money. Exact learned matches are imported
-          automatically.
-        </p>
-      </div>
-      <div className={styles.reviewLayout}>
-        <Card
-          title={`Needs review (${pending.length})`}
-          sub="Choose a message to approve or reject."
-          action={<SmsRefreshButton />}
+    <SmsReviewWorkspace
+      items={items}
+      total={pending.length}
+      counts={view.counts}
+      filter={filter}
+      sort={sort}
+      open={selected?.id ?? null}
+      showingMessage={asked}
+      accounts={accounts}
+      categories={categories}
+    >
+      {selected ? (
+        <SmsMessage
+          sender={selected.sender}
+          meta={[
+            `Received ${formatReceivedFull(selected.receivedAt)}`,
+            `via ${selected.deviceLabel}`,
+            ...(selected.reference ? [`Ref ${selected.reference}`] : []),
+          ]}
+          position={place.index === -1 ? null : { index: place.index + 1, total: place.total }}
+          prevHref={place.prev === null ? null : hrefFor(place.prev)}
+          nextHref={place.next === null ? null : hrefFor(place.next)}
+          backHref={listHref}
+          backLabel="All SMS to review"
+          segments={
+            selected.body === null
+              ? null
+              : highlightSegments(selected.body, smsHighlights(selected.body))
+          }
+          bodyError={selected.bodyError}
+          reason={
+            smsReasons(selected.reason)
+              .map((r) => r.long)
+              .join(' ') || null
+          }
         >
-          {pending.length === 0 ? (
-            <p className={styles.empty}>
-              No SMS imports need review. New unmatched messages will appear here.
-            </p>
-          ) : (
-            <ol className={styles.queue}>
-              {pending.map((message) => (
-                <li key={message.id}>
-                  <Link
-                    href={`/money/sms?message=${message.id}#sms-detail`}
-                    prefetch={false}
-                    aria-current={selected?.id === message.id ? 'true' : undefined}
-                    className={styles.queueLink}
-                  >
-                    <span className={styles.queueTop}>
-                      <strong>{message.sender}</strong>
-                      <span>
-                        {message.amount === null
-                          ? 'Amount not found'
-                          : formatINR(message.amount, 2)}
-                      </span>
-                    </span>
-                    <span className={styles.queueMeta}>
-                      {message.direction === 'income'
-                        ? 'Money in'
-                        : message.direction === 'expense'
-                          ? 'Money out'
-                          : 'Flow unclear'}
-                      {' · '}
-                      {receivedDate.format(new Date(message.receivedAt))}
-                    </span>
-                    <span className={styles.queueReason}>
-                      {message.reason ?? 'Check the message before approving it.'}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Card>
-
-        {(pending.length > 0 || hasSelection) && (
-          <div id="sms-detail" className={styles.detail}>
-            <Card
-              title={selected ? 'Review message' : 'Choose a message'}
-              sub={
-                selected
-                  ? 'Check the original SMS and edit the transaction before you save it.'
-                  : undefined
-              }
-            >
-              {selected ? (
-                <>
-                  <div className={styles.messageMeta}>
-                    <span>
-                      <strong>From</strong> {selected.sender}
-                    </span>
-                    <span>
-                      <strong>Received</strong> {receivedDate.format(new Date(selected.receivedAt))}
-                    </span>
-                    {selected.reference && (
-                      <span>
-                        <strong>Reference</strong> {selected.reference}
-                      </span>
-                    )}
-                  </div>
-                  {selected.body === null ? (
-                    <p className={styles.notice} role="alert">
-                      {selected.bodyError}
-                    </p>
-                  ) : (
-                    <blockquote className={styles.original}>{selected.body}</blockquote>
-                  )}
-                  {selected.reason && (
-                    <p className={styles.reason}>
-                      <strong>Why review?</strong> {selected.reason}
-                    </p>
-                  )}
-                  <SmsReviewForm
-                    key={selected.id}
-                    message={{
-                      id: selected.id,
-                      direction: selected.direction,
-                      amount: selected.amount,
-                      transactionDate: selected.transactionDate,
-                      proposedAccountId: selected.proposedAccountId,
-                      proposedCategoryId: selected.proposedCategoryId,
-                      providerKey: selected.providerKey,
-                      senderPattern: selected.senderPattern,
-                      templateFingerprint: selected.templateFingerprint,
-                    }}
-                    canReview={selected.body !== null}
-                    accounts={activeAccounts}
-                    categories={categories}
-                  />
-                </>
-              ) : hasSelection ? (
-                <p className={styles.empty} role="status">
-                  That SMS is no longer waiting for review.{' '}
-                  <Link href="/money/sms">Back to the queue</Link>.
-                </p>
-              ) : (
-                <p className={styles.empty}>
-                  Select a message to check its original text and decide what to do.
-                </p>
-              )}
-            </Card>
-          </div>
-        )}
-      </div>
-
-      <div className={styles.management}>
-        <Card
-          title="Pair a phone"
-          sub="Show a one-time code and scan it with your phone."
-          className={styles.pairCard}
-        >
-          <SmsPairing />
-        </Card>
-
-        <Card
-          title={`Connect requests (${requests.length})`}
-          sub="Compare the code with your phone before approving."
-          action={<SmsRefreshButton />}
-        >
-          {requests.length === 0 ? (
-            <p className={styles.empty}>
-              No phone is waiting to connect. To add a phone, use Pair a phone.
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {requests.map((device) => (
-                <li key={device.id} className={styles.listRow}>
-                  <div>
-                    <strong>{device.label}</strong>
-                    <p className={styles.meta}>
-                      Requested {receivedDate.format(new Date(device.createdAt))}
-                    </p>
-                    <p className={styles.code}>
-                      Code <strong>{device.code}</strong>
-                    </p>
-                  </div>
-                  <SmsDeviceActions id={device.id} request />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card
-          title="Paired devices"
-          sub="Revoke a phone if it is lost or its token may be exposed."
-        >
-          {devices.length === 0 ? (
-            <p className={styles.empty}>
-              No Android device is paired. Pair a phone above to receive SMS imports.
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {devices.map((device) => (
-                <li key={device.id} className={styles.listRow}>
-                  <div>
-                    <strong>{device.label}</strong>
-                    <p className={styles.meta}>
-                      {device.revokedAt
-                        ? 'Revoked'
-                        : device.lastSeenAt
-                          ? `Last seen ${receivedDate.format(new Date(device.lastSeenAt))}`
-                          : device.claimedAt
-                            ? 'Connected, no SMS received yet'
-                            : 'Approved; waiting for phone'}
-                    </p>
-                  </div>
-                  {!device.revokedAt && <SmsDeviceActions id={device.id} />}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card
-          title="Learned rules"
-          sub="Approving a message with a rule teaches Hisaab to import the same sender and structure next time."
-          className={styles.rulesCard}
-        >
-          {rules.length === 0 ? (
-            <p className={styles.empty}>
-              No rules yet. Review a message and choose “Learn rule and approve” to start.
-            </p>
-          ) : (
-            <ul className={styles.rules}>
-              {rules.map((rule) => (
-                <li key={rule.id}>
-                  <strong>{rule.name}</strong>
-                  <span>{rule.enabled ? 'Enabled' : 'Disabled'}</span>
-                  <span className={styles.meta}>Sender: {rule.senderPattern}</span>
-                  <span className={styles.meta}>
-                    Account:{' '}
-                    {accounts.find((account) => account.id === rule.accountId)?.name ??
-                      'Missing account'}
-                    {rule.incomeCategoryId
-                      ? ` · Money in: ${categories.find((category) => category.id === rule.incomeCategoryId)?.name ?? 'Missing category'}`
-                      : ''}
-                    {rule.expenseCategoryId
-                      ? ` · Money out: ${categories.find((category) => category.id === rule.expenseCategoryId)?.name ?? 'Missing category'}`
-                      : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-    </div>
+          <SmsReviewForm
+            key={selected.id}
+            message={{
+              id: selected.id,
+              sender: selected.sender,
+              direction: selected.direction,
+              amount: selected.amount,
+              date: selected.transactionDate ?? istDate(selected.receivedAt),
+              providerKey: selected.providerKey,
+              canLearn: canLearn(selected),
+            }}
+            suggestion={suggestionFor(selected)}
+            canReview={selected.body !== null}
+            accounts={accounts.filter((a) => !a.archived).map(({ id, name }) => ({ id, name }))}
+            categories={categories}
+            afterHref={hrefFor(place.after)}
+            skipHref={
+              place.skip === null || place.skip === selected.id ? null : hrefFor(place.skip)
+            }
+            restoreHref={hrefFor(selected.id)}
+          />
+        </SmsMessage>
+      ) : asked ? (
+        <SmsMessageEmpty>
+          <p role="status">That SMS is no longer waiting for review.</p>
+          <Link href={listHref} scroll={false}>
+            Back to the SMS to review
+          </Link>
+        </SmsMessageEmpty>
+      ) : (
+        <SmsMessageEmpty>
+          <p>Choose an SMS to check its original text, then approve or reject it.</p>
+          <p className="muted">Tick several to approve or reject them together.</p>
+        </SmsMessageEmpty>
+      )}
+    </SmsReviewWorkspace>
   );
 }

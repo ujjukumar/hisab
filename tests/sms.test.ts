@@ -7,6 +7,7 @@ import {
   smsTemplateFingerprint,
   smsContentHash,
   smsDedupeKey,
+  smsHighlights,
   type SmsEnvelope,
 } from '@/lib/domain/sms';
 import { decryptSmsBody, encryptSmsBody, hashSmsToken } from '@/lib/sms/security';
@@ -112,6 +113,57 @@ describe('learned SMS rule helpers', () => {
   it('derives a provider key from a structured message', () => {
     expect(learnedProviderKey('BANK-INFO', 'INR 100 credited FROM Sample Bank A/C')).toBe('Sample Bank');
     expect(learnedProviderKey('BANK-INFO', 'INR 100 credited')).toBe('BANK-INFO');
+  });
+});
+
+describe('smsHighlights', () => {
+  const read = (body: string) =>
+    smsHighlights(body).map((range) => [range.kind, body.slice(range.start, range.end)]);
+
+  it('marks each part the parser read, in reading order', () => {
+    expect(read('INR 1,250.50 debited on 07/10/2026 at Invented Shop. Ref UPI ABC12345')).toEqual([
+      ['amount', 'INR 1,250.50'],
+      ['direction', 'debited'],
+      ['date', '07/10/2026'],
+      ['merchant', 'Invented Shop'],
+      ['reference', 'ABC12345'],
+    ]);
+  });
+
+  it('reads the rupee sign and money in', () => {
+    expect(read('₹2,000 received from Demo Payer, UPI 123456789')).toEqual([
+      ['amount', '₹2,000'],
+      ['direction', 'received'],
+      ['merchant', 'Demo Payer'],
+      ['reference', '123456789'],
+    ]);
+  });
+
+  it('marks no amount when there is none, a zero, or more than one', () => {
+    expect(read('Your one-time code is 4821')).toEqual([]);
+    expect(read('INR 0 debited')).toEqual([['direction', 'debited']]);
+    expect(read('INR 500 debited. Avl bal INR 10,000.00')).toEqual([['direction', 'debited']]);
+  });
+
+  it('marks no flow word when the SMS says both and no impossible date', () => {
+    expect(read('Rs. 500 credited and debited on 31/02/2026')).toEqual([['amount', 'Rs. 500']]);
+  });
+
+  it('keeps the earlier kind when two parts overlap', () => {
+    expect(read('INR 75 paid via UPI ABC12345.')).toEqual([
+      ['amount', 'INR 75'],
+      ['direction', 'paid'],
+      ['reference', 'ABC12345'],
+    ]);
+  });
+
+  it('keeps offsets right across Windows line breaks', () => {
+    expect(read('INR 120 debited\r\nat Demo Cafe.\r\nRef 98765XYZ')).toEqual([
+      ['amount', 'INR 120'],
+      ['direction', 'debited'],
+      ['merchant', 'Demo Cafe'],
+      ['reference', '98765XYZ'],
+    ]);
   });
 });
 

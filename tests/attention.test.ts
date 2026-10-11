@@ -32,8 +32,9 @@ describe('attentionItems', () => {
         holdings: [{ name: 'Index fund', stale: true, sold: false }],
         budgets: { rows: [{ name: 'Food', over: true }] },
         accounts: [{ name: 'Savings', type: 'bank', balance: -100, archived: false }],
+        sms: { pending: 2 },
       }),
-    ).toEqual(['prices', 'no-price', 'budgets', 'overdrawn']);
+    ).toEqual(['prices', 'no-price', 'budgets', 'overdrawn', 'sms']);
   });
 });
 
@@ -157,5 +158,26 @@ describe('accounts below zero', () => {
 
   it('does not flag a balance of exactly zero', () => {
     expect(keys({ accounts: [account({ balance: 0 })] })).toEqual([]);
+  });
+});
+
+describe('SMS waiting for review', () => {
+  it('says nothing when the queue is empty or SMS is not set up', () => {
+    expect(keys({ sms: { pending: 0 } })).toEqual([]);
+    expect(keys({ sms: undefined })).toEqual([]);
+  });
+
+  it('uses the singular for one SMS', () => {
+    expect(only({ sms: { pending: 1 } })).toEqual({
+      key: 'sms',
+      text: '1 SMS import needs review',
+      action: 'Review SMS',
+      href: '/money/sms',
+      tone: '',
+    });
+  });
+
+  it('counts several SMS', () => {
+    expect(only({ sms: { pending: 7 } }).text).toBe('7 SMS imports need review');
   });
 });

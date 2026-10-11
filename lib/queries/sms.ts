@@ -1,7 +1,34 @@
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, max } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { smsDevices, smsMessages, smsRules } from '@/lib/db/schema';
+import {
+  smsDevices,
+  smsMessages,
+  smsPairingInvites,
+  smsRules,
+  transactions,
+} from '@/lib/db/schema';
+import { addDays, addMonths, type IsoDate } from '@/lib/domain/dates';
+import { istDate } from '@/lib/domain/smsReview';
 import { decryptSmsBody, ENCRYPTION_KEY_REQUIRED, SMS_DECRYPTION_FAILED } from '@/lib/sms/security';
+
+/** Messages waiting for review, for the Money tab badge and the dashboard. */
+export function pendingSmsCount(): number {
+  return (
+    db.select({ n: count() }).from(smsMessages).where(eq(smsMessages.status, 'pending')).get()?.n ??
+    0
+  );
+}
+
+/** Counts for the SMS view tabs. */
+export function smsTabCounts() {
+  const requests =
+    db
+      .select({ n: count() })
+      .from(smsDevices)
+      .where(and(isNull(smsDevices.approvedAt), isNull(smsDevices.revokedAt)))
+      .get()?.n ?? 0;
+  return { pending: pendingSmsCount(), requests };
+}
 
 export function pendingSmsMessages() {
   return db
@@ -46,8 +73,10 @@ export function pendingSmsMessage(id: number) {
       templateFingerprint: smsMessages.templateFingerprint,
       reason: smsMessages.reason,
       rawCiphertext: smsMessages.rawCiphertext,
+      deviceLabel: smsDevices.label,
     })
     .from(smsMessages)
+    .innerJoin(smsDevices, eq(smsDevices.id, smsMessages.deviceId))
     .where(and(eq(smsMessages.id, id), eq(smsMessages.status, 'pending')))
     .get();
   if (!row) return null;
@@ -92,8 +121,98 @@ export function pendingSmsMessage(id: number) {
   }
 }
 
+/** What the owner chose for earlier SMS, newest first, so new ones can be prefilled the same way. */
+export function recentSmsApprovals(limit = 300) {
+  return db
+    .select({
+      senderPattern: smsMessages.senderPattern,
+      direction: smsMessages.direction,
+      accountId: smsMessages.proposedAccountId,
+      categoryId: smsMessages.proposedCategoryId,
+    })
+    .from(smsMessages)
+    .where(eq(smsMessages.status, 'imported'))
+    .orderBy(desc(smsMessages.decidedAt), desc(smsMessages.id))
+    .limit(limit)
+    .all();
+}
+
+/** Learned rules with how often each has imported an SMS and when it last did. */
 export function smsRuleRows() {
-  return db.select().from(smsRules).orderBy(smsRules.name).all();
+  const usage = new Map(
+    db
+      .select({
+        ruleId: smsMessages.ruleId,
+        imported: count(),
+        lastUsed: max(smsMessages.decidedAt),
+      })
+      .from(smsMessages)
+      .where(and(isNotNull(smsMessages.ruleId), eq(smsMessages.status, 'imported')))
+      .groupBy(smsMessages.ruleId)
+      .all()
+      .map((row) => [row.ruleId!, row]),
+  );
+  return db
+    .select()
+    .from(smsRules)
+    .orderBy(smsRules.name, smsRules.id)
+    .all()
+    .map((rule) => ({
+      ...rule,
+      imported: usage.get(rule.id)?.imported ?? 0,
+      lastUsed: usage.get(rule.id)?.lastUsed ?? null,
+    }));
+}
+
+export type SmsOutcome = 'auto' | 'approved' | 'rejected';
+
+/**
+ * Decided SMS for one India-time month, or every month for one rule, newest first.
+ * The original text is gone by now; this is what Hisaab keeps.
+ */
+export function smsHistory({ month, ruleId }: { month: string; ruleId?: number | null }) {
+  const start: IsoDate = `${month}-01`;
+  const rows = db
+    .select({
+      id: smsMessages.id,
+      sender: smsMessages.sender,
+      receivedAt: smsMessages.receivedAt,
+      providerKey: smsMessages.providerKey,
+      direction: smsMessages.direction,
+      amount: smsMessages.amount,
+      status: smsMessages.status,
+      decidedBy: smsMessages.decidedBy,
+      ruleId: smsMessages.ruleId,
+      ruleName: smsRules.name,
+      transactionId: smsMessages.transactionId,
+      transactionDate: transactions.date,
+      description: transactions.description,
+    })
+    .from(smsMessages)
+    .leftJoin(smsRules, eq(smsRules.id, smsMessages.ruleId))
+    .leftJoin(transactions, eq(transactions.id, smsMessages.transactionId))
+    .where(
+      and(
+        inArray(smsMessages.status, ['imported', 'rejected']),
+        ruleId
+          ? eq(smsMessages.ruleId, ruleId)
+          : // Received times carry the phone's offset, so widen by a day and filter exactly below.
+            and(
+              gte(smsMessages.receivedAt, addDays(start, -1)),
+              lt(smsMessages.receivedAt, addDays(`${addMonths(month, 1)}-01`, 1)),
+            ),
+      ),
+    )
+    .orderBy(desc(smsMessages.receivedAt), desc(smsMessages.id))
+    .all();
+  return rows
+    .filter((row) => ruleId || istDate(row.receivedAt)?.slice(0, 7) === month)
+    .map((row) => ({ ...row, outcome: smsOutcome(row) }));
+}
+
+function smsOutcome(row: { status: string; decidedBy: 'rule' | 'owner' | null }): SmsOutcome {
+  if (row.status === 'rejected') return 'rejected';
+  return row.decidedBy === 'rule' ? 'auto' : 'approved';
 }
 
 const deviceColumns = {
@@ -119,11 +238,42 @@ export function pendingSmsDeviceRows() {
 }
 
 /** Devices the owner has already approved, including ones that were later revoked. */
-export function smsDeviceRows() {
+export function smsDeviceRows(now: Date = new Date()) {
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const week = new Map(
+    db
+      .select({ deviceId: smsMessages.deviceId, n: count() })
+      .from(smsMessages)
+      .where(gte(smsMessages.createdAt, weekAgo))
+      .groupBy(smsMessages.deviceId)
+      .all()
+      .map((row) => [row.deviceId, row.n]),
+  );
   return db
     .select(deviceColumns)
     .from(smsDevices)
     .where(isNotNull(smsDevices.approvedAt))
     .orderBy(desc(smsDevices.createdAt))
-    .all();
+    .all()
+    .map((device) => ({ ...device, receivedThisWeek: week.get(device.id) ?? 0 }));
+}
+
+/** Whether a QR pairing code shown in Hisaab has been used yet, and by which phone. */
+export function smsPairingInviteState(
+  id: number,
+  now: Date = new Date(),
+): { status: 'waiting' } | { status: 'used'; label: string } | { status: 'expired' } {
+  const invite = db
+    .select({
+      usedAt: smsPairingInvites.usedAt,
+      expiresAt: smsPairingInvites.expiresAt,
+      label: smsDevices.label,
+    })
+    .from(smsPairingInvites)
+    .leftJoin(smsDevices, eq(smsDevices.id, smsPairingInvites.deviceId))
+    .where(eq(smsPairingInvites.id, id))
+    .get();
+  if (invite?.usedAt) return { status: 'used', label: invite.label ?? 'Your phone' };
+  if (!invite || invite.expiresAt <= now.toISOString()) return { status: 'expired' };
+  return { status: 'waiting' };
 }

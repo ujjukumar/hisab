@@ -121,6 +121,56 @@ function parseReference(body: string): string | null {
   return match?.[1]?.toUpperCase() ?? null;
 }
 
+export type SmsHighlightKind = 'amount' | 'direction' | 'date' | 'reference' | 'merchant';
+export type SmsHighlight = { start: number; end: number; kind: SmsHighlightKind };
+
+/**
+ * Character ranges in the SMS as shown to the owner that the parser read, using
+ * the same rules: an amount only when there is exactly one, a flow word only when
+ * the flow is clear. Overlaps keep the earlier kind in the list above.
+ */
+export function smsHighlights(body: string): SmsHighlight[] {
+  const found: SmsHighlight[] = [];
+  const amounts = [...body.matchAll(/(?:₹|INR|Rs\.?|amount(?:\s+of)?)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi)]
+    .filter((match) => {
+      const value = parsePaise(match[1]!);
+      return value.ok && value.value > 0;
+    });
+  if (amounts.length === 1) {
+    const match = amounts[0]!;
+    found.push({ start: match.index, end: match.index + match[0].length, kind: 'amount' });
+  }
+  const direction = parseDirection(body);
+  if (direction) {
+    const words =
+      direction === 'expense'
+        ? /\b(?:DEBITED|DEBIT|SPENT|PAID|WITHDRAWN|PURCHASE)\b/i
+        : /\b(?:CREDITED|CREDIT|RECEIVED|DEPOSITED|REFUND)\b/i;
+    const match = words.exec(body);
+    if (match) found.push({ start: match.index, end: match.index + match[0].length, kind: 'direction' });
+  }
+  const date = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/.exec(body);
+  if (date) {
+    const year = date[3]!.length === 2 ? `20${date[3]}` : date[3]!;
+    if (isValidDate(`${year}-${date[2]!.padStart(2, '0')}-${date[1]!.padStart(2, '0')}`)) {
+      found.push({ start: date.index, end: date.index + date[0].length, kind: 'date' });
+    }
+  }
+  const reference = /\b(?:UPI|UTR|REF(?:ERENCE)?|TXN|TRANSACTION)\s*[:#-]?\s*([A-Z0-9-]{5,})\b/di.exec(body);
+  const referenceAt = reference?.indices?.[1];
+  if (referenceAt) found.push({ start: referenceAt[0], end: referenceAt[1], kind: 'reference' });
+  const merchant = /\b(?:FROM|AT|VIA)\s+([A-Z][A-Z0-9 &.-]{2,40}?)(?:\s+(?:A\/C|ACCOUNT|CARD)\b|[,.]|$)/di.exec(body);
+  const merchantAt = merchant?.indices?.[1];
+  if (merchantAt) found.push({ start: merchantAt[0], end: merchantAt[1], kind: 'merchant' });
+
+  const kept: SmsHighlight[] = [];
+  for (const range of found) {
+    if (kept.some((other) => range.start < other.end && other.start < range.end)) continue;
+    kept.push(range);
+  }
+  return kept.sort((a, b) => a.start - b.start);
+}
+
 export function parseSms(envelope: SmsEnvelope, rules: SmsRuleInput[] = []): SmsParseResult {
   const sender = normalizeSmsText(envelope.sender);
   const body = normalizeSmsText(envelope.body);
