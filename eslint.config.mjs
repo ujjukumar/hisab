@@ -14,6 +14,13 @@ const config = [
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
+  {
+    settings: {
+      react: {
+        version: '19.3.0',
+      },
+    },
+  },
 ];
 
 export default config;
