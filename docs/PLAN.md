@@ -410,6 +410,7 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | SMS review workspace | Done | 7 Oct 2026 | Moved reviews, connection requests, paired devices and learned rules into a dedicated Money tab with an accessible review-first layout, on-demand original text and shared editable approval fields. |
 | Unclear SMS review | Done | 7 Oct 2026 | An owner can set the direction of an unclear SMS by choosing a grouped category for manual approval; automatic rules still require a clear direction in the message. |
 | Private VM deployment | Done | 7 Oct 2026 | Deployed the Money SMS workspace to the Tailscale-only VM, kept its database and configuration, and restored systemd as the sole app process. |
+| SMS pairing by QR code | Done | 11 Oct 2026 | Money → SMS → Pair a phone shows a one-time QR code and link (from `SMS_PAIRING_URL`) that expires after 10 minutes; the phone redeems it at `/api/sms/pair/redeem` for its bearer token, and only hashes are stored. Pairing the same phone again revokes its earlier device. Added the dependency-free `uqr` package to draw the code. Request-and-approve stays for older app versions. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

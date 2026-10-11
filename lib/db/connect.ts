@@ -90,6 +90,7 @@ function migrationState(sqlite: DatabaseSync): { needsMigration: boolean; hasApp
 /** Every app table, children before parents, so deleting in this order respects foreign keys. */
 export const TABLES = [
   'sms_messages',
+  'sms_pairing_invites',
   'sms_rules',
   'sms_devices',
   'transactions',
@@ -103,7 +104,10 @@ export const TABLES = [
   'settings',
 ] as const;
 const REQUIRED_BACKUP_TABLES = TABLES.filter(
-  (table) => !(['sms_messages', 'sms_rules', 'sms_devices'] as readonly string[]).includes(table),
+  (table) =>
+    !(
+      ['sms_messages', 'sms_pairing_invites', 'sms_rules', 'sms_devices'] as readonly string[]
+    ).includes(table),
 );
 
 /** Delete every row and restart the ids. Call `ensureDefaults` afterwards. */

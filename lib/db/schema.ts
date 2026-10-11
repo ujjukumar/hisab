@@ -207,12 +207,12 @@ export const smsDevices = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     label: text('label').notNull(),
     installationId: text('installation_id'),
-    /** Set only once the owner approves the request in Money -> SMS. */
+    /** Set once the owner approves the request, or when the phone redeems a QR code. */
     tokenHash: text('token_hash').unique(),
-    /** Hash of the one-time secret the phone keeps while waiting for approval. */
-    claimHash: text('claim_hash').notNull().unique(),
-    /** Short code shown on the phone and in Money -> SMS to check the request. */
-    code: text('code').notNull(),
+    /** Hash of the secret the phone keeps while waiting for approval. Null for QR pairing. */
+    claimHash: text('claim_hash').unique(),
+    /** Short code to compare on the phone and in Money -> SMS. Null for QR pairing. */
+    code: text('code'),
     tokenCiphertext: text('token_ciphertext'),
     approvedAt: text('approved_at'),
     claimedAt: text('claimed_at'),
@@ -222,6 +222,17 @@ export const smsDevices = sqliteTable(
   },
   (t) => [index('sms_devices_installation').on(t.installationId), index('sms_devices_claim').on(t.claimHash)],
 );
+
+/** One-time QR pairing codes. Only a hash of the secret is kept; each code pairs one phone. */
+export const smsPairingInvites = sqliteTable('sms_pairing_invites', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  secretHash: text('secret_hash').notNull().unique(),
+  createdAt: text('created_at').notNull().default(now),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  /** The device the code paired, once it has been used. */
+  deviceId: integer('device_id').references(() => smsDevices.id),
+});
 
 export const smsRules = sqliteTable(
   'sms_rules',
@@ -289,6 +300,7 @@ export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type Price = typeof prices.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
 export type SmsDevice = typeof smsDevices.$inferSelect;
+export type SmsPairingInvite = typeof smsPairingInvites.$inferSelect;
 export type SmsRule = typeof smsRules.$inferSelect;
 export type SmsMessage = typeof smsMessages.$inferSelect;
 

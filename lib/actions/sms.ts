@@ -1,7 +1,7 @@
 'use server';
 
 import { randomBytes } from 'node:crypto';
-import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -11,6 +11,7 @@ import {
   categories,
   smsDevices,
   smsMessages,
+  smsPairingInvites,
   smsRules,
   transactions,
 } from '@/lib/db/schema';
@@ -34,6 +35,13 @@ import {
   encryptSmsText,
   hashSmsToken,
 } from '@/lib/sms/security';
+import {
+  SMS_PAIRING_CODE_EXPIRED,
+  SMS_PAIRING_LIFETIME_MS,
+  SMS_PAIRING_URL_REQUIRED,
+  smsPairingLink,
+  smsPairingUrl,
+} from '@/lib/sms/pairing';
 import { failed, type ActionFailure } from '@/lib/validation/money';
 
 const envelopeSchema = z.object({
@@ -48,6 +56,11 @@ const envelopeSchema = z.object({
 const pairSchema = z.object({
   label: z.string().trim().min(1).max(80),
   installationId: z.string().trim().min(1).max(200).optional(),
+});
+
+const redeemSchema = pairSchema.extend({
+  /** 32 random bytes as base64url, exactly as the QR code carries it. */
+  secret: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
 const reviewSchema = z.object({
@@ -76,6 +89,13 @@ export type SmsClaimResult =
   | { ok: true; status: 'approved'; token: string; deviceId: number }
   | { ok: true; status: 'claimed'; deviceId: number }
   | ActionFailure;
+
+export type SmsPairingInviteResult = { ok: true; link: string; expiresAt: string } | ActionFailure;
+
+/** `invalid` is a malformed request; `expired` covers used, replaced, unknown and old codes. */
+export type SmsRedeemResult =
+  | { ok: true; status: 'approved'; token: string; deviceId: number }
+  | (ActionFailure & { status: 'invalid' | 'expired' });
 
 /** A short code the owner can compare with the phone before approving the request. */
 function pairingCode(): string {
@@ -192,6 +212,95 @@ export async function rejectSmsDevice(formData: FormData): Promise<ActionFailure
   if (!changed.changes) return failed('That pairing request is no longer waiting.');
   revalidatePath('/money/sms');
   return { ok: true };
+}
+
+/**
+ * Show a one-time QR pairing code in Money -> SMS. Only a hash of its secret is kept,
+ * and a new code replaces any earlier one that has not been used yet.
+ */
+export async function createSmsPairingInvite(): Promise<SmsPairingInviteResult> {
+  const baseUrl = smsPairingUrl();
+  if (!baseUrl) return failed(SMS_PAIRING_URL_REQUIRED);
+  const secret = createSmsToken();
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + SMS_PAIRING_LIFETIME_MS).toISOString();
+  db.transaction((tx) => {
+    tx.update(smsPairingInvites)
+      .set({ expiresAt: createdAt })
+      .where(and(isNull(smsPairingInvites.usedAt), gt(smsPairingInvites.expiresAt, createdAt)))
+      .run();
+    tx.insert(smsPairingInvites)
+      .values({ secretHash: hashSmsToken(secret), createdAt, expiresAt })
+      .run();
+  });
+  return { ok: true, link: smsPairingLink(baseUrl, secret), expiresAt };
+}
+
+/**
+ * The phone redeems a QR pairing code once and gets its bearer token in the reply.
+ * The device is approved at once; Hisaab keeps only hashes of the code and the token.
+ * Earlier devices with the same installation ID are revoked.
+ */
+export async function redeemSmsPairingInvite(input: unknown): Promise<SmsRedeemResult> {
+  const parsed = redeemSchema.safeParse(input);
+  if (!parsed.success) {
+    const fields = new Set(parsed.error.issues.map((issue) => issue.path[0]));
+    const failure = fields.has('secret')
+      ? failed('That pairing code is not valid. Scan or paste the code shown in Hisaab.', 'secret')
+      : fields.has('label')
+        ? failed('Send a device name with the pairing request.', 'label')
+        : fields.has('installationId')
+          ? failed('Send an installation ID of 200 characters or fewer.', 'installationId')
+          : failed('Send the pairing code and a device name.');
+    return { ...failure, status: 'invalid' };
+  }
+  const token = createSmsToken();
+  const now = new Date().toISOString();
+  const result = db.transaction((tx): SmsRedeemResult => {
+    const invite = tx
+      .select({ id: smsPairingInvites.id })
+      .from(smsPairingInvites)
+      .where(
+        and(
+          eq(smsPairingInvites.secretHash, hashSmsToken(parsed.data.secret)),
+          isNull(smsPairingInvites.usedAt),
+          gt(smsPairingInvites.expiresAt, now),
+        ),
+      )
+      .get();
+    if (!invite) return { ...failed(SMS_PAIRING_CODE_EXPIRED), status: 'expired' };
+    if (parsed.data.installationId) {
+      // A phone that pairs again replaces its earlier pairing, so the old token stops working.
+      tx.update(smsDevices)
+        .set({ revokedAt: now })
+        .where(
+          and(
+            eq(smsDevices.installationId, parsed.data.installationId),
+            isNull(smsDevices.revokedAt),
+          ),
+        )
+        .run();
+    }
+    const device = tx
+      .insert(smsDevices)
+      .values({
+        label: parsed.data.label,
+        installationId: parsed.data.installationId ?? null,
+        tokenHash: hashSmsToken(token),
+        approvedAt: now,
+        claimedAt: now,
+      })
+      .returning({ id: smsDevices.id })
+      .get();
+    tx.update(smsPairingInvites)
+      .set({ usedAt: now, deviceId: device.id })
+      .where(eq(smsPairingInvites.id, invite.id))
+      .run();
+    return { ok: true, status: 'approved', token, deviceId: device.id };
+  });
+  if (result.ok) revalidatePath('/money/sms');
+  return result;
 }
 
 /** Only an approved, unrevoked device may post messages. */

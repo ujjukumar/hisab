@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Card } from '@/components/Card/Card';
+import { SmsPairing } from '@/components/SmsPairing/SmsPairing';
 import {
   SmsDeviceActions,
   SmsRefreshButton,
@@ -167,13 +168,21 @@ export default async function SmsPage({
 
       <div className={styles.management}>
         <Card
+          title="Pair a phone"
+          sub="Show a one-time code and scan it with your phone."
+          className={styles.pairCard}
+        >
+          <SmsPairing />
+        </Card>
+
+        <Card
           title={`Connect requests (${requests.length})`}
           sub="Compare the code with your phone before approving."
           action={<SmsRefreshButton />}
         >
           {requests.length === 0 ? (
             <p className={styles.empty}>
-              No phone is waiting to connect. Send a connect request from your SMS app.
+              No phone is waiting to connect. To add a phone, use Pair a phone.
             </p>
           ) : (
             <ul className={styles.list}>
@@ -201,7 +210,7 @@ export default async function SmsPage({
         >
           {devices.length === 0 ? (
             <p className={styles.empty}>
-              No Android device is paired. Connect a phone to receive SMS imports.
+              No Android device is paired. Pair a phone above to receive SMS imports.
             </p>
           ) : (
             <ul className={styles.list}>

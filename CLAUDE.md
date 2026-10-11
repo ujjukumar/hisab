@@ -34,7 +34,7 @@ relative imports inside them need explicit `.ts` extensions.
 - Every server action validates with Zod, runs writes in a transaction, revalidates affected paths and returns the standard result shape.
 - Components live in their own folder with a CSS Module. Use CSS variables from `styles/tokens.css` only; no raw hex colours in components.
 - Every function in `lib/domain` has unit tests, including edge cases (zero units, sell everything, split, missing prices, leap years).
-- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, zod, decimal.js, vitest, eslint, prettier, server-only, and a zip library for the full export.
+- Add a dependency only when it clearly earns its place, and mention why in the phase summary. Approved: next, react, react-dom, typescript, drizzle-orm, drizzle-kit, zod, decimal.js, vitest, eslint, prettier, server-only, a zip library for the full export, and uqr for the SMS pairing QR code.
 
 ## Copy and design rules
 

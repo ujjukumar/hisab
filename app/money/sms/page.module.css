@@ -119,6 +119,11 @@
   grid-column: 1 / -1;
 }
 
+/* The pairing card is taller once the QR code shows, so the other two cards stack beside it. */
+.pairCard {
+  grid-row: span 2;
+}
+
 .listRow {
   display: flex;
   justify-content: space-between;
@@ -179,5 +184,9 @@
 
   .rulesCard {
     grid-column: auto;
+  }
+
+  .pairCard {
+    grid-row: auto;
   }
 }

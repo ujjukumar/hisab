@@ -74,20 +74,27 @@ use a Tailscale-only reverse proxy or equivalent private service to forward the
 Android app's request to the local Hisaab port. Do not bind Next.js to
 `0.0.0.0`, publish the receiver publicly, or send SMS through a cloud relay.
 
-Set this value outside the repository before enabling the receiver:
+Set these values outside the repository before enabling the receiver:
 
 ```text
 SMS_ENCRYPTION_KEY=<base64-encoded 32-byte key>
+SMS_PAIRING_URL=https://<this-pc>.<tailnet>.ts.net
 ```
 
-Pairing is request-and-approve, so no shared secret is needed. The Android app
-sends `POST /api/sms/pair` with `{"label":"Pixel"}` and gets back a six-character
-code and a `claimToken`. The request does nothing until you open Money → SMS.
-In Connect requests, check the code matches the one shown on the phone, and
-choose **Approve device**. The app then polls `GET /api/sms/pair` with its claim token
-as a bearer credential; once approved, that call returns the device bearer token
-exactly once and the stored copy is deleted. Reject a request you do not
-recognise, and revoke a paired device if the phone is lost.
+`SMS_PAIRING_URL` is the tailnet HTTPS address the phone uses to reach Hisaab.
+Hisaab can't work it out from the request, because it listens on `127.0.0.1`
+and is often opened on this PC. It must be a plain `https://` address with no
+user name, password, query or fragment; a trailing slash is ignored.
+
+Pair a phone with a one-time QR code. In Money → SMS → **Pair a phone**, choose
+**Show pairing code**, then scan the code in SMS Organiser → ⋮ → Hisaab, or copy
+the link and paste it there. The code works once and expires after 10 minutes;
+showing a new code cancels the previous one. The app redeems it with
+`POST /api/sms/pair/redeem` and `{"secret":"…","label":"Pixel"}`, and the reply
+carries the device bearer token exactly once. Hisaab stores only hashes of the
+code and the token. Revoke a paired device under Paired devices if the phone is
+lost. Older app versions still use request-and-approve through `/api/sms/pair`,
+which shows their requests under Connect requests.
 
 Store the returned bearer token only in the paired
 Android app. Send SMS envelopes to `POST /api/sms/inbound` with

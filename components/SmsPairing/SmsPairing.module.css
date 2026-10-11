@@ -1,0 +1,66 @@
+.pairing {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  margin-top: 20px;
+}
+
+.qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+  /* Keep the fixed QR colours in Windows high contrast mode too. */
+  forced-color-adjust: none;
+}
+
+.qrLight {
+  fill: var(--qr-light);
+}
+
+.qrDark {
+  fill: var(--qr-dark);
+}
+
+.hint,
+.expiry {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.linkRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.link {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  font: 400 13px/1.4 var(--mono);
+  color: var(--text);
+}
+
+.feedback {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--primary);
+  overflow-wrap: anywhere;
+}
