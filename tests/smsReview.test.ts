@@ -275,6 +275,15 @@ describe('smsSuggestion', () => {
     ).toBeNull();
   });
 
+  it('treats any route of the same registered sender as the same sender', () => {
+    const anyRoute = { ...message, senderPattern: '^[A-Z]{2}-DEMOBK(?:-[A-Z])?$' };
+    expect(smsSuggestion([past({ senderPattern: '^JD-DEMOBK-S$' })], anyRoute, choices)).toEqual({
+      accountId: 1,
+      categoryId: 10,
+    });
+    expect(smsSuggestion([past({ senderPattern: '^JD-DEMOBX-S$' })], anyRoute, choices)).toBeNull();
+  });
+
   it('has no suggestion without a sender pattern or a flow', () => {
     expect(smsSuggestion([past({})], { ...message, senderPattern: null }, choices)).toBeNull();
     expect(smsSuggestion([past({})], { ...message, direction: null }, choices)).toBeNull();
@@ -401,6 +410,10 @@ describe('senderLabel', () => {
   it('shows an exact learned pattern as the sender it matches', () => {
     expect(senderLabel('^AX\\-DEMOBK\\-S$')).toBe('AX-DEMOBK-S');
     expect(senderLabel('^DEMO$')).toBe('DEMO');
+  });
+
+  it('shows a pattern for any route as the registered sender ID', () => {
+    expect(senderLabel('^[A-Z]{2}-DEMOBK(?:-[A-Z])?$')).toBe('DEMOBK');
   });
 
   it('leaves any other pattern as written', () => {

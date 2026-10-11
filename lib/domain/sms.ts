@@ -3,7 +3,7 @@ import { parsePaise, type Paise } from './money';
 import { isValidDate, type IsoDate } from './dates';
 
 /** Bumped when parsing changes, so SMS still waiting for review are read again. */
-export const SMS_PARSER_VERSION = '2';
+export const SMS_PARSER_VERSION = '3';
 
 export type SmsDirection = 'income' | 'expense';
 
@@ -98,12 +98,25 @@ export function smsTemplateFingerprint(body: string): string {
     .replace(NUMERIC_DATE, '<DATE>')
     .replace(NAMED_DATE, '<DATE>')
     .replace(/\b(?:UPI|UTR|REF(?:ERENCE)?|TXN|TRANSACTION)\s*[:#-]?\s*[A-Z0-9-]{5,}\b/gi, '<REFERENCE>')
-    .replace(/\b\d{6,}\b/g, '<NUMBER>');
+    .replace(/\b\d{6,}\b/g, '<NUMBER>')
+    // References such as 'IN12345678' or 'CHASH0001234' join letters to a long number.
+    // A UPI handle ('shop123456@ybl') names the payee, so it stays.
+    .replace(/\b[A-Z0-9]*\d{6,}[A-Z0-9]*\b(?!@)/gi, '<NUMBER>');
   return createHash('sha256').update(normalized.toUpperCase()).digest('hex');
 }
 
+/**
+ * Indian senders look like 'JD-ICICIT-S': a route prefix that changes from one SMS to the
+ * next, the bank's registered ID, and an optional type letter. Learn the registered ID so
+ * the same bank matches whichever route delivered it; any other sender is matched exactly.
+ */
 export function learnedSenderPattern(sender: string): string {
-  return `^${normalizeSmsText(sender).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
+  const normalized = normalizeSmsText(sender);
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const registered = normalized.match(/^[A-Z]{2}-([A-Z0-9]{3,9})(?:-[A-Z])?$/i);
+  return registered
+    ? `^[A-Z]{2}-${escape(registered[1]!)}(?:-[A-Z])?$`
+    : `^${escape(normalized)}$`;
 }
 
 export function learnedProviderKey(sender: string, body: string): string {
@@ -132,21 +145,36 @@ export function smsTransactionDate(body: string, receivedAt: string): IsoDate | 
   return parseDate(body, receivedAt);
 }
 
+/** 'Avl Bal Rs 1,200', 'available limit is Rs 5,000', 'Updated balance is Rs 80' */
+const BALANCE_BEFORE =
+  /\b(?:AVL|AVAILABLE|UPDATED|CLOSING)\.?\s*(?:BAL(?:ANCE)?|LIMIT|LMT)\.?(?:\s+IS)?\s*[:.-]?\s*$/i;
+
+/** The amounts written in the SMS, leaving out a balance or limit stated after the transaction. */
+function amountMatches(body: string): { index: number; length: number; value: Paise }[] {
+  return [...body.matchAll(/(?:₹|INR|Rs\.?|amount(?:\s+of)?)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi)]
+    .filter((match) => !BALANCE_BEFORE.test(body.slice(Math.max(0, match.index - 30), match.index)))
+    .flatMap((match) => {
+      const value = parsePaise(match[1]!);
+      return value.ok && value.value > 0
+        ? [{ index: match.index, length: match[0].length, value: value.value }]
+        : [];
+    });
+}
+
 function parseAmount(body: string): Paise | null {
-  const matches = [...body.matchAll(/(?:₹|INR|Rs\.?|amount(?:\s+of)?)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi)];
-  const candidates = matches
-    .map((match) => parsePaise(match[1]!))
-    .filter((result): result is { ok: true; value: Paise } => result.ok && result.value > 0)
-    .map((result) => result.value);
-  return candidates.length === 1 ? candidates[0]! : null;
+  const amounts = amountMatches(body);
+  return amounts.length === 1 ? amounts[0]!.value : null;
 }
 
 export function smsAmount(body: string): Paise | null {
   return parseAmount(body);
 }
 
-const DEBIT_WORDS = /\b(DEBITED|DEBIT|SPENT|PAID|WITHDRAWN|PURCHASE)\b/;
-const CREDIT_WORDS = /\b(CREDITED|CREDIT|RECEIVED|DEPOSITED|REFUND)\b/;
+// 'Credit Card' and 'Debit Card' name a card, not a flow; 'Sent Rs 50' is money out.
+const DEBIT = String.raw`DEBITED|DEBIT(?!\s+CARDS?\b)|SPENT|PAID|WITHDRAWN|PURCHASE|SENT(?=\s*(?:₹|INR|RS\.?\s*\d))`;
+const CREDIT = String.raw`CREDITED|CREDIT(?!\s+(?:CARDS?|LIMIT)\b)|RECEIVED|DEPOSITED|REFUND`;
+const DEBIT_WORDS = new RegExp(String.raw`\b(?:${DEBIT})\b`);
+const CREDIT_WORDS = new RegExp(String.raw`\b(?:${CREDIT})\b`);
 /** The owner's own masked account number: 'Acct XX123', 'A/c no. XX1234', 'Account *1234'. */
 const OWN_ACCOUNT = /\b(?:A\/C|ACCT|ACCOUNT)\.?\s*(?:NO\.?\s*)?[X*]+\d{3,}/;
 
@@ -185,21 +213,14 @@ export type SmsHighlight = { start: number; end: number; kind: SmsHighlightKind 
  */
 export function smsHighlights(body: string): SmsHighlight[] {
   const found: SmsHighlight[] = [];
-  const amounts = [...body.matchAll(/(?:₹|INR|Rs\.?|amount(?:\s+of)?)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi)]
-    .filter((match) => {
-      const value = parsePaise(match[1]!);
-      return value.ok && value.value > 0;
-    });
+  const amounts = amountMatches(body);
   if (amounts.length === 1) {
-    const match = amounts[0]!;
-    found.push({ start: match.index, end: match.index + match[0].length, kind: 'amount' });
+    const amount = amounts[0]!;
+    found.push({ start: amount.index, end: amount.index + amount.length, kind: 'amount' });
   }
   const direction = parseDirection(body);
   if (direction) {
-    const words =
-      direction === 'expense'
-        ? /\b(?:DEBITED|DEBIT|SPENT|PAID|WITHDRAWN|PURCHASE)\b/i
-        : /\b(?:CREDITED|CREDIT|RECEIVED|DEPOSITED|REFUND)\b/i;
+    const words = new RegExp(String.raw`\b(?:${direction === 'expense' ? DEBIT : CREDIT})\b`, 'i');
     const match = words.exec(body);
     if (match) found.push({ start: match.index, end: match.index + match[0].length, kind: 'direction' });
   }

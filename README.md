@@ -146,6 +146,16 @@ month name (`07-Oct-26`, `7 October 2026`). Rules learned before month-name
 dates were understood include that day's date in their wording, so they only
 ever matched SMS from that day. Learn them again from a new SMS.
 
+The words in a card's name ("Credit Card", "Debit Card") and "credit limit"
+don't count as money in or out, "Sent Rs…" counts as money out, and a balance
+or limit quoted after the transaction ("Avl Bal Rs…", "available limit is
+Rs…") isn't read as a second amount. A reference that runs letters into a long
+number (`IN1234567890`) is variable data, like any other reference. Banks send
+from IDs like `JD-DEMOBK-S`, where the two-letter route changes from one SMS to
+the next, so a rule learns the registered ID (`DEMOBK`) and matches it by any
+route. Rules learned earlier keep matching the one route they saw; learn them
+again to match all of them.
+
 When you are ready to use it for real, empty it:
 
 ```bash

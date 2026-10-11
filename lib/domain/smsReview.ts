@@ -232,8 +232,13 @@ export function smsSuggestion(
   choices: { accounts: AccountChoice[]; categories: CategoryChoice[] },
 ): { accountId: number; categoryId: number } | null {
   if (!message.senderPattern || !message.direction) return null;
+  const sender = senderId(message.senderPattern);
   for (const past of history) {
-    if (past.senderPattern !== message.senderPattern || past.direction !== message.direction)
+    if (
+      !past.senderPattern ||
+      senderId(past.senderPattern) !== sender ||
+      past.direction !== message.direction
+    )
       continue;
     const account = choices.accounts.find((a) => a.id === past.accountId && !a.archived);
     const category = choices.categories.find(
@@ -384,10 +389,23 @@ export function smsReasons(reason: string | null): SmsReason[] {
 
 /* ---------- display helpers ---------- */
 
-/** A learned sender pattern such as '^AX-SMPBNK-S$' shown as the sender it matches. */
+/**
+ * A learned sender pattern shown as the sender it matches: '^AX-SMPBNK-S$' as 'AX-SMPBNK-S',
+ * and a pattern for any route, '^[A-Z]{2}-SMPBNK(?:-[A-Z])?$', as the registered ID 'SMPBNK'.
+ */
 export function senderLabel(pattern: string): string {
+  const anyRoute = pattern.match(/^\^\[A-Z\]\{2\}-(.+)\(\?:-\[A-Z\]\)\?\$$/);
+  if (anyRoute) return anyRoute[1]!.replace(/\\(.)/g, '$1');
   const exact = pattern.match(/^\^(.*)\$$/);
   return exact ? exact[1]!.replace(/\\(.)/g, '$1') : pattern;
+}
+
+/** The registered sender ID behind a pattern, so 'JD-SMPBNK-S' and any route of SMPBNK compare equal. */
+function senderId(pattern: string): string {
+  return senderLabel(pattern)
+    .replace(/^[A-Z]{2}-(?=[A-Z0-9]{3,9}(?:-[A-Z])?$)/i, '')
+    .replace(/^([A-Z0-9]{3,9})-[A-Z]$/i, '$1')
+    .toUpperCase();
 }
 
 /** Cut text into plain and highlighted pieces. Ranges must be sorted and not overlap. */

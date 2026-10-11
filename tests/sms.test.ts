@@ -4,6 +4,7 @@ import {
   parseSms,
   learnedProviderKey,
   learnedSenderPattern,
+  smsAmount,
   smsDirection,
   smsTemplateFingerprint,
   smsContentHash,
@@ -117,6 +118,35 @@ describe('parseSms', () => {
     expect(smsDirection('Acct XX1111 debited and credited for Rs 500.')).toBeNull();
   });
 
+  it("doesn't read a card's name as the flow", () => {
+    expect(smsDirection('Rs 90 spent on your Demo Credit Card ending 1234 at Invented Mart on 05/10/26.')).toBe(
+      'expense',
+    );
+    expect(smsDirection('Rs 90 refund credited to your Demo Credit Card.')).toBe('income');
+    expect(smsDirection('Refund of Rs 90 credited to your Demo Debit Card XX9999.')).toBe('income');
+    expect(smsDirection('Rs 90 spent via Demo Debit Card XX9999 at Invented Cafe.')).toBe('expense');
+    expect(smsDirection('Demo Credit Card XX1234 statement is ready. Total of Rs 500 is due.')).toBeNull();
+    expect(smsDirection('The credit limit for your Demo Credit Card XX1234 has been changed to Rs 50,000.')).toBeNull();
+  });
+
+  it('reads money sent as money out', () => {
+    expect(smsDirection('Sent Rs.250.00 from Demo Bank AC X1234 to Invented Store on 05-10-26.')).toBe(
+      'expense',
+    );
+    expect(smsDirection('Sent INR 250 to Demo Payee')).toBe('expense');
+    expect(smsDirection('Your statement is sent to your email. Total of Rs 500 is due.')).toBeNull();
+  });
+
+  it('leaves out a balance or limit stated after the transaction', () => {
+    expect(smsAmount('Rs 500 debited on 05/10/26. Avl Bal Rs 12,000.00')).toBe(50000);
+    expect(smsAmount('INR 500 debited. Avl bal INR 10,000.00')).toBe(50000);
+    expect(smsAmount('Demo Acc XX123 debited Rs 75.00 on 05-Oct-26.Avl Bal-INR 1,000')).toBe(7500);
+    expect(smsAmount('Payment of Rs 300 received. Your available limit is Rs.40,000.')).toBe(30000);
+    expect(smsAmount('Payment of Rs 300 is successful. Updated balance is Rs 80.')).toBe(30000);
+    expect(smsAmount('Rs 300 spent. Avl Lmt: Rs 9,000')).toBe(30000);
+    expect(smsAmount('Total of Rs 500 or minimum of Rs 50 is due')).toBeNull();
+  });
+
   it('reads money out as a transfer when the rule says so', () => {
     const result = parseSms(envelope(PAID_OUT), [
       { ...rule, expenseCategoryId: null, expenseTransferAccountId: 9 },
@@ -195,6 +225,29 @@ describe('learned SMS rule helpers', () => {
     );
   });
 
+  it('treats a reference that joins letters to a long number as volatile', () => {
+    expect(
+      smsTemplateFingerprint('Transfer with reference number DEMO12345678 for Rs 500 has been credited to Demo Payee.'),
+    ).toBe(
+      smsTemplateFingerprint('Transfer with reference number DEMO87654321 for Rs 900 has been credited to Demo Payee.'),
+    );
+    expect(smsTemplateFingerprint('Acct XX123 credited:Rs 5 on 05-Oct-26. Info NEFT-ABCD0001234567-DEMO.')).toBe(
+      smsTemplateFingerprint('Acct XX123 credited:Rs 9 on 06-Oct-26. Info NEFT-ABCD0009876543-DEMO.'),
+    );
+    expect(smsTemplateFingerprint('Acct XX123 credited:Rs 5. Info NEFT-ABCD0001234567-DEMO.')).not.toBe(
+      smsTemplateFingerprint('Acct XX123 credited:Rs 5. Info NEFT-ABCD0001234567-SAMPLE.'),
+    );
+  });
+
+  it('keeps the payee named by a UPI handle with a long number', () => {
+    expect(smsTemplateFingerprint('Sent Rs 5 to shop1234567@demo on 05-10-26.')).not.toBe(
+      smsTemplateFingerprint('Sent Rs 5 to cafe7654321@demo on 05-10-26.'),
+    );
+    expect(smsTemplateFingerprint('Sent Rs 5 to 9000000001@demo on 05-10-26.')).toBe(
+      smsTemplateFingerprint('Sent Rs 5 to 9000000002@demo on 05-10-26.'),
+    );
+  });
+
   it('treats dates written with a month name as volatile too', () => {
     expect(smsTemplateFingerprint(PAID_OUT)).toBe(
       smsTemplateFingerprint(
@@ -211,6 +264,26 @@ describe('learned SMS rule helpers', () => {
 
   it('escapes sender text when making an exact pattern', () => {
     expect(learnedSenderPattern('BANK.INFO+1')).toBe('^BANK\\.INFO\\+1$');
+    expect(learnedSenderPattern('BANK-INFO')).toBe('^BANK-INFO$');
+  });
+
+  it('learns a registered sender ID for any route prefix and type letter', () => {
+    const pattern = learnedSenderPattern('JD-DEMOBK-S');
+    expect(pattern).toBe('^[A-Z]{2}-DEMOBK(?:-[A-Z])?$');
+    const matches = (sender: string) => new RegExp(pattern, 'i').test(sender);
+    expect(['JD-DEMOBK-S', 'VM-DEMOBK-T', 'AX-DEMOBK', 'bt-demobk-s'].every(matches)).toBe(true);
+    expect(['DEMOBK', 'VM-DEMOBKX-S', 'VM-XDEMOBK-S', 'ABC-DEMOBK-S'].some(matches)).toBe(false);
+  });
+
+  it('matches a rule learned from one route when the next SMS comes by another', () => {
+    const body = 'Rs 90 spent on your Demo Credit Card ending 1234 at Invented Mart on 05/10/26.';
+    const learned = {
+      ...rule,
+      senderPattern: learnedSenderPattern('JD-DEMOBK-S'),
+      templateFingerprint: smsTemplateFingerprint(body),
+    };
+    const result = parseSms({ ...envelope(body), sender: 'VM-DEMOBK-T' }, [learned]);
+    expect(result.ok && result.proposal).toMatchObject({ direction: 'expense', amount: 9000, ruleId: 3 });
   });
 
   it('derives a provider key from a structured message', () => {
@@ -245,7 +318,23 @@ describe('smsHighlights', () => {
   it('marks no amount when there is none, a zero, or more than one', () => {
     expect(read('Your one-time code is 4821')).toEqual([]);
     expect(read('INR 0 debited')).toEqual([['direction', 'debited']]);
-    expect(read('INR 500 debited. Avl bal INR 10,000.00')).toEqual([['direction', 'debited']]);
+    expect(read('INR 500 and INR 200 debited')).toEqual([['direction', 'debited']]);
+  });
+
+  it('marks the spend, not the balance after it or the card name', () => {
+    expect(read('INR 500 debited. Avl bal INR 10,000.00')).toEqual([
+      ['amount', 'INR 500'],
+      ['direction', 'debited'],
+    ]);
+    expect(read('Rs 90 spent on your Demo Credit Card ending 1234 at Invented Mart on 05/10/26.')).toEqual([
+      ['amount', 'Rs 90'],
+      ['direction', 'spent'],
+      ['date', '05/10/26'],
+    ]);
+    expect(read('Sent Rs.40.00 from Demo Bank AC X1234').slice(0, 2)).toEqual([
+      ['direction', 'Sent'],
+      ['amount', 'Rs.40.00'],
+    ]);
   });
 
   it('marks no flow word when the SMS says both and no impossible date', () => {
