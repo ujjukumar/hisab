@@ -23,6 +23,7 @@ const { db, sqlite } = await import('@/lib/db/client');
 const { accounts, categories, smsDevices, smsMessages, smsRules, transactions } =
   await import('@/lib/db/schema');
 const { encryptSmsBody } = await import('@/lib/sms/security');
+const { SMS_PARSER_VERSION } = await import('@/lib/domain/sms');
 const {
   pendingSmsCount,
   pendingSmsMessage,
@@ -32,11 +33,13 @@ const {
   smsHistory,
   smsRuleRows,
   smsTabCounts,
+  smsTransferMatches,
 } = await import('@/lib/queries/sms');
 const {
   approveSmsBatch,
   claimSmsDeviceToken,
   deleteSmsRule,
+  linkSmsToTransfer,
   manageSmsDeviceFormAction,
   receiveSms,
   rejectSms,
@@ -48,11 +51,17 @@ const {
   undoSmsRuleDelete,
   updateSmsRule,
 } = await import('@/lib/actions/sms');
+const { rereadPendingSms } = await import('@/lib/actions/smsRead');
 const { SmsReviewForm } = await import('@/components/SmsReviewForm/SmsReviewForm');
 
 const account = db
   .insert(accounts)
   .values({ name: 'Invented wallet', type: 'wallet', openingDate: '2026-01-01' })
+  .returning({ id: accounts.id })
+  .get();
+const card = db
+  .insert(accounts)
+  .values({ name: 'Invented card', type: 'card', openingDate: '2026-01-01' })
   .returning({ id: accounts.id })
   .get();
 const category = db
@@ -93,7 +102,7 @@ const createMessage = (direction: 'expense' | 'income' | null = 'expense') => {
       contentHash: `invented-content-${sequence}`,
       rawCiphertext: encryptSmsBody(rawBody),
       status: 'pending',
-      parserVersion: '1',
+      parserVersion: SMS_PARSER_VERSION,
       providerKey: 'Invented Shop',
       senderPattern: '^DEMO-ALERT$',
       templateFingerprint: `invented-template-${sequence}`,
@@ -225,8 +234,12 @@ describe('SMS review form', () => {
     const html = renderForm(id);
     expect(html.match(/name="date"/g)).toHaveLength(1);
     expect(html.match(/name="amount"/g)).toHaveLength(1);
-    expect(html).not.toContain('name="direction"');
+    expect(html).toContain('type="hidden" name="flow" value="expense"');
     expect(html).toContain('Money out');
+    expect(html).toContain('>Spending</button>');
+    expect(html).toContain('>Transfer</button>');
+    expect(html).not.toContain('>Income</button>');
+    expect(html).not.toContain('name="toAccountId"');
     expect(html).toMatch(
       /<button(?=[^>]*type="submit")(?=[^>]*name="intent")(?=[^>]*value="approve")[^>]*>/,
     );
@@ -240,7 +253,9 @@ describe('SMS review form', () => {
   it('asks for money in or out when the SMS does not say, and cannot learn a rule', () => {
     const { id } = createMessage(null);
     const html = renderForm(id);
-    expect(html).toContain('type="hidden" name="direction" value="expense"');
+    expect(html).toContain('type="hidden" name="flow" value="expense"');
+    expect(html).toContain('>Income</button>');
+    expect(html).toContain('>Transfer</button>');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('Invented groceries');
     expect(html).not.toContain('Invented income');
@@ -343,7 +358,7 @@ describe('SMS review actions', () => {
   it('uses the chosen flow to approve an unclear SMS as spending', async () => {
     const { id } = createMessage(null);
     const form = reviewData(id);
-    form.set('direction', 'expense');
+    form.set('flow', 'expense');
     expect(await reviewSmsFormAction(null, form)).toMatchObject({ ok: true });
     const imported = stored(id);
     expect(imported).toMatchObject({
@@ -366,7 +381,7 @@ describe('SMS review actions', () => {
   it('uses the chosen flow to approve an unclear SMS as income', async () => {
     const { id } = createMessage(null);
     const form = reviewData(id);
-    form.set('direction', 'income');
+    form.set('flow', 'income');
     form.set('categoryId', String(incomeCategory.id));
     expect(await reviewSmsFormAction(null, form)).toMatchObject({ ok: true });
     const imported = stored(id);
@@ -379,7 +394,7 @@ describe('SMS review actions', () => {
   it('rejects a category that does not match the chosen flow', async () => {
     const { id } = createMessage(null);
     const form = reviewData(id);
-    form.set('direction', 'income');
+    form.set('flow', 'income');
     expect(await reviewSmsFormAction(null, form)).toMatchObject({
       ok: false,
       message: 'Choose an income category.',
@@ -581,24 +596,58 @@ describe('SMS rules and history', () => {
     form.set('id', String(ruleId));
     form.set('name', 'Invented shop rule');
     form.set('accountId', String(account.id));
-    form.set('incomeCategoryId', '');
-    form.set('expenseCategoryId', '');
+    form.set('incomeTarget', '');
+    form.set('expenseTarget', '');
     expect(await updateSmsRule(form)).toMatchObject({
       ok: false,
-      message: 'Choose a category for money in, money out or both.',
+      message: 'Choose where money in, money out or both go.',
     });
-    form.set('expenseCategoryId', String(incomeCategory.id));
+    form.set('expenseTarget', `category:${incomeCategory.id}`);
     expect(await updateSmsRule(form)).toMatchObject({
       ok: false,
-      fieldErrors: { expenseCategoryId: 'Choose a spending category.' },
+      fieldErrors: { expenseTarget: 'Choose a spending category.' },
     });
-    form.set('expenseCategoryId', String(category.id));
-    form.set('incomeCategoryId', String(incomeCategory.id));
+    form.set('expenseTarget', String(category.id));
+    expect(await updateSmsRule(form)).toMatchObject({
+      ok: false,
+      fieldErrors: { expenseTarget: 'Choose a category or an account from the list.' },
+    });
+    form.set('expenseTarget', `category:${category.id}`);
+    form.set('incomeTarget', `category:${incomeCategory.id}`);
     expect(await updateSmsRule(form)).toEqual({ ok: true, message: 'Rule saved' });
     expect(db.select().from(smsRules).where(eq(smsRules.id, ruleId)).get()).toMatchObject({
       name: 'Invented shop rule',
       incomeCategoryId: incomeCategory.id,
       expenseCategoryId: category.id,
+      incomeTransferAccountId: null,
+      expenseTransferAccountId: null,
+    });
+  });
+
+  it('turns a rule side into a transfer to another of the owner’s accounts', async () => {
+    const { ruleId } = await learnedRule();
+    const form = new FormData();
+    form.set('id', String(ruleId));
+    form.set('name', 'Invented card payment');
+    form.set('accountId', String(account.id));
+    form.set('incomeTarget', '');
+    form.set('expenseTarget', `transfer:${account.id}`);
+    expect(await updateSmsRule(form)).toMatchObject({
+      ok: false,
+      fieldErrors: { expenseTarget: 'Choose an account other than the rule’s own account.' },
+    });
+    form.set('expenseTarget', 'transfer:999999');
+    expect(await updateSmsRule(form)).toMatchObject({
+      ok: false,
+      fieldErrors: { expenseTarget: 'That account no longer exists. Choose another.' },
+    });
+    form.set('expenseTarget', `transfer:${card.id}`);
+    expect(await updateSmsRule(form)).toEqual({ ok: true, message: 'Rule saved' });
+    expect(db.select().from(smsRules).where(eq(smsRules.id, ruleId)).get()).toMatchObject({
+      expenseCategoryId: null,
+      expenseTransferAccountId: card.id,
+      incomeCategoryId: null,
+      incomeTransferAccountId: null,
     });
   });
 
@@ -653,6 +702,305 @@ describe('SMS rules and history', () => {
     expect(october.some((row) => row.id === earlyNovember)).toBe(false);
     expect(november.find((row) => row.id === earlyNovember)?.outcome).toBe('auto');
     expect(october.some((row) => pendingSmsMessage(row.id))).toBe(false);
+  });
+});
+
+describe('SMS transfers between the owner’s accounts', () => {
+  const transferData = (id: number, intent: 'approve' | 'learn' = 'approve') => {
+    const form = reviewData(id, intent);
+    form.set('flow', 'transfer');
+    form.delete('categoryId');
+    form.set('accountId', String(account.id));
+    form.set('toAccountId', String(card.id));
+    form.set('amount', '182.40');
+    return form;
+  };
+  const transactionOf = (id: number) =>
+    db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, stored(id)!.transactionId!))
+      .get();
+
+  async function pairedPhone(label: string) {
+    const requested = await requestSmsDevicePairing({ label });
+    if (!requested.ok) throw new Error('The invented request failed.');
+    const approve = new FormData();
+    approve.set('id', String(requested.deviceId));
+    approve.set('intent', 'approve');
+    await manageSmsDeviceFormAction(null, approve);
+    const claimed = await claimSmsDeviceToken(requested.claimToken);
+    if (!claimed.ok || claimed.status !== 'approved') throw new Error('The invented claim failed.');
+    return (
+      sender: string,
+      messageId: string,
+      body: string,
+      receivedAt = '2026-10-09T10:00:00+05:30',
+    ) => receiveSms(claimed.token, { schemaVersion: 1, messageId, sender, receivedAt, body });
+  }
+
+  it('approves money out as a transfer and keeps the SMS’s own flow', async () => {
+    const { id } = createMessage('expense');
+    expect(await reviewSmsFormAction(null, transferData(id))).toEqual({
+      ok: true,
+      message: 'Transfer approved',
+    });
+    expect(stored(id)).toMatchObject({
+      status: 'imported',
+      direction: 'expense',
+      proposedAccountId: account.id,
+      proposedToAccountId: card.id,
+      proposedCategoryId: null,
+      rawCiphertext: null,
+    });
+    expect(transactionOf(id)).toMatchObject({
+      type: 'transfer',
+      amount: 18240,
+      accountId: account.id,
+      toAccountId: card.id,
+      categoryId: null,
+    });
+  });
+
+  it('asks for two different accounts', async () => {
+    const { id } = createMessage('expense');
+    const missing = transferData(id);
+    missing.set('toAccountId', '');
+    expect(await reviewSmsFormAction(null, missing)).toMatchObject({
+      ok: false,
+      fieldErrors: { toAccountId: 'Choose the account the money went to.' },
+    });
+    const same = transferData(id);
+    same.set('toAccountId', String(account.id));
+    expect(await reviewSmsFormAction(null, same)).toMatchObject({
+      ok: false,
+      fieldErrors: { toAccountId: 'Choose two different accounts for a transfer.' },
+    });
+    expect(pendingSmsMessage(id)?.body).toBeTruthy();
+  });
+
+  it('learns a transfer rule, imports the next payment and holds back a likely repeat', async () => {
+    const send = await pairedPhone('Invented transfer phone');
+    const body = (amount: string, day: string, ref: string) =>
+      `Acct XX123 debited for Rs ${amount} on ${day}-Oct-26; Sample Cards credited. UPI:${ref}.`;
+    const first = await send('DEMO-BANKAC', 'tr-1', body('18240.00', '05', '512345678901'));
+    if (!first.ok || first.status !== 'queued') throw new Error('The first SMS was not queued.');
+    expect(stored(first.id)).toMatchObject({
+      direction: 'expense',
+      parserVersion: SMS_PARSER_VERSION,
+    });
+    expect(await reviewSmsFormAction(null, transferData(first.id, 'learn'))).toEqual({
+      ok: true,
+      message: 'Transfer approved and rule learned',
+    });
+    const ruleId = stored(first.id)!.ruleId!;
+    expect(db.select().from(smsRules).where(eq(smsRules.id, ruleId)).get()).toMatchObject({
+      accountId: account.id,
+      expenseCategoryId: null,
+      expenseTransferAccountId: card.id,
+      incomeTransferAccountId: null,
+    });
+    expect(smsRuleRows().find((rule) => rule.id === ruleId)).toMatchObject({
+      expenseTransferAccountId: card.id,
+    });
+
+    const second = await send('DEMO-BANKAC', 'tr-2', body('2000.00', '08', '512345678902'));
+    if (!second.ok || second.status !== 'imported') throw new Error('The rule did not import.');
+    expect(transactionOf(second.id)).toMatchObject({
+      type: 'transfer',
+      date: '2026-10-08',
+      amount: 200000,
+      accountId: account.id,
+      toAccountId: card.id,
+      categoryId: null,
+    });
+    expect(stored(second.id)).toMatchObject({ proposedToAccountId: card.id, decidedBy: 'rule' });
+    const october = smsHistory({ month: '2026-10' });
+    expect(october.find((row) => row.id === second.id)?.transactionType).toBe('transfer');
+
+    // The same amount again the next day is probably the same payment, so it waits.
+    const again = await send(
+      'DEMO-BANKAC',
+      'tr-3',
+      body('2000.00', '09', '512345678903'),
+      '2026-10-10T10:00:00+05:30',
+    );
+    if (!again.ok || again.status !== 'queued') throw new Error('The repeat was not held back.');
+    expect(stored(again.id)).toMatchObject({
+      status: 'pending',
+      proposedAccountId: account.id,
+      proposedToAccountId: card.id,
+      reason: 'A matching transfer is already recorded.',
+    });
+    expect(
+      await approveSmsBatch({
+        items: [{ id: again.id, accountId: account.id, categoryId: category.id }],
+        learn: false,
+      }),
+    ).toMatchObject({ ok: false, message: expect.stringContaining('looks like a transfer.') });
+
+    const transferId = stored(second.id)!.transactionId!;
+    const matches = smsTransferMatches(200000, stored(again.id)!.transactionDate!);
+    expect(matches[0]).toMatchObject({
+      id: transferId,
+      fromAccount: 'Invented wallet',
+      toAccount: 'Invented card',
+    });
+    const link = new FormData();
+    link.set('id', String(again.id));
+    link.set('transactionId', String(transferId));
+    expect(await linkSmsToTransfer(link)).toEqual({ ok: true, message: 'SMS linked to transfer' });
+    expect(stored(again.id)).toMatchObject({
+      status: 'imported',
+      transactionId: transferId,
+      rawCiphertext: null,
+      decidedBy: 'owner',
+    });
+    expect(await linkSmsToTransfer(link)).toMatchObject({
+      ok: false,
+      message: 'That SMS is no longer pending.',
+    });
+  });
+
+  it('learns money in as a transfer from the other account', async () => {
+    const send = await pairedPhone('Invented card phone');
+    const body = (amount: string) =>
+      `Payment of INR ${amount} received on your Sample card. Thank you.`;
+    const first = await send('DEMO-CARDS', 'in-1', body('2,500.00'));
+    if (!first.ok || first.status !== 'queued') throw new Error('The first SMS was not queued.');
+    const form = transferData(first.id, 'learn');
+    expect(await reviewSmsFormAction(null, form)).toMatchObject({ ok: true });
+    expect(
+      db.select().from(smsRules).where(eq(smsRules.id, stored(first.id)!.ruleId!)).get(),
+    ).toMatchObject({
+      accountId: card.id,
+      incomeCategoryId: null,
+      incomeTransferAccountId: account.id,
+    });
+    const next = await send('DEMO-CARDS', 'in-2', body('700.00'));
+    if (!next.ok || next.status !== 'imported') throw new Error('The rule did not import.');
+    expect(transactionOf(next.id)).toMatchObject({
+      type: 'transfer',
+      amount: 70000,
+      accountId: account.id,
+      toAccountId: card.id,
+    });
+  });
+
+  it('only links an SMS to a transfer', async () => {
+    const spent = createMessage();
+    await reviewSmsFormAction(null, reviewData(spent.id));
+    const { id } = createMessage();
+    const link = new FormData();
+    link.set('id', String(id));
+    link.set('transactionId', String(stored(spent.id)!.transactionId));
+    expect(await linkSmsToTransfer(link)).toMatchObject({
+      ok: false,
+      message: 'That transfer no longer exists. Refresh and try again.',
+    });
+    expect(await linkSmsToTransfer(new FormData())).toMatchObject({ ok: false });
+    expect(stored(id)?.status).toBe('pending');
+  });
+
+  it('finds recorded transfers a few days either side, closest first', () => {
+    const add = (date: string) =>
+      db
+        .insert(transactions)
+        .values({
+          date,
+          type: 'transfer',
+          amount: 31415,
+          accountId: card.id,
+          toAccountId: account.id,
+          description: 'Invented transfer',
+        })
+        .returning({ id: transactions.id })
+        .get().id;
+    const near = add('2026-03-02');
+    const far = add('2026-02-26');
+    const outside = add('2026-03-05');
+    const found = smsTransferMatches(31415, '2026-03-01').map((match) => match.id);
+    expect(found).toEqual([near, far]);
+    expect(found).not.toContain(outside);
+    expect(smsTransferMatches(31416, '2026-03-01')).toEqual([]);
+  });
+
+  it('reads waiting SMS again after the parser changes, without importing them', () => {
+    const old = (rawCiphertext: string) =>
+      db
+        .insert(smsMessages)
+        .values({
+          deviceId: device.id,
+          sender: 'DEMO-OLD',
+          receivedAt: '2026-10-07T08:00:00+05:30',
+          contentHash: `invented-content-old-${++sequence}`,
+          rawCiphertext,
+          status: 'pending',
+          parserVersion: '1',
+          amount: 7500,
+          reason: 'The message does not clearly say debit or credit.',
+        })
+        .returning({ id: smsMessages.id })
+        .get().id;
+    const readable = old(encryptSmsBody('Acct XX999 debited for Rs 75.00; Sample Payee credited.'));
+    const damaged = old('not.valid.parts');
+    expect(rereadPendingSms()).toBe(1);
+    expect(stored(readable)).toMatchObject({
+      status: 'pending',
+      parserVersion: SMS_PARSER_VERSION,
+      direction: 'expense',
+      amount: 7500,
+    });
+    expect(stored(readable)?.reason).not.toContain('debit or credit');
+    expect(stored(damaged)).toMatchObject({ parserVersion: '1', status: 'pending' });
+    expect(rereadPendingSms()).toBe(0);
+  });
+});
+
+describe('SMS review form for transfers', () => {
+  const both = [
+    { id: account.id, name: 'Invented wallet' },
+    { id: card.id, name: 'Invented card' },
+  ];
+
+  it('shows both accounts and no category for a transfer, and offers to link a match', () => {
+    const { id } = createMessage('expense');
+    const html = renderForm(id, {
+      suggestion: { accountId: account.id, categoryId: null, toAccountId: card.id },
+      accounts: both,
+      matches: [
+        {
+          id: 1,
+          date: '2026-10-06',
+          amount: 125050,
+          fromAccount: 'Invented wallet',
+          toAccount: 'Invented card',
+        },
+      ],
+    });
+    expect(html).toContain('type="hidden" name="flow" value="transfer"');
+    expect(html).toContain('From account');
+    expect(html).toContain('To account');
+    expect(html).toMatch(new RegExp(`name="toAccountId"[\\s\\S]*?value="${card.id}" selected=""`));
+    expect(html).not.toContain('name="categoryId"');
+    expect(html).toContain('Approve transfer');
+    expect(html).toContain('This may already be recorded');
+    expect(html).toContain('6 Oct 2026: ₹1,250.50 from Invented wallet to Invented card');
+    expect(html).toContain('Link to this transfer');
+  });
+
+  it('puts the SMS’s own account on the receiving side for money in', () => {
+    const { id } = createMessage('income');
+    const html = renderForm(id, {
+      suggestion: { accountId: card.id, categoryId: null, toAccountId: account.id },
+      accounts: both,
+    });
+    expect(html).toMatch(new RegExp(`name="accountId"[\\s\\S]*?value="${card.id}" selected=""`));
+    expect(html).toMatch(
+      new RegExp(`name="toAccountId"[\\s\\S]*?value="${account.id}" selected=""`),
+    );
+    expect(html).toContain('>Income</button>');
+    expect(html).not.toContain('>Spending</button>');
   });
 });
 

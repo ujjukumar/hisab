@@ -25,7 +25,9 @@ import {
   pendingSmsMessages,
   recentSmsApprovals,
   smsDeviceRows,
+  smsTransferMatches,
 } from '@/lib/queries/sms';
+import { rereadPendingSms } from '@/lib/actions/smsRead';
 import styles from './page.module.css';
 
 type Search = {
@@ -47,6 +49,8 @@ const canLearn = (m: Learnable) =>
 
 export default async function SmsReviewPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
+  // SMS read by an older parser are read again first, so the queue shows the newer reading.
+  rereadPendingSms();
   const filter = parseQueueFilter(params.filter);
   const sort = parseQueueSort(params.sort);
   const asked = params.message !== undefined;
@@ -87,21 +91,40 @@ export default async function SmsReviewPage({ searchParams }: { searchParams: Pr
   const choices = { accounts, categories };
   const history = recentSmsApprovals();
 
-  /** The proposal when it still works, else what the owner chose last time for this sender. */
+  /**
+   * The proposal when it still works, else what the owner chose last time for this sender.
+   * A rule's transfer is only offered while both its accounts are active.
+   */
   function suggestionFor(m: {
     direction: SmsFlow | null;
     senderPattern: string | null;
     proposedAccountId: number | null;
     proposedCategoryId: number | null;
+    proposedToAccountId: number | null;
   }) {
-    const accountId = accounts.find((a) => a.id === m.proposedAccountId && !a.archived)?.id ?? null;
+    const active = (id: number | null) =>
+      accounts.find((a) => a.id === id && !a.archived)?.id ?? null;
+    if (m.proposedToAccountId !== null) {
+      const from = active(m.proposedAccountId);
+      const to = active(m.proposedToAccountId);
+      if (from && to && from !== to) return { accountId: from, categoryId: null, toAccountId: to };
+    }
+    // For a transfer into this account, the SMS's own account is the "to" side.
+    const own =
+      m.proposedToAccountId !== null && m.direction === 'income'
+        ? m.proposedToAccountId
+        : m.proposedAccountId;
+    const accountId = active(own);
     const categoryId =
       categories.find(
         (c) =>
           c.id === m.proposedCategoryId && !c.archived && (!m.direction || c.kind === m.direction),
       )?.id ?? null;
-    if (accountId && categoryId) return { accountId, categoryId };
-    return smsSuggestion(history, m, choices) ?? { accountId, categoryId };
+    if (accountId && categoryId) return { accountId, categoryId, toAccountId: null };
+    return {
+      ...(smsSuggestion(history, m, choices) ?? { accountId, categoryId }),
+      toAccountId: null,
+    };
   }
 
   const view = smsQueueView(pending, filter, sort);
@@ -120,8 +143,18 @@ export default async function SmsReviewPage({ searchParams }: { searchParams: Pr
         .map((r) => r.short)
         .join(' · ') || null,
     ...suggestionFor(m),
+    // Any SMS a rule reads as a transfer needs opening, even if an account has since gone.
+    toAccountId: m.proposedToAccountId,
     canLearn: canLearn(m),
   }));
+
+  const selectedDate = selected
+    ? (selected.transactionDate ?? istDate(selected.receivedAt))
+    : null;
+  const matches =
+    selected && selected.amount !== null && selectedDate
+      ? smsTransferMatches(selected.amount, selectedDate)
+      : [];
 
   const place = smsNeighbours(
     items.map((item) => item.id),
@@ -174,11 +207,12 @@ export default async function SmsReviewPage({ searchParams }: { searchParams: Pr
               sender: selected.sender,
               direction: selected.direction,
               amount: selected.amount,
-              date: selected.transactionDate ?? istDate(selected.receivedAt),
+              date: selectedDate,
               providerKey: selected.providerKey,
               canLearn: canLearn(selected),
             }}
             suggestion={suggestionFor(selected)}
+            matches={matches}
             canReview={selected.body !== null}
             accounts={accounts.filter((a) => !a.archived).map(({ id, name }) => ({ id, name }))}
             categories={categories}

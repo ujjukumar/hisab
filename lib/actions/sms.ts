@@ -14,20 +14,11 @@ import {
   smsRules,
   transactions,
 } from '@/lib/db/schema';
-import {
-  learnedProviderKey,
-  learnedSenderPattern,
-  parseSms,
-  smsAmount,
-  smsContentHash,
-  smsDirection,
-  smsTransactionDate,
-  smsTemplateFingerprint,
-  type SmsEnvelope,
-} from '@/lib/domain/sms';
+import { smsContentHash, type SmsDirection, type SmsEnvelope } from '@/lib/domain/sms';
 import { parsePositivePaise } from '@/lib/domain/money';
 import { isValidDate } from '@/lib/domain/dates';
 import { smsPairingInviteState } from '@/lib/queries/sms';
+import { readSms, type Tx } from '@/lib/actions/smsRead';
 import {
   ENCRYPTION_KEY_REQUIRED,
   createSmsToken,
@@ -65,18 +56,26 @@ const redeemSchema = pairSchema.extend({
   secret: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
-const flowSchema = z.enum(['income', 'expense']);
-
 const reviewSchema = z.object({
   id: z.coerce.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount: z.string().trim().min(1),
+  /** The transaction's account; for a transfer, the account the money left. */
   accountId: z.coerce.number().int().positive(),
-  categoryId: z.coerce.number().int().positive(),
+  categoryId: optionalId,
+  toAccountId: optionalId,
   description: z.string().trim().min(1).max(200),
-  /** Only sent when the SMS itself does not say; the message's own flow always wins. */
-  direction: z.preprocess((v) => (v === '' || v == null ? undefined : v), flowSchema.optional()),
+  /**
+   * What to add. Income or spending only counts when the SMS itself does not say, since the
+   * message's own flow wins; a transfer can be chosen for any SMS.
+   */
+  flow: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.enum(['income', 'expense', 'transfer']).optional(),
+  ),
 });
+
+const linkSchema = z.object({ id: idSchema, transactionId: idSchema });
 
 const batchApproveSchema = z.object({
   items: z
@@ -94,12 +93,25 @@ const batchApproveSchema = z.object({
 
 const batchIdsSchema = z.array(idSchema).min(1).max(200);
 
+/** A rule side's select sends `category:ID`, `transfer:ID` or nothing. */
+const ruleTarget = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z
+    .string()
+    .regex(/^(category|transfer):[1-9]\d*$/)
+    .transform((value) => {
+      const [kind, id] = value.split(':');
+      return { kind: kind as 'category' | 'transfer', id: Number(id) };
+    })
+    .nullable(),
+);
+
 const ruleSchema = z.object({
   id: idSchema,
   name: z.string().trim().min(1, 'Enter a rule name.').max(80, 'Keep this under 80 characters.'),
   accountId: z.coerce.number({ error: 'Choose an account.' }).int().positive('Choose an account.'),
-  incomeCategoryId: optionalId,
-  expenseCategoryId: optionalId,
+  incomeTarget: ruleTarget,
+  expenseTarget: ruleTarget,
 });
 
 /** Every SMS change can move the Money tab badge and the dashboard, so refresh both. */
@@ -108,11 +120,15 @@ function revalidateSms() {
   revalidatePath('/');
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+/** Where a learned rule sends the SMS's flow: a category, or a transfer between two accounts. */
+type RuleTarget =
+  | { type: 'category'; accountId: number; categoryId: number }
+  | { type: 'transfer'; fromAccountId: number; toAccountId: number };
 
 /**
  * Teach or update the rule for this sender and wording, so the next matching SMS goes
  * where the owner just sent this one. Turning learning on again also switches the rule on.
+ * The rule's account is always the SMS's own one: where money out left, or money in arrived.
  */
 function learnRule(
   tx: Tx,
@@ -120,17 +136,24 @@ function learnRule(
     senderPattern: string;
     templateFingerprint: string;
     providerKey: string;
-    direction: 'income' | 'expense';
+    direction: SmsDirection;
   },
-  accountId: number,
-  categoryId: number,
+  target: RuleTarget,
 ): number {
-  const category =
-    message.direction === 'income'
-      ? { incomeCategoryId: categoryId }
-      : { expenseCategoryId: categoryId };
+  const income = message.direction === 'income';
+  const accountId =
+    target.type === 'category'
+      ? target.accountId
+      : income
+        ? target.toAccountId
+        : target.fromAccountId;
+  const categoryId = target.type === 'category' ? target.categoryId : null;
+  const transferId = target.type === 'transfer' ? (income ? target.fromAccountId : target.toAccountId) : null;
+  const side = income
+    ? { incomeCategoryId: categoryId, incomeTransferAccountId: transferId }
+    : { expenseCategoryId: categoryId, expenseTransferAccountId: transferId };
   const existing = tx
-    .select({ id: smsRules.id })
+    .select()
     .from(smsRules)
     .where(
       and(
@@ -140,8 +163,16 @@ function learnRule(
     )
     .get();
   if (existing) {
+    // A transfer on the other side can't point back at the rule's own account.
+    const other = income
+      ? existing.expenseTransferAccountId === accountId
+        ? { expenseTransferAccountId: null }
+        : {}
+      : existing.incomeTransferAccountId === accountId
+        ? { incomeTransferAccountId: null }
+        : {};
     tx.update(smsRules)
-      .set({ ...category, accountId, enabled: 1, updatedAt: new Date().toISOString() })
+      .set({ ...side, ...other, accountId, enabled: 1, updatedAt: new Date().toISOString() })
       .where(eq(smsRules.id, existing.id))
       .run();
     return existing.id;
@@ -157,7 +188,9 @@ function learnRule(
       accountId,
       incomeCategoryId: null,
       expenseCategoryId: null,
-      ...category,
+      incomeTransferAccountId: null,
+      expenseTransferAccountId: null,
+      ...side,
     })
     .returning({ id: smsRules.id })
     .get().id;
@@ -467,86 +500,38 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
       .get();
     if (duplicate) return { ok: true, status: 'duplicate', id: duplicate.id };
 
-    const rules = tx
-      .select()
-      .from(smsRules)
-      .where(eq(smsRules.enabled, 1))
-      .all()
-      .map((rule) => ({
-        id: rule.id,
-        senderPattern: rule.senderPattern,
-        providerKey: rule.providerKey,
-        templateFingerprint: rule.templateFingerprint,
-        accountId: rule.accountId,
-        incomeCategoryId: rule.incomeCategoryId,
-        expenseCategoryId: rule.expenseCategoryId,
-        enabled: rule.enabled === 1,
-      }));
-    const result = parseSms(envelope, rules);
-    const candidateProviderKey = learnedProviderKey(envelope.sender, envelope.body);
-    const candidateSenderPattern = learnedSenderPattern(envelope.sender);
-    const candidateTemplateFingerprint = smsTemplateFingerprint(envelope.body);
-    const candidateDirection = smsDirection(envelope.body);
-    const candidateAmount = smsAmount(envelope.body);
-    const candidateTransactionDate = smsTransactionDate(envelope.body, envelope.receivedAt);
-    if (result.ok) {
-      const account = tx
-        .select({ id: accounts.id })
-        .from(accounts)
-        .where(eq(accounts.id, result.proposal.accountId!))
-        .get();
-      const category = tx
-        .select()
-        .from(categories)
-        .where(eq(categories.id, result.proposal.categoryId!))
-        .get();
-      if (!account || !category || category.kind !== result.proposal.direction) {
-        result.proposal.strict = false;
-        result.proposal.reasons.push('The configured account or category no longer exists.');
-      }
-    }
-
-    const imported =
-      result.ok &&
-      result.proposal.strict &&
-      result.proposal.accountId !== null &&
-      result.proposal.categoryId !== null;
-    if (imported) {
+    const { importable, fields } = readSms(tx, envelope);
+    const received = {
+      deviceId: device.id,
+      providerMessageId: envelope.messageId ?? null,
+      sender: envelope.sender,
+      receivedAt: envelope.receivedAt,
+      contentHash,
+      ...fields,
+    };
+    if (importable) {
       const transaction = tx
         .insert(transactions)
         .values({
-          date: result.proposal.transactionDate,
-          type: result.proposal.direction,
-          amount: result.proposal.amount,
-          accountId: result.proposal.accountId,
-          categoryId: result.proposal.categoryId,
-          description: result.proposal.description,
+          date: importable.transactionDate,
+          type: importable.type,
+          amount: importable.amount,
+          accountId: importable.accountId,
+          toAccountId: importable.toAccountId,
+          categoryId: importable.categoryId,
+          description: importable.description,
         })
         .returning({ id: transactions.id })
         .get();
       const message = tx
         .insert(smsMessages)
         .values({
-          deviceId: device.id,
-          providerMessageId: envelope.messageId ?? null,
-          sender: envelope.sender,
-          receivedAt: envelope.receivedAt,
-          contentHash,
+          ...received,
           rawCiphertext: null,
           status: 'imported',
-          parserVersion: '1',
-          providerKey: result.proposal.providerKey,
-          senderPattern: candidateSenderPattern,
-          templateFingerprint: candidateTemplateFingerprint,
-          direction: result.proposal.direction,
-          amount: result.proposal.amount,
-          transactionDate: result.proposal.transactionDate,
-          reference: result.proposal.reference,
-          proposedAccountId: result.proposal.accountId,
-          proposedCategoryId: result.proposal.categoryId,
           transactionId: transaction.id,
           reason: null,
-          ruleId: result.proposal.ruleId,
+          ruleId: importable.ruleId,
           decidedBy: 'rule',
           decidedAt: new Date().toISOString(),
         })
@@ -555,29 +540,9 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
       return { ok: true, status: 'imported', id: message.id };
     }
 
-    const reasons = result.ok ? result.proposal.reasons : result.reasons;
     const message = tx
       .insert(smsMessages)
-      .values({
-        deviceId: device.id,
-        providerMessageId: envelope.messageId ?? null,
-        sender: envelope.sender,
-        receivedAt: envelope.receivedAt,
-        contentHash,
-        rawCiphertext: encryptSmsBody(envelope.body),
-        status: 'pending',
-        parserVersion: '1',
-        providerKey: result.ok ? result.proposal.providerKey : candidateProviderKey,
-        senderPattern: candidateSenderPattern,
-        templateFingerprint: candidateTemplateFingerprint,
-        direction: result.ok ? result.proposal.direction : candidateDirection,
-        amount: result.ok ? result.proposal.amount : candidateAmount,
-        transactionDate: result.ok ? result.proposal.transactionDate : candidateTransactionDate,
-        reference: result.ok ? result.proposal.reference : null,
-        proposedAccountId: result.ok ? result.proposal.accountId : null,
-        proposedCategoryId: result.ok ? result.proposal.categoryId : null,
-        reason: reasons.join(' '),
-      })
+      .values({ ...received, rawCiphertext: encryptSmsBody(envelope.body), status: 'pending' })
       .returning({ id: smsMessages.id })
       .get();
     return { ok: true, status: 'queued', id: message.id };
@@ -586,7 +551,10 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
 
 type Decision = { ok: true; ruleId: number | null } | ActionFailure;
 
-/** Approve one pending SMS with the owner's edits, and optionally teach a rule from it. */
+/**
+ * Approve one pending SMS with the owner's edits, as income, spending or a transfer between
+ * two of their accounts, and optionally teach a rule from it.
+ */
 function decideSms(formData: FormData, learn: boolean): Decision {
   const parsed = reviewSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
@@ -606,31 +574,61 @@ function decideSms(formData: FormData, learn: boolean): Decision {
     if (learn && !template) {
       return failed('This SMS has no learnable template. Approve it manually instead.');
     }
-    const account = tx
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.id, input.accountId))
-      .get();
-    const category = tx.select().from(categories).where(eq(categories.id, input.categoryId)).get();
-    if (!account) return failed('That account no longer exists. Choose another.', 'accountId');
-    if (!category) return failed('That category no longer exists. Choose another.', 'categoryId');
-    const type = message.direction ?? input.direction ?? category.kind;
-    if (category.kind !== type) {
-      return failed(
-        type === 'income' ? 'Choose an income category.' : 'Choose a spending category.',
-        'categoryId',
-      );
+    const accountExists = (id: number) =>
+      tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, id)).get() !==
+      undefined;
+    if (!accountExists(input.accountId)) {
+      return failed('That account no longer exists. Choose another.', 'accountId');
     }
 
-    const ruleId = template ? learnRule(tx, template, input.accountId, input.categoryId) : null;
+    let entry: {
+      type: 'income' | 'expense' | 'transfer';
+      toAccountId: number | null;
+      categoryId: number | null;
+    };
+    let target: RuleTarget;
+    if (input.flow === 'transfer') {
+      const toAccountId = input.toAccountId;
+      if (!toAccountId) return failed('Choose the account the money went to.', 'toAccountId');
+      if (toAccountId === input.accountId) {
+        return failed('Choose two different accounts for a transfer.', 'toAccountId');
+      }
+      if (!accountExists(toAccountId)) {
+        return failed('That account no longer exists. Choose another.', 'toAccountId');
+      }
+      entry = { type: 'transfer', toAccountId, categoryId: null };
+      target = { type: 'transfer', fromAccountId: input.accountId, toAccountId };
+    } else {
+      const expected = message.direction ?? input.flow;
+      const choose = !expected
+        ? 'Choose a category.'
+        : expected === 'income'
+          ? 'Choose an income category.'
+          : 'Choose a spending category.';
+      if (!input.categoryId) return failed(choose, 'categoryId');
+      const category = tx
+        .select({ kind: categories.kind })
+        .from(categories)
+        .where(eq(categories.id, input.categoryId))
+        .get();
+      if (!category) {
+        return failed('That category no longer exists. Choose another.', 'categoryId');
+      }
+      if (expected && category.kind !== expected) return failed(choose, 'categoryId');
+      entry = { type: category.kind, toAccountId: null, categoryId: input.categoryId };
+      target = { type: 'category', accountId: input.accountId, categoryId: input.categoryId };
+    }
+
+    const ruleId = template ? learnRule(tx, template, target) : null;
     const transaction = tx
       .insert(transactions)
       .values({
         date: input.date,
-        type,
+        type: entry.type,
         amount: amount.value,
         accountId: input.accountId,
-        categoryId: input.categoryId,
+        toAccountId: entry.toAccountId,
+        categoryId: entry.categoryId,
         description: input.description,
       })
       .returning({ id: transactions.id })
@@ -639,11 +637,13 @@ function decideSms(formData: FormData, learn: boolean): Decision {
     tx.update(smsMessages)
       .set({
         status: 'imported',
-        direction: type,
+        // A transfer leaves the SMS's own flow as the bank wrote it.
+        ...(entry.type === 'transfer' ? {} : { direction: entry.type }),
         amount: amount.value,
         transactionDate: input.date,
         proposedAccountId: input.accountId,
-        proposedCategoryId: input.categoryId,
+        proposedToAccountId: entry.toAccountId,
+        proposedCategoryId: entry.categoryId,
         transactionId: transaction.id,
         rawCiphertext: null,
         ...(ruleId ? { ruleId, reason: `Learned rule ${ruleId}.` } : {}),
@@ -792,6 +792,9 @@ export async function approveSmsBatch(input: unknown): Promise<SmsDecisionResult
         return failed('Some of these SMS are no longer waiting for review. Refresh and try again.');
       }
       const who = `The SMS from ${message.sender} received ${message.receivedAt.slice(0, 10)}`;
+      if (message.proposedToAccountId !== null) {
+        return failed(`${who} looks like a transfer. Open it to finish.`);
+      }
       const { direction, amount, transactionDate } = message;
       if (
         !direction ||
@@ -824,7 +827,13 @@ export async function approveSmsBatch(input: unknown): Promise<SmsDecisionResult
     let learned = 0;
     for (const item of ready) {
       const template = learn ? learnable(item.message) : null;
-      const ruleId = template ? learnRule(tx, template, item.accountId, item.categoryId) : null;
+      const ruleId = template
+        ? learnRule(tx, template, {
+            type: 'category',
+            accountId: item.accountId,
+            categoryId: item.categoryId,
+          })
+        : null;
       if (ruleId) learned += 1;
       const transaction = tx
         .insert(transactions)
@@ -879,6 +888,54 @@ export async function rejectSmsBatch(ids: unknown): Promise<SmsDecisionResult> {
   };
 }
 
+/**
+ * Record a pending SMS as the transfer that's already in Money, typically added from the
+ * other bank's SMS, so the same payment isn't counted twice. Its text is erased as on approve.
+ */
+export async function linkSmsToTransfer(formData: FormData): Promise<SmsDecisionResult> {
+  const parsed = linkSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return failed('Choose the transfer this SMS belongs to.');
+  const { id, transactionId } = parsed.data;
+  const result = db.transaction((tx): SmsDecisionResult => {
+    const message = tx
+      .select({ status: smsMessages.status })
+      .from(smsMessages)
+      .where(eq(smsMessages.id, id))
+      .get();
+    if (message?.status !== 'pending') return failed('That SMS is no longer pending.');
+    const transfer = tx
+      .select({
+        type: transactions.type,
+        accountId: transactions.accountId,
+        toAccountId: transactions.toAccountId,
+      })
+      .from(transactions)
+      .where(eq(transactions.id, transactionId))
+      .get();
+    if (transfer?.type !== 'transfer') {
+      return failed('That transfer no longer exists. Refresh and try again.');
+    }
+    const now = new Date().toISOString();
+    tx.update(smsMessages)
+      .set({
+        status: 'imported',
+        transactionId,
+        rawCiphertext: null,
+        proposedAccountId: transfer.accountId,
+        proposedToAccountId: transfer.toAccountId,
+        proposedCategoryId: null,
+        decidedBy: 'owner',
+        decidedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(smsMessages.id, id))
+      .run();
+    return { ok: true, message: 'SMS linked to transfer' };
+  });
+  if (result.ok) revalidateSms();
+  return result;
+}
+
 /* ---------- learned rules ---------- */
 
 export async function setSmsRuleEnabled(id: unknown, enabled: unknown): Promise<SmsDecisionResult> {
@@ -900,11 +957,17 @@ export async function updateSmsRule(formData: FormData): Promise<SmsDecisionResu
   const parsed = ruleSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    return failed(issue?.message ?? 'Check the rule and try again.', String(issue?.path[0] ?? ''));
+    const field = String(issue?.path[0] ?? '');
+    return failed(
+      field.endsWith('Target')
+        ? 'Choose a category or an account from the list.'
+        : (issue?.message ?? 'Check the rule and try again.'),
+      field,
+    );
   }
   const input = parsed.data;
-  if (!input.incomeCategoryId && !input.expenseCategoryId) {
-    return failed('Choose a category for money in, money out or both.', 'expenseCategoryId');
+  if (!input.incomeTarget && !input.expenseTarget) {
+    return failed('Choose where money in, money out or both go.', 'expenseTarget');
   }
   const result = db.transaction((tx): SmsDecisionResult => {
     const rule = tx
@@ -913,21 +976,30 @@ export async function updateSmsRule(formData: FormData): Promise<SmsDecisionResu
       .where(eq(smsRules.id, input.id))
       .get();
     if (!rule) return failed('That rule no longer exists.');
-    const account = tx
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.id, input.accountId))
-      .get();
-    if (!account) return failed('That account no longer exists. Choose another.', 'accountId');
-    for (const [field, id, kind] of [
-      ['incomeCategoryId', input.incomeCategoryId, 'income'],
-      ['expenseCategoryId', input.expenseCategoryId, 'expense'],
+    const accountExists = (id: number) =>
+      tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, id)).get() !==
+      undefined;
+    if (!accountExists(input.accountId)) {
+      return failed('That account no longer exists. Choose another.', 'accountId');
+    }
+    for (const [field, target, kind] of [
+      ['incomeTarget', input.incomeTarget, 'income'],
+      ['expenseTarget', input.expenseTarget, 'expense'],
     ] as const) {
-      if (!id) continue;
+      if (!target) continue;
+      if (target.kind === 'transfer') {
+        if (target.id === input.accountId) {
+          return failed('Choose an account other than the rule’s own account.', field);
+        }
+        if (!accountExists(target.id)) {
+          return failed('That account no longer exists. Choose another.', field);
+        }
+        continue;
+      }
       const category = tx
         .select({ kind: categories.kind })
         .from(categories)
-        .where(eq(categories.id, id))
+        .where(eq(categories.id, target.id))
         .get();
       if (category?.kind !== kind) {
         return failed(
@@ -936,12 +1008,16 @@ export async function updateSmsRule(formData: FormData): Promise<SmsDecisionResu
         );
       }
     }
+    const pick = (target: typeof input.incomeTarget, kind: 'category' | 'transfer') =>
+      target?.kind === kind ? target.id : null;
     tx.update(smsRules)
       .set({
         name: input.name,
         accountId: input.accountId,
-        incomeCategoryId: input.incomeCategoryId,
-        expenseCategoryId: input.expenseCategoryId,
+        incomeCategoryId: pick(input.incomeTarget, 'category'),
+        incomeTransferAccountId: pick(input.incomeTarget, 'transfer'),
+        expenseCategoryId: pick(input.expenseTarget, 'category'),
+        expenseTransferAccountId: pick(input.expenseTarget, 'transfer'),
         updatedAt: new Date().toISOString(),
       })
       .where(eq(smsRules.id, rule.id))
@@ -1022,12 +1098,13 @@ export async function reviewSmsFormAction(
 ): Promise<SmsDecisionResult | null> {
   const intent = z.enum(['approve', 'learn']).safeParse(formData.get('intent'));
   if (!intent.success) return failed('Choose how to review this SMS.');
+  const approved = formData.get('flow') === 'transfer' ? 'Transfer approved' : 'Transaction approved';
   if (intent.data === 'learn') {
     const result = await learnSmsRuleAndApprove(formData);
-    return result.ok ? { ok: true, message: 'Transaction approved and rule learned' } : result;
+    return result.ok ? { ok: true, message: `${approved} and rule learned` } : result;
   }
   const result = await approveSms(formData);
-  return result.ok ? { ok: true, message: 'Transaction approved' } : result;
+  return result.ok ? { ok: true, message: approved } : result;
 }
 
 export type SmsDeviceFormState = ActionFailure | { ok: true; message: string } | null;

@@ -248,6 +248,12 @@ export const smsRules = sqliteTable(
       .references(() => accounts.id),
     incomeCategoryId: integer('income_category_id').references(() => categories.id),
     expenseCategoryId: integer('expense_category_id').references(() => categories.id),
+    /** Money in becomes a transfer from this account instead of income. Excludes a category. */
+    incomeTransferAccountId: integer('income_transfer_account_id').references(() => accounts.id),
+    /** Money out becomes a transfer to this account instead of spending. Excludes a category. */
+    expenseTransferAccountId: integer('expense_transfer_account_id').references(
+      () => accounts.id,
+    ),
     createdAt: text('created_at').notNull().default(now),
     updatedAt: text('updated_at').notNull().default(now),
   },
@@ -279,6 +285,8 @@ export const smsMessages = sqliteTable(
     reference: text('reference'),
     proposedAccountId: integer('proposed_account_id').references(() => accounts.id),
     proposedCategoryId: integer('proposed_category_id').references(() => categories.id),
+    /** For a transfer, the account the money went to; `proposedAccountId` is where it left. */
+    proposedToAccountId: integer('proposed_to_account_id').references(() => accounts.id),
     transactionId: integer('transaction_id').references(() => transactions.id),
     reason: text('reason'),
     /** The rule that imported this SMS, or that the owner taught while approving it. */

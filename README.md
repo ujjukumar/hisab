@@ -121,10 +121,26 @@ proposed transaction. The original text is not loaded into the list, and the
 same edits are used whether you approve it once or also tick **Import similar
 SMS automatically** to learn a rule. Tick several to approve or reject them
 together; press <kbd>?</kbd> for keyboard shortcuts. If the SMS does not say
-whether money came in or went out, choose **Money out** or **Money in** before
+whether money came in or went out, choose **Spending** or **Income** before
 approving. An unclear message cannot teach a rule. **History** shows each
 month's decisions, **Rules** lets you rename, switch off or delete learned
 rules, and **Devices** lists paired phones and pairing requests.
+
+When an SMS is money moving between your own accounts, such as paying a credit
+card bill from a bank account, choose **Transfer** and pick the from and to
+accounts. A transfer isn't counted as spending or income. Learning a rule from
+it, or setting a rule's money in or money out to **Transfer from…** or
+**Transfer to…** under Rules, imports the next such SMS as a transfer. The card
+often sends its own SMS for the same payment. When a transfer for the same
+amount is already in Money within three days, the SMS shows **This may already
+be recorded**: choose **Link to this transfer** to file it against the existing
+one instead of adding it twice. A rule never auto-imports a transfer that looks
+already recorded, and transfers always need opening rather than bulk approval.
+
+Hisaab reads dates written as numbers (`07/10/2026`, `07-10-26`) or with a
+month name (`07-Oct-26`, `7 October 2026`). Rules learned before month-name
+dates were understood include that day's date in their wording, so they only
+ever matched SMS from that day. Learn them again from a new SMS.
 
 When you are ready to use it for real, empty it:
 

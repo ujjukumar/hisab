@@ -32,8 +32,13 @@ export type SmsRuleRow = {
   accountId: number;
   account: string;
   incomeCategoryId: number | null;
+  /** Money in becomes a transfer from this account instead of income. */
+  incomeTransferAccountId: number | null;
+  /** 'Salary' or 'Transfer from Savings'; null when money in isn't imported. */
   income: string | null;
   expenseCategoryId: number | null;
+  /** Money out becomes a transfer to this account instead of spending. */
+  expenseTransferAccountId: number | null;
   expense: string | null;
   enabled: boolean;
   imported: number;
@@ -247,6 +252,10 @@ function RuleForm({
   const accountChoices = accounts.filter((a) => !a.archived || a.id === row.accountId);
   const categoryChoices = (kind: 'income' | 'expense', current: number | null) =>
     categories.filter((c) => c.kind === kind && (!c.archived || c.id === current));
+  const transferChoices = (current: number | null) =>
+    accounts.filter((a) => !a.archived || a.id === current);
+  const target = (categoryId: number | null, transferId: number | null) =>
+    categoryId ? `category:${categoryId}` : transferId ? `transfer:${transferId}` : '';
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -283,7 +292,8 @@ function RuleForm({
       <input type="hidden" name="id" value={row.id} />
       <p className={styles.note}>
         Matches SMS from <span className={styles.sender}>{row.sender}</span> with the wording it
-        learned. Change where those SMS go.
+        learned. Change where those SMS go. A transfer moves money between your own accounts,
+        like paying a card bill, and isn&apos;t counted as spending or income.
       </p>
       <TextField
         label="Name"
@@ -309,35 +319,55 @@ function RuleForm({
       </SelectField>
       {error('accountId')}
       <SelectField
-        label="Money in goes to"
-        name="incomeCategoryId"
-        defaultValue={row.incomeCategoryId ? String(row.incomeCategoryId) : ''}
-        {...describe('incomeCategoryId')}
+        label="Record money in as"
+        name="incomeTarget"
+        defaultValue={target(row.incomeCategoryId, row.incomeTransferAccountId)}
+        {...describe('incomeTarget')}
       >
         <option value="">Don&apos;t import money in</option>
-        {categoryChoices('income', row.incomeCategoryId).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-            {c.archived ? ' (archived)' : ''}
-          </option>
-        ))}
+        <optgroup label="Income category">
+          {categoryChoices('income', row.incomeCategoryId).map((c) => (
+            <option key={c.id} value={`category:${c.id}`}>
+              {c.name}
+              {c.archived ? ' (archived)' : ''}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Transfer between your accounts">
+          {transferChoices(row.incomeTransferAccountId).map((a) => (
+            <option key={a.id} value={`transfer:${a.id}`}>
+              Transfer from {a.name}
+              {a.archived ? ' (archived)' : ''}
+            </option>
+          ))}
+        </optgroup>
       </SelectField>
-      {error('incomeCategoryId')}
+      {error('incomeTarget')}
       <SelectField
-        label="Money out goes to"
-        name="expenseCategoryId"
-        defaultValue={row.expenseCategoryId ? String(row.expenseCategoryId) : ''}
-        {...describe('expenseCategoryId')}
+        label="Record money out as"
+        name="expenseTarget"
+        defaultValue={target(row.expenseCategoryId, row.expenseTransferAccountId)}
+        {...describe('expenseTarget')}
       >
         <option value="">Don&apos;t import money out</option>
-        {categoryChoices('expense', row.expenseCategoryId).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-            {c.archived ? ' (archived)' : ''}
-          </option>
-        ))}
+        <optgroup label="Spending category">
+          {categoryChoices('expense', row.expenseCategoryId).map((c) => (
+            <option key={c.id} value={`category:${c.id}`}>
+              {c.name}
+              {c.archived ? ' (archived)' : ''}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Transfer between your accounts">
+          {transferChoices(row.expenseTransferAccountId).map((a) => (
+            <option key={a.id} value={`transfer:${a.id}`}>
+              Transfer to {a.name}
+              {a.archived ? ' (archived)' : ''}
+            </option>
+          ))}
+        </optgroup>
       </SelectField>
-      {error('expenseCategoryId')}
+      {error('expenseTarget')}
       {formError && <FieldError>{formError}</FieldError>}
     </form>
   );

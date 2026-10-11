@@ -4,10 +4,12 @@ import {
   parseSms,
   learnedProviderKey,
   learnedSenderPattern,
+  smsDirection,
   smsTemplateFingerprint,
   smsContentHash,
   smsDedupeKey,
   smsHighlights,
+  smsTransactionDate,
   type SmsEnvelope,
 } from '@/lib/domain/sms';
 import { decryptSmsBody, encryptSmsBody, hashSmsToken } from '@/lib/sms/security';
@@ -20,8 +22,13 @@ const rule = {
   accountId: 2,
   incomeCategoryId: 4,
   expenseCategoryId: 5,
+  incomeTransferAccountId: null,
+  expenseTransferAccountId: null,
   enabled: true,
 };
+
+/** Invented wording in the shape some banks use when the owner pays a card or a person. */
+const PAID_OUT = 'Acct XX123 debited for Rs 18240.00 on 05-Oct-26; Sample Cards credited. UPI:512345678901.';
 
 const envelope = (body: string): SmsEnvelope => ({
   schemaVersion: 1,
@@ -52,12 +59,14 @@ describe('parseSms', () => {
       proposal: {
         providerKey: 'Sample Bank',
         direction: 'income',
+        type: 'income',
         amount: 125050,
         transactionDate: '2026-10-07',
         reference: 'ABC12345',
         description: 'Sample Bank ABC12345',
         ruleId: 3,
         accountId: 2,
+        toAccountId: null,
         categoryId: 4,
         strict: true,
         reasons: [],
@@ -97,12 +106,106 @@ describe('parseSms', () => {
     };
     expect(parseSms(envelope('INR 1,250 credited on 07/10/2026. Card ABC12345'), [learned]).ok).toBe(false);
   });
+
+  it("reads the owner's own account clause when an SMS names both sides", () => {
+    expect(smsDirection(PAID_OUT)).toBe('expense');
+    expect(smsDirection('Sample Payer debited for Rs 500; A/c no. XX4321 credited.')).toBe('income');
+    expect(smsDirection('Rs 500 debited; Account *4321 credited.')).toBe('income');
+    // Both clauses name an account, or none does: still unclear.
+    expect(smsDirection('Acct XX1111 debited for Rs 500; Acct XX2222 credited.')).toBeNull();
+    expect(smsDirection('Rs 500 debited; Sample Payee credited.')).toBeNull();
+    expect(smsDirection('Acct XX1111 debited and credited for Rs 500.')).toBeNull();
+  });
+
+  it('reads money out as a transfer when the rule says so', () => {
+    const result = parseSms(envelope(PAID_OUT), [
+      { ...rule, expenseCategoryId: null, expenseTransferAccountId: 9 },
+    ]);
+    expect(result.ok && result.proposal).toMatchObject({
+      direction: 'expense',
+      type: 'transfer',
+      amount: 1824000,
+      accountId: 2,
+      toAccountId: 9,
+      categoryId: null,
+      strict: true,
+    });
+  });
+
+  it('reads money in as a transfer from the other account', () => {
+    const result = parseSms(envelope('INR 500.00 credited on 07/10/2026'), [
+      { ...rule, incomeTransferAccountId: 9 },
+    ]);
+    expect(result.ok && result.proposal).toMatchObject({
+      direction: 'income',
+      type: 'transfer',
+      accountId: 9,
+      toAccountId: 2,
+      categoryId: null,
+    });
+  });
+
+  it('keeps the other flow as income or spending when only one side is a transfer', () => {
+    const result = parseSms(envelope('INR 500.00 credited on 07/10/2026'), [
+      { ...rule, expenseCategoryId: null, expenseTransferAccountId: 9 },
+    ]);
+    expect(result.ok && result.proposal).toMatchObject({
+      type: 'income',
+      accountId: 2,
+      toAccountId: null,
+      categoryId: 4,
+    });
+  });
+});
+
+describe('smsTransactionDate', () => {
+  const received = '2026-10-07T08:00:00+05:30';
+  const read = (body: string) => smsTransactionDate(body, received);
+
+  it('reads day-first numeric dates', () => {
+    expect(read('INR 5 debited on 7/1/2026')).toBe('2026-01-07');
+    expect(read('INR 5 debited on 07-01-26')).toBe('2026-01-07');
+  });
+
+  it('reads dates written with a month name', () => {
+    expect(read(PAID_OUT)).toBe('2026-10-05');
+    expect(read('INR 5 debited on 5 October 2026')).toBe('2026-10-05');
+    expect(read('INR 5 debited on 05Oct25 at Demo')).toBe('2025-10-05');
+    expect(read('INR 5 debited on 1 Sept, 2026')).toBe('2026-09-01');
+    expect(read('INR 5 debited on 29-feb-24')).toBe('2024-02-29');
+  });
+
+  it('uses the first date in the SMS', () => {
+    expect(read('INR 5 debited on 03-Oct-26. Bill due 15/10/2026')).toBe('2026-10-03');
+  });
+
+  it('falls back to the day it arrived when the date is missing or impossible', () => {
+    expect(read('INR 5 debited at Demo')).toBe('2026-10-07');
+    expect(read('INR 5 debited on 29-Feb-25')).toBe('2026-10-07');
+    expect(read('INR 5 debited on 31/02/2026')).toBe('2026-10-07');
+    expect(read('INR 5 debited at Shop 12 Decor 2026')).toBe('2026-10-07');
+    expect(smsTransactionDate('INR 5 debited', 'not a date')).toBeNull();
+  });
 });
 
 describe('learned SMS rule helpers', () => {
   it('normalizes volatile values into the same fingerprint', () => {
     expect(smsTemplateFingerprint('INR 1,250 credited on 07/10/2026. UPI ABC12345')).toBe(
       smsTemplateFingerprint('INR 9,999 credited on 08/10/2026. UPI XYZ98765'),
+    );
+  });
+
+  it('treats dates written with a month name as volatile too', () => {
+    expect(smsTemplateFingerprint(PAID_OUT)).toBe(
+      smsTemplateFingerprint(
+        'Acct XX123 debited for Rs 420.00 on 12-Nov-26; Sample Cards credited. UPI:512345670000.',
+      ),
+    );
+    expect(smsTemplateFingerprint('INR 5 paid on 3 March 2026 at Demo')).toBe(
+      smsTemplateFingerprint('INR 9 paid on 28 Sept 2027 at Demo'),
+    );
+    expect(smsTemplateFingerprint(PAID_OUT)).not.toBe(
+      smsTemplateFingerprint(PAID_OUT.replace('Sample Cards credited', 'Sample Shop credited')),
     );
   });
 
@@ -147,6 +250,20 @@ describe('smsHighlights', () => {
 
   it('marks no flow word when the SMS says both and no impossible date', () => {
     expect(read('Rs. 500 credited and debited on 31/02/2026')).toEqual([['amount', 'Rs. 500']]);
+  });
+
+  it("marks the flow word in the owner's own account clause", () => {
+    expect(read(PAID_OUT).filter(([kind]) => kind === 'direction')).toEqual([
+      ['direction', 'debited'],
+    ]);
+  });
+
+  it('marks a date written with a month name', () => {
+    expect(read(PAID_OUT).filter(([kind]) => kind === 'date')).toEqual([['date', '05-Oct-26']]);
+    expect(read('INR 75 paid on 29-Feb-25')).toEqual([
+      ['amount', 'INR 75'],
+      ['direction', 'paid'],
+    ]);
   });
 
   it('keeps the earlier kind when two parts overlap', () => {

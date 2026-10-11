@@ -1,6 +1,21 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, max } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  max,
+  sql,
+} from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { db } from '@/lib/db/client';
 import {
+  accounts,
   smsDevices,
   smsMessages,
   smsPairingInvites,
@@ -8,7 +23,8 @@ import {
   transactions,
 } from '@/lib/db/schema';
 import { addDays, addMonths, type IsoDate } from '@/lib/domain/dates';
-import { istDate } from '@/lib/domain/smsReview';
+import type { Paise } from '@/lib/domain/money';
+import { istDate, SMS_TRANSFER_MATCH_DAYS } from '@/lib/domain/smsReview';
 import { decryptSmsBody, ENCRYPTION_KEY_REQUIRED, SMS_DECRYPTION_FAILED } from '@/lib/sms/security';
 
 /** Messages waiting for review, for the Money tab badge and the dashboard. */
@@ -45,6 +61,7 @@ export function pendingSmsMessages() {
       reference: smsMessages.reference,
       proposedAccountId: smsMessages.proposedAccountId,
       proposedCategoryId: smsMessages.proposedCategoryId,
+      proposedToAccountId: smsMessages.proposedToAccountId,
       reason: smsMessages.reason,
       deviceLabel: smsDevices.label,
     })
@@ -69,6 +86,7 @@ export function pendingSmsMessage(id: number) {
       reference: smsMessages.reference,
       proposedAccountId: smsMessages.proposedAccountId,
       proposedCategoryId: smsMessages.proposedCategoryId,
+      proposedToAccountId: smsMessages.proposedToAccountId,
       senderPattern: smsMessages.senderPattern,
       templateFingerprint: smsMessages.templateFingerprint,
       reason: smsMessages.reason,
@@ -137,6 +155,40 @@ export function recentSmsApprovals(limit = 300) {
     .all();
 }
 
+const fromAccount = alias(accounts, 'from_account');
+const toAccount = alias(accounts, 'to_account');
+
+/**
+ * Transfers already in Money that an SMS may be another record of: same amount, a few days
+ * either side, closest date first. Typically the other bank's SMS for the same payment.
+ */
+export function smsTransferMatches(amount: Paise, date: IsoDate, limit = 3) {
+  return db
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      amount: transactions.amount,
+      fromAccountId: transactions.accountId,
+      fromAccount: fromAccount.name,
+      toAccountId: transactions.toAccountId,
+      toAccount: toAccount.name,
+    })
+    .from(transactions)
+    .innerJoin(fromAccount, eq(fromAccount.id, transactions.accountId))
+    .innerJoin(toAccount, eq(toAccount.id, transactions.toAccountId))
+    .where(
+      and(
+        eq(transactions.type, 'transfer'),
+        eq(transactions.amount, amount),
+        gte(transactions.date, addDays(date, -SMS_TRANSFER_MATCH_DAYS)),
+        lte(transactions.date, addDays(date, SMS_TRANSFER_MATCH_DAYS)),
+      ),
+    )
+    .orderBy(sql`abs(julianday(${transactions.date}) - julianday(${date}))`, desc(transactions.id))
+    .limit(limit)
+    .all();
+}
+
 /** Learned rules with how often each has imported an SMS and when it last did. */
 export function smsRuleRows() {
   const usage = new Map(
@@ -185,6 +237,7 @@ export function smsHistory({ month, ruleId }: { month: string; ruleId?: number |
       ruleId: smsMessages.ruleId,
       ruleName: smsRules.name,
       transactionId: smsMessages.transactionId,
+      transactionType: transactions.type,
       transactionDate: transactions.date,
       description: transactions.description,
     })

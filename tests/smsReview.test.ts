@@ -176,6 +176,7 @@ describe('smsReadiness and smsMissingText', () => {
     transactionDate: '2026-10-07',
     accountId: 1,
     categoryId: 10,
+    toAccountId: null,
   };
 
   it('is ready when nothing else is needed from the owner', () => {
@@ -185,13 +186,30 @@ describe('smsReadiness and smsMissingText', () => {
   it('lists everything still missing', () => {
     expect(
       smsReadiness(
-        { direction: null, amount: null, transactionDate: null, accountId: null, categoryId: null },
+        {
+          direction: null,
+          amount: null,
+          transactionDate: null,
+          accountId: null,
+          categoryId: null,
+          toAccountId: null,
+        },
         choices,
       ),
     ).toEqual({
       ready: false,
       missing: ['direction', 'amount', 'date', 'account', 'category'],
     });
+  });
+
+  it('always sends a transfer to be opened, whatever its category', () => {
+    expect(smsReadiness({ ...ready, categoryId: null, toAccountId: 3 }, choices)).toEqual({
+      ready: false,
+      missing: ['transfer'],
+    });
+    expect(smsReadiness({ ...ready, toAccountId: 3 }, choices).ready).toBe(false);
+    expect(smsMissingText(['transfer'])).toBe('It looks like a transfer.');
+    expect(smsMissingText(['account', 'transfer'])).toBe('It looks like a transfer.');
   });
 
   it('treats a zero amount and an impossible date as missing', () => {
@@ -350,6 +368,12 @@ describe('smsReasons', () => {
     expect(keys('No category is configured for this direction.')).toEqual(['category']);
     expect(keys('The configured account or category no longer exists.')).toEqual(['stale']);
     expect(keys('The message does not contain a valid transaction date.')).toEqual(['date']);
+  });
+
+  it('explains a transfer that may already be recorded', () => {
+    const [reason] = smsReasons('A matching transfer is already recorded.');
+    expect(reason).toMatchObject({ key: 'duplicate', short: 'Transfer already recorded?' });
+    expect(reason!.long).toContain('already in Money');
   });
 
   it('keeps any text it does not recognise', () => {

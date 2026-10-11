@@ -48,6 +48,8 @@ export type SmsQueueItem = {
   reason: string | null;
   accountId: number | null;
   categoryId: number | null;
+  /** Set when a rule reads the SMS as a transfer; such SMS can't be approved in bulk. */
+  toAccountId: number | null;
   canLearn: boolean;
 };
 
@@ -151,6 +153,7 @@ export function SmsReviewWorkspace({
           transactionDate: item.transactionDate,
           accountId,
           categoryId,
+          toAccountId: item.toAccountId,
         },
         choices,
       );

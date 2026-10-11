@@ -22,9 +22,17 @@ export default function SmsRulesPage() {
     accountId: rule.accountId,
     account: name(accounts, rule.accountId) ?? 'Missing',
     incomeCategoryId: rule.incomeCategoryId,
-    income: name(categories, rule.incomeCategoryId),
+    incomeTransferAccountId: rule.incomeTransferAccountId,
+    income:
+      rule.incomeTransferAccountId !== null
+        ? `Transfer from ${name(accounts, rule.incomeTransferAccountId)}`
+        : name(categories, rule.incomeCategoryId),
     expenseCategoryId: rule.expenseCategoryId,
-    expense: name(categories, rule.expenseCategoryId),
+    expenseTransferAccountId: rule.expenseTransferAccountId,
+    expense:
+      rule.expenseTransferAccountId !== null
+        ? `Transfer to ${name(accounts, rule.expenseTransferAccountId)}`
+        : name(categories, rule.expenseCategoryId),
     enabled: rule.enabled === 1,
     imported: rule.imported,
     lastUsed: rule.lastUsed ? formatReceived(rule.lastUsed, now) : null,

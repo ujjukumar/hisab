@@ -155,7 +155,10 @@ export function formatReceivedFull(iso: string): string {
 
 /* ---------- approving without opening each message ---------- */
 
-export type SmsMissing = 'direction' | 'amount' | 'date' | 'account' | 'category';
+/** How many days either side of an SMS a recorded transfer can be and still count as the same one. */
+export const SMS_TRANSFER_MATCH_DAYS = 3;
+
+export type SmsMissing = 'direction' | 'amount' | 'date' | 'account' | 'category' | 'transfer';
 
 type AccountChoice = { id: number; archived: boolean };
 type CategoryChoice = { id: number; kind: SmsFlow; archived: boolean };
@@ -166,9 +169,14 @@ export type ReadinessInput = {
   transactionDate: IsoDate | null;
   accountId: number | null;
   categoryId: number | null;
+  /** Set when a rule reads the SMS as a transfer to this account. */
+  toAccountId: number | null;
 };
 
-/** A message is ready when it can become a transaction without anything else from the owner. */
+/**
+ * A message is ready when it can become a transaction without anything else from the owner.
+ * A transfer always needs opening, so the owner sees both accounts before it's added.
+ */
 export function smsReadiness(
   message: ReadinessInput,
   choices: { accounts: AccountChoice[]; categories: CategoryChoice[] },
@@ -179,13 +187,17 @@ export function smsReadiness(
   if (!message.transactionDate || !isValidDate(message.transactionDate)) missing.push('date');
   if (!choices.accounts.some((a) => a.id === message.accountId && !a.archived))
     missing.push('account');
+  if (message.toAccountId !== null) {
+    missing.push('transfer');
+    return { ready: false, missing };
+  }
   const category = choices.categories.find((c) => c.id === message.categoryId && !c.archived);
   if (!category || (message.direction && category.kind !== message.direction))
     missing.push('category');
   return { ready: missing.length === 0, missing };
 }
 
-const MISSING_WORDS: Record<SmsMissing, string> = {
+const MISSING_WORDS: Record<Exclude<SmsMissing, 'transfer'>, string> = {
   direction: 'money in or out',
   amount: 'an amount',
   date: 'a date',
@@ -193,9 +205,10 @@ const MISSING_WORDS: Record<SmsMissing, string> = {
   category: 'a category',
 };
 
-/** 'Choose money in or out, an account and a category.' */
+/** 'Choose money in or out, an account and a category.' A transfer just says so. */
 export function smsMissingText(missing: SmsMissing[]): string {
-  const words = missing.map((m) => MISSING_WORDS[m]);
+  if (missing.includes('transfer')) return 'It looks like a transfer.';
+  const words = missing.map((m) => MISSING_WORDS[m as Exclude<SmsMissing, 'transfer'>]);
   if (words.length === 0) return '';
   const list =
     words.length === 1 ? words[0]! : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
@@ -290,7 +303,7 @@ export function smsConnectionSummary(
 /* ---------- why an SMS is waiting ---------- */
 
 export type SmsReasonKey =
-  'direction' | 'amount' | 'date' | 'rule' | 'category' | 'stale' | 'other';
+  'direction' | 'amount' | 'date' | 'rule' | 'category' | 'stale' | 'duplicate' | 'other';
 export type SmsReason = { key: SmsReasonKey; short: string; long: string };
 
 /** The parser's stored sentences, in the order they matter to the owner. */
@@ -337,6 +350,14 @@ const KNOWN_REASONS: { text: string; reason: SmsReason }[] = [
       key: 'stale',
       short: 'Rule needs updating',
       long: "The matching rule's account or category was deleted.",
+    },
+  },
+  {
+    text: 'A matching transfer is already recorded.',
+    reason: {
+      key: 'duplicate',
+      short: 'Transfer already recorded?',
+      long: 'A transfer between the same accounts for the same amount is already in Money, perhaps from the other bank’s SMS.',
     },
   },
 ];

@@ -30,10 +30,41 @@
   color: var(--text-3);
 }
 
-.unclear {
+.type {
   display: grid;
   gap: 8px;
-  max-width: 360px;
+  max-width: 420px;
+}
+
+.matches {
+  display: grid;
+  gap: 8px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--accent);
+}
+
+.matches h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--heading);
+}
+
+.matches ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.matches li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .fields {

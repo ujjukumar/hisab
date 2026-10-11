@@ -177,7 +177,16 @@ describe('migration history upgrade', () => {
             rule_id: null,
             decided_by: null,
             decided_at: null,
+            proposed_to_account_id: null,
           })),
+        );
+        expect(
+          upgraded.sqlite
+            .prepare('PRAGMA table_info(sms_rules)')
+            .all()
+            .map((column) => column.name),
+        ).toEqual(
+          expect.arrayContaining(['income_transfer_account_id', 'expense_transfer_account_id']),
         );
         expect(upgraded.sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
         const keys = upgraded.sqlite.prepare('PRAGMA foreign_key_list(sms_messages)').all();

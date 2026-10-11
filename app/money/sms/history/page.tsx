@@ -58,6 +58,10 @@ function historyHref(view: {
 function amountCell(row: Row) {
   if (row.amount === null) return <Amount tone="muted">—</Amount>;
   if (row.outcome === 'rejected') return <Amount tone="muted">{formatAmount(row.amount)}</Amount>;
+  // Transfers are grey and unsigned, as in Transactions.
+  if (row.transactionType === 'transfer') {
+    return <Amount tone="muted">{formatAmount(row.amount)}</Amount>;
+  }
   return row.direction === 'income' ? (
     <Amount tone="pos">+{formatAmount(row.amount)}</Amount>
   ) : (
@@ -133,7 +137,10 @@ export default async function SmsHistoryPage({
         ) : row.description === null ? (
           <span className="muted">Transaction removed</span>
         ) : (
-          <DescCell desc={row.description} />
+          <DescCell
+            desc={row.description}
+            note={row.transactionType === 'transfer' ? 'Transfer' : undefined}
+          />
         ),
     },
     {

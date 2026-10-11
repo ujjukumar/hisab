@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { parsePaise, type Paise } from './money';
 import { isValidDate, type IsoDate } from './dates';
 
-export const SMS_PARSER_VERSION = '1';
+/** Bumped when parsing changes, so SMS still waiting for review are read again. */
+export const SMS_PARSER_VERSION = '2';
 
 export type SmsDirection = 'income' | 'expense';
 
@@ -23,18 +24,27 @@ export type SmsRuleInput = {
   accountId: number;
   incomeCategoryId: number | null;
   expenseCategoryId: number | null;
+  /** Money in that becomes a transfer from this account into `accountId`, instead of income. */
+  incomeTransferAccountId: number | null;
+  /** Money out that becomes a transfer from `accountId` to this account, instead of spending. */
+  expenseTransferAccountId: number | null;
   enabled: boolean;
 };
 
 export type SmsProposal = {
   providerKey: string;
   direction: SmsDirection;
+  /** What to add: income or spending for the SMS's flow, or a transfer between two accounts. */
+  type: SmsDirection | 'transfer';
   amount: Paise;
   transactionDate: IsoDate;
   reference: string | null;
   description: string;
   ruleId: number | null;
+  /** The transaction's account; for a transfer, the account the money left. */
   accountId: number | null;
+  /** Only for a transfer: the account the money went to. */
+  toAccountId: number | null;
   categoryId: number | null;
   strict: boolean;
   reasons: string[];
@@ -48,11 +58,45 @@ export function normalizeSmsText(value: string): string {
   return value.normalize('NFKC').replace(/\s+/g, ' ').trim();
 }
 
+/** 11/10/2026, 11-10-26 */
+const NUMERIC_DATE = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/g;
+/** 11-Oct-26, 11 October 2026, 11Oct26 */
+const NAMED_DATE =
+  /\b(\d{1,2})[-/ ]?(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUNE?|JULY?|AUG(?:UST)?|SEP(?:T(?:EMBER)?)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)(?![A-Z])[-/ ,]*(\d{4}|\d{2})\b/gi;
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+function isoDate(day: string, month: string, year: string): IsoDate | null {
+  const date = `${year.length === 2 ? `20${year}` : year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  return isValidDate(date) ? date : null;
+}
+
+/** The first date written in the SMS, and where it is; `date` is null when it isn't a real day. */
+function firstDate(body: string): { index: number; length: number; date: IsoDate | null } | null {
+  const found = [
+    ...[...body.matchAll(NUMERIC_DATE)].map((match) => ({
+      index: match.index,
+      length: match[0].length,
+      date: isoDate(match[1]!, match[2]!, match[3]!),
+    })),
+    ...[...body.matchAll(NAMED_DATE)].map((match) => ({
+      index: match.index,
+      length: match[0].length,
+      date: isoDate(
+        match[1]!,
+        String(MONTHS.indexOf(match[2]!.slice(0, 3).toUpperCase()) + 1),
+        match[3]!,
+      ),
+    })),
+  ];
+  return found.sort((a, b) => a.index - b.index)[0] ?? null;
+}
+
 /** Replace volatile values so a learned rule describes structure, not private data. */
 export function smsTemplateFingerprint(body: string): string {
   const normalized = normalizeSmsText(body)
     .replace(/\b(?:₹|INR|Rs\.?)\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?/gi, '<AMOUNT>')
-    .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, '<DATE>')
+    .replace(NUMERIC_DATE, '<DATE>')
+    .replace(NAMED_DATE, '<DATE>')
     .replace(/\b(?:UPI|UTR|REF(?:ERENCE)?|TXN|TRANSACTION)\s*[:#-]?\s*[A-Z0-9-]{5,}\b/gi, '<REFERENCE>')
     .replace(/\b\d{6,}\b/g, '<NUMBER>');
   return createHash('sha256').update(normalized.toUpperCase()).digest('hex');
@@ -78,12 +122,8 @@ export function smsDedupeKey(input: Pick<SmsEnvelope, 'sender' | 'body' | 'messa
 }
 
 function parseDate(body: string, receivedAt: string): IsoDate | null {
-  const match = body.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/);
-  if (match) {
-    const year = match[3]!.length === 2 ? `20${match[3]}` : match[3]!;
-    const date = `${year}-${match[2]!.padStart(2, '0')}-${match[1]!.padStart(2, '0')}`;
-    if (isValidDate(date)) return date;
-  }
+  const written = firstDate(body)?.date;
+  if (written) return written;
   const date = receivedAt.slice(0, 10);
   return isValidDate(date) ? date : null;
 }
@@ -105,11 +145,25 @@ export function smsAmount(body: string): Paise | null {
   return parseAmount(body);
 }
 
+const DEBIT_WORDS = /\b(DEBITED|DEBIT|SPENT|PAID|WITHDRAWN|PURCHASE)\b/;
+const CREDIT_WORDS = /\b(CREDITED|CREDIT|RECEIVED|DEPOSITED|REFUND)\b/;
+/** The owner's own masked account number: 'Acct XX123', 'A/c no. XX1234', 'Account *1234'. */
+const OWN_ACCOUNT = /\b(?:A\/C|ACCT|ACCOUNT)\.?\s*(?:NO\.?\s*)?[X*]+\d{3,}/;
+
+function flowWords(text: string): SmsDirection | null {
+  const debit = DEBIT_WORDS.test(text);
+  const credit = CREDIT_WORDS.test(text);
+  return debit === credit ? null : debit ? 'expense' : 'income';
+}
+
 function parseDirection(body: string): SmsDirection | null {
   const upper = body.toUpperCase();
-  const debit = /\b(DEBITED|DEBIT|SPENT|PAID|WITHDRAWN|PURCHASE)\b/.test(upper);
-  const credit = /\b(CREDITED|CREDIT|RECEIVED|DEPOSITED|REFUND)\b/.test(upper);
-  return debit === credit ? null : debit ? 'expense' : 'income';
+  const flow = flowWords(upper);
+  if (flow || !DEBIT_WORDS.test(upper)) return flow;
+  // 'Acct XX123 debited for Rs 500 on 05-Oct-26; ASHA credited.' says both words, but
+  // only the clause naming the owner's account says which way their money went.
+  const own = upper.split(';').filter((clause) => OWN_ACCOUNT.test(clause));
+  return own.length === 1 ? flowWords(own[0]!) : null;
 }
 
 export function smsDirection(body: string): SmsDirection | null {
@@ -149,13 +203,8 @@ export function smsHighlights(body: string): SmsHighlight[] {
     const match = words.exec(body);
     if (match) found.push({ start: match.index, end: match.index + match[0].length, kind: 'direction' });
   }
-  const date = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/.exec(body);
-  if (date) {
-    const year = date[3]!.length === 2 ? `20${date[3]}` : date[3]!;
-    if (isValidDate(`${year}-${date[2]!.padStart(2, '0')}-${date[1]!.padStart(2, '0')}`)) {
-      found.push({ start: date.index, end: date.index + date[0].length, kind: 'date' });
-    }
-  }
+  const date = firstDate(body);
+  if (date?.date) found.push({ start: date.index, end: date.index + date.length, kind: 'date' });
   const reference = /\b(?:UPI|UTR|REF(?:ERENCE)?|TXN|TRANSACTION)\s*[:#-]?\s*([A-Z0-9-]{5,})\b/di.exec(body);
   const referenceAt = reference?.indices?.[1];
   if (referenceAt) found.push({ start: referenceAt[0], end: referenceAt[1], kind: 'reference' });
@@ -194,12 +243,13 @@ export function parseSms(envelope: SmsEnvelope, rules: SmsRuleInput[] = []): Sms
   }) ?? null;
   if (!rule) reasons.push('No enabled provider rule matches this sender.');
 
-  const categoryId = rule
+  const side = rule
     ? direction === 'income'
-      ? rule.incomeCategoryId
-      : rule.expenseCategoryId
-    : null;
-  if (!categoryId) reasons.push('No category is configured for this direction.');
+      ? { categoryId: rule.incomeCategoryId, transferAccountId: rule.incomeTransferAccountId }
+      : { categoryId: rule.expenseCategoryId, transferAccountId: rule.expenseTransferAccountId }
+    : { categoryId: null, transferAccountId: null };
+  const transfer = side.transferAccountId !== null;
+  if (!side.categoryId && !transfer) reasons.push('No category is configured for this direction.');
 
   if (reasons.length > 0 || direction === null || amount === null || transactionDate === null) {
     return { ok: false, reasons };
@@ -211,13 +261,19 @@ export function parseSms(envelope: SmsEnvelope, rules: SmsRuleInput[] = []): Sms
     proposal: {
       providerKey: rule!.providerKey,
       direction,
+      type: transfer ? 'transfer' : direction,
       amount,
       transactionDate,
       reference,
       description: reference ? `${rule!.providerKey} ${reference}` : rule!.providerKey,
       ruleId: rule!.id,
-      accountId: rule!.accountId,
-      categoryId,
+      accountId: transfer && direction === 'income' ? side.transferAccountId : rule!.accountId,
+      toAccountId: !transfer
+        ? null
+        : direction === 'income'
+          ? rule!.accountId
+          : side.transferAccountId,
+      categoryId: transfer ? null : side.categoryId,
       strict: true,
       reasons: [],
     },
