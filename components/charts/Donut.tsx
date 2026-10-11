@@ -58,7 +58,7 @@ export function Donut({
   );
 }
 
-/** The name and share list that sits beside a donut. */
+/** The name, amount and share list that sits beside a donut. */
 export function LegendList({ items }: { items: Slice[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
@@ -66,10 +66,11 @@ export function LegendList({ items }: { items: Slice[] }) {
       {items.map((item) => (
         <li key={item.name}>
           <i className="dot" style={{ background: item.color }} aria-hidden="true" />
-          <span>
+          <span className={styles.legendText}>
             <span className={styles.nm}>{item.name}</span>
             <span className={styles.pc}>
-              {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}%
+              {formatINR(item.value)} · {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}
+              %
             </span>
           </span>
         </li>
@@ -78,22 +79,38 @@ export function LegendList({ items }: { items: Slice[] }) {
   );
 }
 
+/**
+ * Keeps the largest `max` slices and rolls the rest into one "Other" slice, so a
+ * long tail of small categories stays readable. Without `max` nothing changes.
+ */
+export function capSlices(items: Slice[], max?: number): Slice[] {
+  if (!max || items.length <= max) return items;
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  const rest = sorted.slice(max).reduce((sum, item) => sum + item.value, 0);
+  const kept = sorted.slice(0, max);
+  return rest > 0 ? [...kept, { name: 'Other', value: rest, color: 'var(--c-muted)' }] : kept;
+}
+
 /** Legend on the left, donut on the right. */
 export function DonutSplit({
   items,
   label,
   size,
   strokeWidth,
+  max,
 }: {
   items: Slice[];
   label: string;
   size?: number;
   strokeWidth?: number;
+  /** Show at most this many slices, with the remainder as "Other". */
+  max?: number;
 }) {
+  const shown = capSlices(items, max);
   return (
     <div className={styles.split}>
-      <LegendList items={items} />
-      <Donut items={items} label={label} size={size} strokeWidth={strokeWidth} />
+      <LegendList items={shown} />
+      <Donut items={shown} label={label} size={size} strokeWidth={strokeWidth} />
     </div>
   );
 }

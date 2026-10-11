@@ -41,7 +41,8 @@
   font: 500 18px/1.25 var(--sans);
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
-  white-space: nowrap;
+  /* Wraps rather than overflowing: some asides carry a figure and its period. */
+  white-space: normal;
 }
 
 .periodChange {

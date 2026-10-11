@@ -100,21 +100,28 @@
 
 .legendList li {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 10px;
   font-size: 14px;
   line-height: 1.2;
 }
 
+.legendText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .legendList .nm {
   font-weight: 600;
   color: var(--heading);
+  overflow-wrap: anywhere;
 }
 
 .legendList .pc {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-  margin-left: 4px;
 }
 
 .donut {

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { spentAndSaved } from '@/app/money/stats';
+import { AttentionStrip } from '@/components/AttentionStrip/AttentionStrip';
 import { BudgetBar } from '@/components/BudgetBar/BudgetBar';
 import { ButtonLink, IconLink } from '@/components/Button/Button';
 import { Card, MoreLink } from '@/components/Card/Card';
@@ -23,6 +24,7 @@ import {
   TransactionDrawerProvider,
 } from '@/components/TransactionDrawer/TransactionDrawer';
 import { ASSET_CLASS_LABELS, GROUPS } from '@/lib/domain/assets';
+import { attentionItems } from '@/lib/domain/attention';
 import {
   addMonths,
   currentMonth,
@@ -31,6 +33,7 @@ import {
   monthLabel,
   SHORT_MONTHS,
   startOfMonth,
+  today,
   type IsoMonth,
 } from '@/lib/domain/dates';
 import {
@@ -41,6 +44,7 @@ import {
   formatPercent,
   formatReturn,
   formatShortINR,
+  formatShortINRSigned,
   gainClass,
   MINUS,
 } from '@/lib/domain/format';
@@ -73,7 +77,12 @@ import {
   type Params,
   paramReader,
 } from '@/lib/queries/money';
-import { defaultCompounding, financialYearStartMonth } from '@/lib/queries/settings';
+import {
+  autoPrices,
+  defaultCompounding,
+  financialYearStartMonth,
+  priceUpdate,
+} from '@/lib/queries/settings';
 import styles from './page.module.css';
 
 const color = (i: number) => `var(--c${(i % 8) + 1})`;
@@ -182,9 +191,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   /* ---------- where the money went ---------- */
   const spend = spendingBreakdown(month);
-  const spendSplit = (items: Slice[]) =>
+  const spendSplit = (items: Slice[], max?: number) =>
     items.length ? (
-      <DonutSplit items={items} label={`Spending in ${monthLabel(month)}`} />
+      <DonutSplit items={items} label={`Spending in ${monthLabel(month)}`} max={max} />
     ) : (
       <p className={styles.empty}>
         No spending in {monthName} yet. Add a transaction to see where your money goes.
@@ -328,6 +337,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         : 'Gain since each holding was bought',
   }));
 
+  /* ---------- needs attention ---------- */
+  const lastPrices = await priceUpdate();
+  const attention = steps.some((step) => step.done)
+    ? attentionItems({
+        today: today(),
+        month,
+        isCurrentMonth: isNow,
+        budgets: b,
+        accounts: allAccounts,
+        holdings: rows.map((r) => ({ name: r.asset.name, stale: r.stale, sold: r.sold })),
+        prices: {
+          lastOn: lastPrices?.on ?? null,
+          ok: lastPrices?.ok ?? false,
+          auto: await autoPrices(),
+        },
+      })
+    : [];
+
   return (
     <TransactionDrawerProvider
       accounts={allAccounts.map(({ id, name, archived }) => ({ id, name, archived }))}
@@ -379,15 +406,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               asideTone: gainClass(worthChange),
             },
             {
-              label: 'Investments',
+              label: 'Portfolio value',
               value: formatShortINR(t.value),
-              aside: `${formatShortINR(t.invested)} invested`,
+              aside: `${formatShortINRSigned(t.allTime)} (${formatReturn(t.ret)}) all time`,
+              asideTone: gainClass(t.allTime),
             },
             ...spentAndSaved(s),
           ]}
         />
 
         <div className="wrap page-body">
+          <AttentionStrip items={attention} />
           <div className="grid">
             {steps.some((step) => !step.done) && (
               <Card
@@ -416,40 +445,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </Card>
             )}
             <SwitchCard
-              id="cash-range"
-              label="Time range"
-              title="Income vs spending"
-              sub="What came in and went out each month"
-              span={8}
-              options={[
-                { value: '6', label: '6M', content: cashChart(6) },
-                { value: '12', label: '1Y', content: cashChart(12) },
-              ]}
-              footer={<MoreLink href={moneyHref}>See all transactions</MoreLink>}
-            />
-
-            <SwitchCard
-              id="spend-by"
-              label="Group spending by"
-              title="Where your money went"
-              sub={`${formatINR(s.spending)} spent ${isNow ? 'so far this month' : `in ${monthName}`}`}
-              span={4}
-              options={[
-                {
-                  value: 'cat',
-                  label: 'By category',
-                  content: spendSplit(slices(spend.byCategory)),
-                },
-                {
-                  value: 'acct',
-                  label: 'By account',
-                  content: spendSplit(slices(spend.byAccount)),
-                },
-              ]}
-              footer={<MoreLink href={budgetsHref}>See budgets</MoreLink>}
-            />
-
-            <SwitchCard
               id="perf-range"
               label="Time range"
               title="Portfolio performance"
@@ -477,6 +472,62 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 { value: 'type', label: 'By investment type', content: allocSplit(byGroup) },
               ]}
               footer={<MoreLink href="/investments">See all holdings</MoreLink>}
+            />
+
+            <MoversCard
+              movers={movers}
+              periods={moverPeriods}
+              groups={GROUPS.filter((g) =>
+                Object.values(movers).some((list) => list.some((m) => m.group === g.key)),
+              )}
+            />
+
+            <SwitchCard
+              id="returns-duration"
+              variant="select"
+              label="Duration"
+              title="Returns by investment type"
+              span={5}
+              options={byPeriod.map(({ period, rows: periodRowsOf }) => ({
+                value: period,
+                label: PERIOD_LABELS[period],
+                content: <Rows rows={returnRows(period, periodRowsOf)} />,
+              }))}
+              footer={<MoreLink href="/investments">See all holdings</MoreLink>}
+            />
+
+            <SwitchCard
+              id="cash-range"
+              label="Time range"
+              title="Income vs spending"
+              sub="What came in and went out each month"
+              span={8}
+              options={[
+                { value: '6', label: '6M', content: cashChart(6) },
+                { value: '12', label: '1Y', content: cashChart(12) },
+              ]}
+              footer={<MoreLink href={moneyHref}>See all transactions</MoreLink>}
+            />
+
+            <SwitchCard
+              id="spend-by"
+              label="Group spending by"
+              title="Where your money went"
+              sub={`${formatINR(s.spending)} spent ${isNow ? 'so far this month' : `in ${monthName}`}`}
+              span={4}
+              options={[
+                {
+                  value: 'cat',
+                  label: 'By category',
+                  content: spendSplit(slices(spend.byCategory), 5),
+                },
+                {
+                  value: 'acct',
+                  label: 'By account',
+                  content: spendSplit(slices(spend.byAccount), 5),
+                },
+              ]}
+              footer={<MoreLink href={budgetsHref}>See budgets</MoreLink>}
             />
 
             <Card
@@ -524,32 +575,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               )}
             </Card>
 
-            <SwitchCard
-              id="returns-duration"
-              variant="select"
-              label="Duration"
-              title="Returns by investment type"
-              span={4}
-              options={byPeriod.map(({ period, rows: periodRowsOf }) => ({
-                value: period,
-                label: PERIOD_LABELS[period],
-                content: <Rows rows={returnRows(period, periodRowsOf)} />,
-              }))}
-              footer={<MoreLink href="/investments">See all holdings</MoreLink>}
-            />
-
-            <MoversCard
-              movers={movers}
-              periods={moverPeriods}
-              groups={GROUPS.filter((g) =>
-                Object.values(movers).some((list) => list.some((m) => m.group === g.key)),
-              )}
-            />
-
             <Card
               title="Accounts"
               sub={isNow ? 'Bank, card and cash balances' : `Balances on ${formatDate(asOf)}`}
-              span={5}
+              span={4}
               footer={<MoreLink href="/money/accounts">Manage accounts</MoreLink>}
             >
               <Rows

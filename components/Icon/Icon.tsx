@@ -15,7 +15,8 @@ export type IconName =
   | 'user'
   | 'sun'
   | 'moon'
-  | 'sort';
+  | 'sort'
+  | 'alert';
 
 const stroke = (size: number, width: number, join = false) => ({
   width: size,
@@ -103,6 +104,13 @@ const ICONS: Record<IconName, (props: SVGProps<SVGSVGElement>) => JSX.Element> =
     <svg width={8} height={13} viewBox="0 0 8 13" {...p}>
       <path className="up" d="M4 0 8 5H0z" />
       <path className="dn" d="M4 13 0 8h8z" />
+    </svg>
+  ),
+  alert: (p) => (
+    <svg {...stroke(16, 2.2, true)} {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5" />
+      <path d="M12 16.4h.01" />
     </svg>
   ),
 };
