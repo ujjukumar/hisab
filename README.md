@@ -58,6 +58,10 @@ npm run dev
 
 Open <http://127.0.0.1:3000>.
 
+New migrations are applied, after a backup, whenever the app starts. If a pull
+brings one while `npm run dev` is running, pages show "New database migrations
+were added. Restart npm run dev to apply them." Restart it and carry on.
+
 ## Android SMS imports
 
 The optional SMS receiver accepts financial-message envelopes from the owner's

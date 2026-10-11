@@ -87,6 +87,11 @@ function migrationState(sqlite: DatabaseSync): { needsMigration: boolean; hasApp
   return { needsMigration: legacy || applied.length < files.length, hasApplied: applied.length > 0 };
 }
 
+/** Whether migration files exist that this database hasn't applied. Only reads; changes nothing. */
+export function hasPendingMigrations(sqlite: DatabaseSync): boolean {
+  return migrationState(sqlite).needsMigration;
+}
+
 /** Every app table, children before parents, so deleting in this order respects foreign keys. */
 export const TABLES = [
   'sms_messages',

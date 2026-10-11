@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
 import { describe, expect, it } from 'vitest';
-import { MIGRATIONS_FOLDER, openDatabase, prepareBackup } from '@/lib/db/connect';
+import { MIGRATIONS_FOLDER, hasPendingMigrations, openDatabase, prepareBackup } from '@/lib/db/connect';
 
 const legacyCreatedAt = 1790604645711;
 const migrationName = '20260928141045_aberrant_bloodaxe';
@@ -261,6 +261,36 @@ describe('migration history upgrade', () => {
         ).toEqual({ linked: 0 });
       } finally {
         upgraded.sqlite.close();
+      }
+    } finally {
+      if (previousPath === undefined) delete process.env.DATABASE_PATH;
+      else process.env.DATABASE_PATH = previousPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('reports pending migrations without applying them or writing a backup', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hisaab-pending-'));
+    const previousPath = process.env.DATABASE_PATH;
+    process.env.DATABASE_PATH = join(directory, 'pending.db');
+    try {
+      const older = new DatabaseSync(process.env.DATABASE_PATH);
+      migrate(drizzle({ client: older }), {
+        migrationsFolder: migrationsBefore(directory, 'sms_transfers'),
+      });
+      const applied = () =>
+        (older.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get() as { n: number }).n;
+      const before = applied();
+      expect(hasPendingMigrations(older)).toBe(true);
+      expect(applied()).toBe(before);
+      expect(existsSync(join(directory, 'backups'))).toBe(false);
+      older.close();
+
+      const current = openDatabase();
+      try {
+        expect(hasPendingMigrations(current.sqlite)).toBe(false);
+      } finally {
+        current.sqlite.close();
       }
     } finally {
       if (previousPath === undefined) delete process.env.DATABASE_PATH;
