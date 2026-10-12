@@ -4,6 +4,31 @@
   min-height: 250px;
 }
 
+.rangeTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.rangeChange {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 13px/1.4 var(--sans);
+  color: var(--text-2);
+}
+
+.rangeChange strong {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.rangeChange strong:global(.pos) { color: var(--gain); }
+.rangeChange strong:global(.neg) { color: var(--loss); }
+
 .chart svg {
   display: block;
   overflow: visible;

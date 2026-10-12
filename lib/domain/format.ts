@@ -177,6 +177,20 @@ export function niceRange(min: number, max: number, targetTicks: number) {
   return bottom === top ? { bottom: -step, top: step, step } : { bottom, top, step };
 }
 
+/** Nice value ticks that reveal small changes without dropping a crossed zero. */
+export function niceValueRange(min: number, max: number, targetTicks: number) {
+  if (min === 0 && max === 0) return { bottom: 0, top: 1, step: 1 };
+  const padding = min === max ? Math.max(Math.abs(max) * 0.02, 1) : (max - min) * 0.1;
+  const step = niceStep((max - min + 2 * padding) / targetTicks);
+  const bottom = Math.floor((min - padding) / step) * step;
+  const top = Math.ceil((max + padding) / step) * step;
+  return {
+    bottom: min >= 0 ? Math.max(0, bottom) : bottom,
+    top: max <= 0 && top >= 0 ? 0 : top,
+    step,
+  };
+}
+
 export function formatAxisPercent(value: number, step: number): string {
   const decimals = step < 1 ? Math.min(3, Math.ceil(-Math.log10(step))) : 0;
   return formatPercent(value, decimals);

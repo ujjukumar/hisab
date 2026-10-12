@@ -15,6 +15,7 @@ import {
   SHORT_MONTHS,
   type IsoDate,
 } from './dates';
+import { accountBalance, type Flow, type OpeningBalance } from './balances';
 import { formatDate, formatDay } from './format';
 import type { Paise } from './money';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from './portfolio';
@@ -79,6 +80,37 @@ export function performanceSeries(data: PortfolioData, to: IsoDate, from: IsoDat
       worth += r.value;
     }
     return { date, invested, worth };
+  });
+}
+
+export type NetWorthPoint = { date: IsoDate; accounts: Paise; investments: Paise; worth: Paise };
+
+/** Net worth at historical account, transaction, and sampled valuation dates. */
+export function netWorthSeries(
+  data: PortfolioData,
+  accounts: (OpeningBalance & { archived: boolean })[],
+  flows: Flow[],
+  to: IsoDate,
+  from: IsoDate | null = null,
+): NetWorthPoint[] {
+  const active = accounts.filter((account) => !account.archived && account.openingDate <= to);
+  const first = [...active.map((account) => account.openingDate), ...data.txns.map((txn) => txn.date)].sort()[0];
+  if (!first || first > to) return [];
+  const start = from && from > first ? from : first;
+  const dates = new Set<IsoDate>([start, ...sampleHistoryDates(data, first, to, from)]);
+  for (const account of active) {
+    if (account.openingDate >= start) dates.add(account.openingDate);
+  }
+  if (seriesCadence(from, to) === 'daily') {
+    for (const flow of flows) {
+      if (flow.date >= start && flow.date <= to) dates.add(flow.date);
+    }
+  }
+  return [...dates].sort().map((date) => {
+    const accountValue = active.filter((account) => account.openingDate <= date)
+      .reduce((sum, account) => sum + accountBalance(account, flows, date), 0);
+    const investments = buildPortfolio(data, date).reduce((sum, row) => sum + row.value, 0);
+    return { date, accounts: accountValue, investments, worth: accountValue + investments };
   });
 }
 

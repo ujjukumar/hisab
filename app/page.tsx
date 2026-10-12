@@ -51,7 +51,7 @@ import {
 import {
   investmentPeriodRows,
   linePoints,
-  performanceSeries,
+  netWorthSeries,
   seriesCadence,
   PERIOD_LABELS,
   periodRows,
@@ -66,6 +66,7 @@ import { ACCOUNT_TYPE_LABELS } from '@/lib/validation/money';
 import { monthBudgets } from '@/lib/queries/budgets';
 import { assetOptions, portfolio, portfolioData } from '@/lib/queries/investments';
 import {
+  allFlows,
   asOfDate,
   listAccounts,
   listCategories,
@@ -132,7 +133,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const t = totals(rows, asOf);
   const worthFrom = periodStart(netWorthPeriod.value, asOf, 1)!;
   const earlierCash = listAccounts(worthFrom)
-    .filter((account) => !account.archived)
+    .filter((account) => !account.archived && account.openingDate <= worthFrom)
     .reduce((sum, account) => sum + account.balance, 0);
   const earlierInvestments = portfolio(worthFrom).reduce((sum, row) => sum + row.value, 0);
   const calendarInvestmentGain = netWorthPeriod.value === '1d'
@@ -201,18 +202,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </p>
     );
 
-  /* ---------- portfolio performance ---------- */
-  const perfChart = (period: Period) => {
+  /* ---------- net worth history ---------- */
+  const flows = allFlows();
+  const worthChart = (period: Period) => {
     const start = periodStart(period, asOf, 1);
-    const points = performanceSeries(portfolioData(), asOf, start);
+    const points = netWorthSeries(data, allAccounts, flows, asOf, start);
     return (
-      <>
-        <LegendInline>
-          <LegendKey color="var(--c1)">Amount invested</LegendKey>
-          <LegendKey color="var(--c2)">Current worth</LegendKey>
-        </LegendInline>
-        <LineChart points={linePoints(points, seriesCadence(start, asOf))} />
-      </>
+      <LineChart mode="netWorth" points={linePoints(points.map((point) => ({
+        date: point.date, invested: point.accounts, worth: point.worth,
+      })), seriesCadence(start, asOf))} />
     );
   };
 
@@ -447,21 +445,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </Card>
             )}
             <SwitchCard
-              id="perf-range"
+              id="worth-range"
               label="Time range"
-              title="Portfolio performance"
-              sub="Amount invested against current worth, with detail to match the range. YTD starts on 1 January."
+              title="Net worth"
+              sub="Accounts and investments · YTD starts on 1 January."
               span={8}
               options={(
                 [
                   ['all', 'All time'],
                   ['ytd', 'YTD'],
+                  ['1m', '1M'],
+                  ['3m', '3M'],
                   ['6m', '6M'],
                   ['1y', '1Y'],
                   ['3y', '3Y'],
                 ] as const
-              ).map(([value, label]) => ({ value, label, content: perfChart(value) }))}
-              footer={<MoreLink href="/investments/performance">See performance details</MoreLink>}
+              ).map(([value, label]) => ({ value, label, content: worthChart(value) }))}
+              footer={<MoreLink href="/money/accounts">See accounts</MoreLink>}
             />
 
             <SwitchCard

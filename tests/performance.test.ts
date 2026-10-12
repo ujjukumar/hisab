@@ -4,6 +4,7 @@ import { unitsAmount, type HoldingTxn } from '@/lib/domain/holdings';
 import {
   investmentPeriodRows,
   linePoints,
+  netWorthSeries,
   performanceSeries,
   sampleHistoryDates,
   seriesCadence,
@@ -238,6 +239,44 @@ describe('performanceSeries', () => {
         const [row] = buildPortfolio(own, date);
         return [row?.holding.cost, row?.value];
       })).toEqual([[0, 0], [55000, 55000]]);
+  });
+});
+
+describe('netWorthSeries', () => {
+  it('combines account balances and investment value without treating transfers as gains', () => {
+    const own: PortfolioData = {
+      assets: [asset(1, 'Example Fund')],
+      txns: [trade(1, 1, '2025-01-15', 'buy', '100', '10')],
+      prices: [{ assetId: 1, date: '2025-01-31', price: '12' }],
+      valuations: [],
+    };
+    const accounts = [
+      { id: 1, openingDate: '2025-01-01', openingBalance: 200000, archived: false },
+      { id: 2, openingDate: '2025-02-01', openingBalance: -20000, archived: false },
+      { id: 3, openingDate: '2025-01-01', openingBalance: 500000, archived: true },
+    ];
+    const flows = [
+      { date: '2025-01-15', type: 'transfer' as const, amount: 100000, accountId: 1, toAccountId: null },
+      { date: '2025-02-10', type: 'transfer' as const, amount: 10000, accountId: 1, toAccountId: 2 },
+    ];
+    expect(netWorthSeries(own, accounts, flows, '2025-02-28', '2025-01-31')).toEqual([
+      { date: '2025-01-31', accounts: 100000, investments: 120000, worth: 220000 },
+      { date: '2025-02-01', accounts: 80000, investments: 120000, worth: 200000 },
+      { date: '2025-02-10', accounts: 80000, investments: 120000, worth: 200000 },
+      { date: '2025-02-28', accounts: 80000, investments: 120000, worth: 200000 },
+    ]);
+  });
+
+  it('starts with an account when there are no investments and keeps negative worth', () => {
+    expect(netWorthSeries({ ...data, txns: [] }, [
+      { id: 1, openingDate: '2025-01-15', openingBalance: -5000, archived: false },
+    ], [], '2025-03-01')).toEqual([
+      { date: '2025-01-15', accounts: -5000, investments: 0, worth: -5000 },
+      { date: '2025-01-31', accounts: -5000, investments: 0, worth: -5000 },
+      { date: '2025-02-28', accounts: -5000, investments: 0, worth: -5000 },
+      { date: '2025-03-01', accounts: -5000, investments: 0, worth: -5000 },
+    ]);
+    expect(netWorthSeries({ ...data, txns: [] }, [], [], '2025-03-01')).toEqual([]);
   });
 });
 

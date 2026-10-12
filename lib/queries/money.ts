@@ -24,7 +24,7 @@ import { financialYearStartMonth } from './settings';
 
 // ponytail: balances replay every transaction on each request. Fine for a
 // household's few thousand rows a year; add a per-account running total if it ever drags.
-function allFlows(): Flow[] {
+export function allFlows(): Flow[] {
   return db
     .select({
       date: transactions.date,
@@ -352,7 +352,8 @@ export function moneyStrip(month: IsoMonth = currentMonth()): MoneyStrip {
       .all(),
   );
   const { budget } = monthBudgets(month);
-  const active = listAccounts(asOfDate(month)).filter((a) => !a.archived);
+  const date = asOfDate(month);
+  const active = listAccounts(date).filter((a) => !a.archived && a.openingDate <= date);
   return {
     month,
     ...summary,

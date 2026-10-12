@@ -161,6 +161,13 @@ updates keep both rows in sync. Deleting either removes both, with Undo availabl
 - The budget card's total only counts categories that have a budget.
 
 **Net worth:** sum of all non-archived account balances (card balances are negative) + current portfolio value.
+The Dashboard net-worth chart samples that sum from the first account opening or
+investment transaction through the selected month. Its tooltip separates accounts
+and investments; accounts do not contribute before their opening dates. All time,
+calendar YTD, 1/3/6 months and 1/3 years use the performance-series date cadence.
+The change shown above the chart is the last sampled net worth minus the first.
+The optional Changes view plots accounts and investments relative to that first
+sample, with signed hover amounts that add up to the net-worth change.
 
 ### Holdings (`holdings.ts`)
 
@@ -235,7 +242,7 @@ Include the range start and last day, and position points according to calendar 
 On an individual investment's detail chart, also plot transaction dates at every
 cadence so a sale and repurchase between checkpoints are visible.
 
-Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's portfolio YTD chip uses the calendar year.
+Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's net-worth YTD chip uses the calendar year.
 
 The Investments Overview has a separate **Returns** percentage chart (`returns.ts`).
 Portfolio and investment-type lines show gain divided by starting value plus money paid
@@ -458,6 +465,7 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Investment benchmarks | Done | 12 Oct 2026 | Owner-configured AMFI index fund ISINs add optional dashed, same-cash-flow return lines. Latest and resumable daily NAVs reuse AMFI downloads, with absent-day markers and missing-price notes. Lint, typecheck, tests, build and disposable-data browser checks passed; no new sites or dependencies. |
 | Overview holdings table | Done | 12 Oct 2026 | Last price and its date now appear below unit-priced investment names instead of in a separate column; portfolio share follows total return. Totals, sorting and mobile table scrolling verified with invented data. |
 | Holding chart trade dates | Done | 12 Oct 2026 | Individual invested-and-worth charts now show trades between monthly or weekly checkpoints, including a full sale and repurchase. Invented-data regression confirms the zero holding and new cost. |
+| Dashboard net-worth chart | Done | 12 Oct 2026 | Replaced the investment-only chart with historical net worth (accounts including cards plus investments), one line and a hover breakdown. Added 1- and 3-month views and kept YTD, 6 months, 1/3 years and All. A signed range change and optional account/investment changes show what drove the move; invented-data mobile, desktop and past-month checks match the headline. Lint, typecheck, tests and build passed; no new dependencies. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

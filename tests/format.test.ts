@@ -22,6 +22,7 @@ import {
   niceRange,
   niceScale,
   niceStep,
+  niceValueRange,
 } from '@/lib/domain/format';
 
 describe('formatINR', () => {
@@ -151,6 +152,13 @@ describe('chart axes', () => {
     expect(niceRange(-3, 8, 4)).toEqual({ bottom: -5, top: 10, step: 5 });
     expect(niceRange(0, 0, 5)).toEqual({ bottom: -1, top: 1, step: 1 });
     expect(formatAxisPercent(-2.5, 0.5)).toBe('−2.5%');
+  });
+
+  it('shows small net-worth changes without cropping the range or losing zero', () => {
+    expect(niceValueRange(2690000, 2710000, 5)).toEqual({ bottom: 2685000, top: 2715000, step: 5000 });
+    expect(niceValueRange(-150, -50, 4)).toEqual({ bottom: -200, top: 0, step: 50 });
+    expect(niceValueRange(0, 300000, 5)).toEqual({ bottom: 0, top: 400000, step: 100000 });
+    expect(niceValueRange(0, 0, 5)).toEqual({ bottom: 0, top: 1, step: 1 });
   });
 });
 
