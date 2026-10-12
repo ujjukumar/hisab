@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, count, desc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { cache } from 'react';
 import { db } from '@/lib/db/client';
+import { benchmarkHistory, benchmarkList } from './benchmarks';
 import {
   accounts,
   assets,
@@ -367,7 +368,7 @@ export function holdingHistory(assetId: number, from: IsoDate | null = null): Hi
     valuations: data.valuations.filter((v) => v.assetId === assetId),
   };
   const end = today();
-  return sampleHistoryDates(own, first, end, from)
+  return sampleHistoryDates(own, first, end, from, true)
     .map((date) => {
       const [row] = buildPortfolio(own, date);
       return { date, invested: row?.holding.cost ?? 0, worth: row?.value ?? 0 };
@@ -400,10 +401,12 @@ export function pastPriceDates(): {
   listed: boolean;
   cadence: 'daily';
 }[] {
-  return pastPriceNeeds(portfolioData(), today(), noMarketFileDates()).map((n) => ({
+  const benchmarks = benchmarkList();
+  return pastPriceNeeds(portfolioData(), today(), noMarketFileDates(), benchmarks,
+    benchmarkHistory(benchmarks.map((item) => item.id))).map((n) => ({
     date: n.date,
     cadence: n.cadence,
-    funds: n.linked.some((a) => a.feed === 'amfi'),
+    funds: n.linked.some((a) => a.feed === 'amfi') || Boolean(n.benchmarks?.length),
     listed: n.linked.some((a) => a.feed === 'nse'),
   }));
 }

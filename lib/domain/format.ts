@@ -168,3 +168,16 @@ export function niceScale(
   const top = Math.ceil(max / step) * step;
   return { top, step, ticks: Math.round(top / step) };
 }
+
+/** Signed percentage ticks, including a zero baseline even when all returns have one sign. */
+export function niceRange(min: number, max: number, targetTicks: number) {
+  const step = niceStep((Math.max(max, 0) - Math.min(min, 0)) / targetTicks);
+  const bottom = Math.min(0, Math.floor(min / step) * step);
+  const top = Math.max(0, Math.ceil(max / step) * step);
+  return bottom === top ? { bottom: -step, top: step, step } : { bottom, top, step };
+}
+
+export function formatAxisPercent(value: number, step: number): string {
+  const decimals = step < 1 ? Math.min(3, Math.ceil(-Math.log10(step))) : 0;
+  return formatPercent(value, decimals);
+}

@@ -4,6 +4,7 @@ import { Card, MoreLink } from '@/components/Card/Card';
 import { BarChart } from '@/components/charts/BarChart';
 import { DonutSplit } from '@/components/charts/Donut';
 import { LineChart } from '@/components/charts/LineChart';
+import { ReturnChart } from '@/components/charts/ReturnChart';
 import { LegendInline, LegendKey } from '@/components/charts/Tip';
 import {
   Amount,
@@ -134,6 +135,13 @@ export function Showcase() {
 
           <Card span={4} title="Movers" sub="Since buying">
             <GainLoseTiles gainers={GAINERS} losers={LOSERS} />
+          </Card>
+          <Card span={8} title="Returns" sub="Gain on money put in">
+            <ReturnChart dates={['2026-01-01', '2026-04-01', '2026-07-01', '2026-10-01']}
+              lines={[
+                { key: 'portfolio', label: 'Portfolio', color: 'var(--c1)', values: [0, 0.04, -0.02, 0.12] },
+                { key: 'funds', label: 'Mutual funds', color: 'var(--c3)', values: [0, 0.05, 0.01, 0.14] },
+              ]} />
           </Card>
         </div>
       </Section>

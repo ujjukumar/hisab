@@ -12,6 +12,7 @@ import {
   periodTotals,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type PortfolioData } from '@/lib/domain/portfolio';
+import { benchmarkReturns, pickReturnRange, returnRangeStart, returnSeries } from '@/lib/domain/returns';
 
 const asset = (id: number, name: string): Asset => ({
   id,
@@ -68,6 +69,82 @@ const data: PortfolioData = {
   ],
   valuations: [],
 };
+
+describe('returnSeries', () => {
+  it('ends at the same gain on money put in as the period total, including sold holdings', () => {
+    for (const from of [null, '2025-01-10', '2025-01-31', '2025-02-10']) {
+      const points = returnSeries(data, '2025-04-20', from);
+      expect(points.at(-1)?.portfolio).toBeCloseTo(
+        periodTotals(periodRows(data, from, '2025-04-20'), '2025-04-20').absolute!,
+      );
+    }
+  });
+
+  it('counts a first-day purchase made after the requested start', () => {
+    const changed = { ...data, prices: [{ assetId: 1, date: '2025-01-15', price: '11' }, ...data.prices] };
+    expect(returnSeries(changed, '2025-01-15', '2025-01-01').at(-1)?.portfolio).toBeCloseTo(
+      periodTotals(periodRows(changed, '2025-01-01', '2025-01-15'), '2025-01-15').absolute!,
+    );
+  });
+
+  it('selects available ranges and rejects reversed custom dates', () => {
+    expect(pickReturnRange({}, '2026-10-12', '2025-01-15').range).toBe('1y');
+    expect(pickReturnRange({}, '2025-04-12', '2025-01-15').range).toBe('all');
+    expect(pickReturnRange({ range: 'custom', from: '2026-11-01', to: '2026-11-12' },
+      '2026-10-12', '2025-01-15').error).toMatch(/before/);
+    expect(returnRangeStart('5y', '2028-02-29')).toBe('2023-02-28');
+    expect(returnRangeStart('ytd', '2026-01-01')).toBe('2025-12-31');
+  });
+
+  it('splits group returns, keeps income, and leaves a zero denominator undefined', () => {
+    const mixed: PortfolioData = {
+      ...data,
+      assets: [asset(1, 'Meridian'), { ...asset(2, 'Banyan'), type: 'stock' }],
+      txns: [trade(1, 1, '2025-01-15', 'buy', '100', '10'),
+        trade(2, 2, '2025-02-01', 'buy', '10', '100'),
+        { ...trade(3, 1, '2025-03-01', 'buy', '0', '10'), action: 'dividend',
+          amount: 5000, units: null, price: null }],
+      prices: [{ assetId: 1, date: '2025-04-01', price: '11' }],
+    };
+    const points = returnSeries(mixed, '2025-04-01', '2025-01-31');
+    expect(points[0]?.groups.stock).toBeNull();
+    expect(points.at(-1)?.groups.mf).toBeCloseTo(0.15);
+    expect(points.at(-1)?.portfolio).toBeCloseTo(
+      periodTotals(periodRows(mixed, '2025-01-31', '2025-04-01'), '2025-04-01').absolute!,
+    );
+  });
+});
+
+describe('benchmarkReturns', () => {
+  it('uses SIP dates, not a plain index change, and declines missing NAVs', () => {
+    const own = { ...data, assets: [data.assets[0]!],
+      txns: data.txns.filter((txn) => txn.assetId === 1) };
+    const points = returnSeries(own, '2025-04-01', null);
+    const history = [
+      { date: '2025-01-15', price: '10' }, { date: '2025-01-31', price: '11' },
+      { date: '2025-02-28', price: '12' }, { date: '2025-03-10', price: '12' },
+      { date: '2025-03-31', price: '13' }, { date: '2025-04-01', price: '13' },
+    ];
+    expect(benchmarkReturns(own, points, null, history).values.at(-1)).toBeCloseTo(0.21875);
+    expect(benchmarkReturns(own, points, null, []).error).toMatch(/No benchmark NAV/);
+  });
+
+  it('mirrors a withdrawal, but not a dividend, and requires a NAV at the start', () => {
+    const own: PortfolioData = { ...data, assets: [data.assets[0]!],
+      txns: [trade(1, 1, '2025-01-15', 'buy', '100', '10'),
+        { ...trade(2, 1, '2025-03-01', 'buy', '0', '10'), action: 'dividend', amount: 10000 },
+        trade(3, 1, '2025-03-10', 'sell', '20', '12')],
+      prices: [{ assetId: 1, date: '2025-01-31', price: '10' },
+        { assetId: 1, date: '2025-03-10', price: '12' }],
+    };
+    const points = returnSeries(own, '2025-03-10', '2025-01-31');
+    const quotes = [{ date: '2025-01-31', price: '10' }, { date: '2025-03-10', price: '12' }];
+    expect(benchmarkReturns(own, points, '2025-01-31', quotes).values.at(-1)).toBeCloseTo(0.2);
+    expect(benchmarkReturns(own, points, '2025-01-31', quotes.slice(1)).error).toMatch(/start date/);
+    expect(benchmarkReturns(own, points, '2025-01-31', [{ date: '2025-01-31', price: '1' },
+      { date: '2025-03-10', price: '0.1' }]).error).toMatch(/withdrawal/);
+  });
+});
 
 describe('performanceSeries', () => {
   it('has a point at each month-end from the first transaction, then the last day', () => {
@@ -139,6 +216,28 @@ describe('performanceSeries', () => {
     expect(dates).toHaveLength(31);
     expect(dates.slice(0, 3)).toEqual(['2025-09-01', '2025-09-02', '2025-09-03']);
     expect(dates.at(-1)).toBe('2025-10-01');
+  });
+
+  it('shows a full sale and repurchase within one month on a holding chart', () => {
+    const own: PortfolioData = {
+      assets: [asset(1, 'Example Fund')],
+      txns: [
+        trade(1, 1, '2025-01-15', 'buy', '100', '10'),
+        trade(2, 1, '2026-09-07', 'sell', '100', '12'),
+        trade(3, 1, '2026-09-29', 'buy', '50', '11'),
+      ],
+      prices: [],
+      valuations: [],
+    };
+    const dates = sampleHistoryDates(own, '2025-01-15', '2026-10-12', null, true);
+    expect(dates.filter((date) => date.startsWith('2026-09'))).toEqual([
+      '2026-09-07', '2026-09-29', '2026-09-30',
+    ]);
+    expect(dates.filter((date) => date === '2026-09-07' || date === '2026-09-29')
+      .map((date) => {
+        const [row] = buildPortfolio(own, date);
+        return [row?.holding.cost, row?.value];
+      })).toEqual([[0, 0], [55000, 55000]]);
   });
 });
 

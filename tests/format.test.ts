@@ -3,6 +3,7 @@ import {
   axisLabel,
   formatAmount,
   formatAmountSigned,
+  formatAxisPercent,
   formatDate,
   formatDay,
   formatTime,
@@ -18,6 +19,7 @@ import {
   formatUnits,
   gainClass,
   MINUS,
+  niceRange,
   niceScale,
   niceStep,
 } from '@/lib/domain/format';
@@ -143,6 +145,12 @@ describe('chart axes', () => {
 
   it('survives an empty chart', () => {
     expect(niceScale(0, 4)).toEqual({ top: 1, step: 1, ticks: 1 });
+  });
+
+  it('scales signed returns around zero', () => {
+    expect(niceRange(-3, 8, 4)).toEqual({ bottom: -5, top: 10, step: 5 });
+    expect(niceRange(0, 0, 5)).toEqual({ bottom: -1, top: 1, step: 1 });
+    expect(formatAxisPercent(-2.5, 0.5)).toBe('−2.5%');
   });
 });
 

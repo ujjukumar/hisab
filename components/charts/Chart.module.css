@@ -145,6 +145,8 @@
   gap: 7px;
 }
 
+.dash { width: 16px; border-top: 2px dashed; }
+
 .empty {
   display: grid;
   place-items: center;

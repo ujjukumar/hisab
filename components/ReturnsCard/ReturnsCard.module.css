@@ -1,0 +1,43 @@
+.dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.dates label {
+  display: grid;
+  gap: 4px;
+}
+
+.dates input {
+  font: inherit;
+  color: var(--heading);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 7px;
+}
+
+.dates button {
+  font: inherit;
+  color: var(--surface);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 3px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.dates :is(input, button):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.note { color: var(--text-3); font-size: 12px; margin: 4px 0 0; }
+.error { color: var(--loss); font-size: 13px; }
+
+.compare { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 15px; font-size: 12px; }
+.compare span { color: var(--text-2); margin-right: 4px; }
+.compare button { color: var(--primary); background: none; border: 1px solid var(--line-strong); border-radius: 3px; padding: 5px 8px; cursor: pointer; font: inherit; }
+.compare button[aria-pressed='true'] { background: var(--surface); border-color: var(--primary); font-weight: 600; }
+.compare button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

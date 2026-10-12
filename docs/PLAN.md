@@ -232,7 +232,27 @@ Include the range start and last day, and position points according to calendar 
 - **Invested** = total cost of holdings on that date (same rules as above).
 - **Worth** = value of holdings on that date, using the latest price or valuation known on or before it.
 
+On an individual investment's detail chart, also plot transaction dates at every
+cadence so a sale and repurchase between checkpoints are visible.
+
 Periods include 1 day, 1 week, 1/3/6 months, financial year to date, 1/3 years and all time. YTD follows the configured financial year; the Dashboard's portfolio YTD chip uses the calendar year.
+
+The Investments Overview has a separate **Returns** percentage chart (`returns.ts`).
+Portfolio and investment-type lines show gain divided by starting value plus money paid
+in; sales and income are money out, not market gains. Undefined denominators leave a
+gap in the line. The endpoint matches Change in period for the same dates. Its ranges
+are YTD (calendar year), 1/3/6 months, 1/3/5/10 years, All and Custom, independent
+of the table's period selector. Short histories default to All, otherwise 1 year.
+
+An optional benchmark is an owner-named AMFI index fund ISIN, not an official
+index level. Its NAV is in rupees and comes from the same whole-market AMFI files
+as holding prices. For comparison, hypothetically buy that fund with the period's
+starting portfolio value and add or remove units on the same dates as buys,
+deposits, fees, sales and withdrawals. Dividends, interest and intraday P&L are
+not benchmark purchases. Divide hypothetical gain by the portfolio line's
+starting value plus money paid in. If a required NAV is missing or a withdrawal
+cannot be covered, mark that comparison unavailable; a missing chart-date NAV
+leaves a gap. Up to eight benchmarks can be selected independently in the URL.
 
 ### Allocation
 
@@ -255,7 +275,7 @@ The top 3 holdings each way over a chosen period (1 day, 1 week, 1/3/6 months, f
 | `/money/accounts`, `/money/categories` | Create, edit and archive accounts/categories |
 | `/money/sms` | Review SMS imports one by one or in bulk, with filters and keyboard shortcuts |
 | `/money/sms/history`, `/money/sms/rules`, `/money/sms/devices` | Monthly SMS decisions; learned import rules; paired phones and pairing requests |
-| `/investments` | Grouped holdings, sold toggle, price fetches and statement updates |
+| `/investments` | Returns chart with optional benchmarks, date ranges and investment types; grouped holdings, sold toggle, price fetches and statement updates |
 | `/investments/performance` | As-of date and period, flow-adjusted returns, chart, tables and CSV |
 | `/investments/transactions` | Filtered investment activity, running units and CSV |
 | `/investments/[assetId]` | Holding summary, period chart, transactions and FD details |
@@ -366,6 +386,11 @@ themes and 360/768/1440px layouts using invented data. Charts need zero, one and
 many points with readable labels/tooltips. Playwright is optional, not a required
 new dependency. Documentation-only edits need link/reference and diff checks.
 
+For the Returns chart, check range links, custom dates, group tabs, sold holdings,
+the zero line and the endpoint against Change in period for matching dates.
+For benchmarks, check a shared AMFI download, missing and pre-launch NAVs,
+stop/resume, Compare with toggles, and Settings add/remove on invented data.
+
 ---
 
 ## 13. Decisions (settled)
@@ -395,7 +420,7 @@ new dependency. Documentation-only edits need link/reference and diff checks.
 
 - Import bank and card statements from CSV, with column mapping and duplicate detection.
 - Recurring transactions (rent, SIPs, subscriptions) with reminders.
-- Benchmark comparison (e.g. against an index) and inflation-adjusted returns.
+- Inflation-adjusted returns and official index-level comparison.
 - Tax view: capital gains by financial year using FIFO. This is not tax advice.
 - Rule-based insights card ("Dining is 30% above your 3-month average").
 - Split transactions across categories, attachments/receipts, multiple currencies.
@@ -429,6 +454,10 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Dev migration check | Done | 11 Oct 2026 | A running `npm run dev` keeps its database connection across hot reloads, so a migration pulled in meanwhile used to surface as "no such column". Now a schema change makes pages say to restart, and the restart applies the migration after a backup. Nothing is migrated mid-session. |
 | SMS parser v3 | Done | 11 Oct 2026 | A survey of three months of real bank SMS (read in memory only) found most recurring messages could never auto-import. Fixed: a card's name and "credit limit" no longer read as a flow, "Sent Rs…" is money out, a quoted balance or limit is no longer a second amount, references that join letters to a long number are masked in the fingerprint, and new rules match a bank's registered sender ID across route prefixes. Waiting SMS are re-read. No new dependencies. |
 | Intraday trades | Done | 12 Oct 2026 | Stocks and ETFs can record a same-day buy and sell as one Intraday entry with buy and sell prices (`intraday_trades` migration adds `sell_price`). Only the profit or loss after charges counts, so it no longer blends into the delivery holding's average cost. The drawer offers actions by kind of investment; existing rows keep theirs. No new dependencies. |
+| Investment returns chart | Done | 12 Oct 2026 | Overview now plots flow-adjusted portfolio and investment-type returns over calendar YTD, 1/3/6 months, 1/3/5/10 years, All or custom dates. Tests, lint, typecheck, build and disposable sample-data route checks passed. Benchmark comparison follows separately. |
+| Investment benchmarks | Done | 12 Oct 2026 | Owner-configured AMFI index fund ISINs add optional dashed, same-cash-flow return lines. Latest and resumable daily NAVs reuse AMFI downloads, with absent-day markers and missing-price notes. Lint, typecheck, tests, build and disposable-data browser checks passed; no new sites or dependencies. |
+| Overview holdings table | Done | 12 Oct 2026 | Last price and its date now appear below unit-priced investment names instead of in a separate column; portfolio share follows total return. Totals, sorting and mobile table scrolling verified with invented data. |
+| Holding chart trade dates | Done | 12 Oct 2026 | Individual invested-and-worth charts now show trades between monthly or weekly checkpoints, including a full sale and repurchase. Invented-data regression confirms the zero holding and new cost. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

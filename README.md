@@ -253,8 +253,18 @@ it from Settings to undo an import.
 
 ## Automatic prices
 
+**Investments → Overview → Returns** plots portfolio and investment-type gains
+as a percentage of starting value plus money added. Choose a range or Custom
+dates. Calendar YTD starts on 1 January; the separate "Change in period" YTD
+still follows your configured financial year. To compare with an index, add an
+AMFI index fund's name and ISIN under **Settings → Benchmarks**, then select it
+under "Compare with" on the chart. The dashed line shows what the same deposits
+and withdrawals would have earned in that fund, not the index's own percentage
+change. NAVs before the fund existed or missing on flow dates make its line
+unavailable; use **Fetch past prices** in Settings to fill missing history.
+
 Once a day, the first time you open the app, Hisaab downloads the latest fund
-NAVs from AMFI and the last closing prices of stocks and ETFs from NSE, using
+and benchmark NAVs from AMFI and the last closing prices of stocks and ETFs from NSE, using
 BSE for listed ISINs NSE does not have. This
 works for funds, stocks and ETFs whose **Symbol or code** is their ISIN (the
 Value Research import fills it in). Investments shows when prices were last

@@ -51,10 +51,10 @@ export function LegendInline({ children }: { children: ReactNode }) {
   return <div className={styles.legendInline}>{children}</div>;
 }
 
-export function LegendKey({ color, children }: { color: string; children: ReactNode }) {
+export function LegendKey({ color, dashed, children }: { color: string; dashed?: boolean; children: ReactNode }) {
   return (
     <span>
-      <i className="dot" style={{ background: color }} aria-hidden="true" />
+      <i className={dashed ? styles.dash : 'dot'} style={dashed ? { borderColor: color } : { background: color }} aria-hidden="true" />
       {children}
     </span>
   );

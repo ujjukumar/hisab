@@ -37,12 +37,18 @@ export function sampleHistoryDates(
   first: IsoDate,
   to: IsoDate,
   from: IsoDate | null = null,
+  includeTransactions = false,
 ): IsoDate[] {
   if (first > to) return [];
   const start = from && from > first ? from : first;
   const cadence = seriesCadence(from, to);
   const dates = new Set<IsoDate>([to]);
   if (from) dates.add(start);
+  if (includeTransactions) {
+    for (const txn of data.txns) {
+      if (txn.date >= start && txn.date <= to) dates.add(txn.date);
+    }
+  }
   if (cadence === 'daily') {
     for (const row of [...data.txns, ...data.prices, ...data.valuations]) {
       if (row.date >= start && row.date <= to) dates.add(row.date);

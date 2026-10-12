@@ -15,6 +15,8 @@ import {
   UpdateValuesButton,
 } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { SubTabs } from '@/components/SubTabs/SubTabs';
+import { ReturnsCard } from '@/components/ReturnsCard/ReturnsCard';
+import type { ReturnLine } from '@/components/charts/ReturnChart';
 import { ASSET_TYPE_LABELS, GROUPS, maskRef } from '@/lib/domain/assets';
 import { today } from '@/lib/domain/dates';
 import {
@@ -37,6 +39,8 @@ import {
   type PeriodRow,
 } from '@/lib/domain/performance';
 import { totals, type HoldingRow } from '@/lib/domain/portfolio';
+import { benchmarkReturns, pickReturnRange, returnSeries } from '@/lib/domain/returns';
+import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { assetOptions, pickHoldings, portfolio, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
@@ -45,8 +49,6 @@ type Group = (typeof GROUPS)[number];
 const MUTED = <Amount tone="muted">—</Amount>;
 const SORT_KEYS = [
   'name',
-  'price',
-  'priceDate',
   'change',
   'changePercent',
   'cost',
@@ -79,7 +81,7 @@ function columns(
     {
       key: 'name',
       header: 'Name',
-      sub: g.nameSub,
+      sub: g.key === 'mf' || g.key === 'stock' ? 'Last price' : g.nameSub,
       align: 'l',
       sortable: true,
       sortValue: (r) => r.asset.name,
@@ -96,38 +98,15 @@ function columns(
               )}
             </>
           }
-          sub={maskRef(r.asset.accountRef) || ASSET_TYPE_LABELS[r.asset.type]}
+          sub={r.sold || r.asset.valuation !== 'units'
+            ? maskRef(r.asset.accountRef) || ASSET_TYPE_LABELS[r.asset.type]
+            : r.price
+              ? `${price(r.price.price)} · ${formatDate(r.price.date)}`
+              : r.holding.lastBuyPrice
+                ? `${price(r.holding.lastBuyPrice)} · Price not updated`
+                : 'Price not updated'}
         />
       ),
-    },
-    {
-      key: 'price',
-      header: 'Last price',
-      sortOptions: [
-        {
-          key: 'price',
-          header: 'Last price',
-          sub: 'As of',
-          sortValue: (r) => r.sold || r.asset.valuation !== 'units'
-            ? null
-            : Number(r.price?.price ?? r.holding.lastBuyPrice ?? 0),
-        },
-        {
-          key: 'priceDate',
-          header: 'As of',
-          sortValue: (r) => r.price?.date ?? null,
-        },
-      ],
-      cell: (r) =>
-        r.sold || r.asset.valuation !== 'units' ? (
-          MUTED
-        ) : r.price ? (
-          <Amount sub={formatDate(r.price.date)}>{price(r.price.price)}</Amount>
-        ) : (
-          <Amount sub="Price not updated">
-            {r.holding.lastBuyPrice ? price(r.holding.lastBuyPrice) : '—'}
-          </Amount>
-        ),
     },
     {
       key: 'change',
@@ -223,15 +202,6 @@ function columns(
       ),
     },
     {
-      key: 'share',
-      header: '% of portfolio',
-      sortable: true,
-      sortValue: (r) => portfolioValue ? (r.value / portfolioValue) * 100 : 0,
-      cell: (r) => (
-        <Amount>{portfolioValue ? ((r.value / portfolioValue) * 100).toFixed(2) : '0.00'}</Amount>
-      ),
-    },
-    {
       key: 'return',
       header: 'Total return',
       sortOptions: [
@@ -255,6 +225,15 @@ function columns(
         >
           {formatAmountSigned(r.totalReturn)}
         </Amount>
+      ),
+    },
+    {
+      key: 'share',
+      header: '% of portfolio',
+      sortable: true,
+      sortValue: (r) => portfolioValue ? (r.value / portfolioValue) * 100 : 0,
+      cell: (r) => (
+        <Amount>{portfolioValue ? ((r.value / portfolioValue) * 100).toFixed(2) : '0.00'}</Amount>
       ),
     },
   ];
@@ -281,6 +260,42 @@ export default async function OverviewPage({
   const sort = tableSortFromParams(search, SORT_KEYS);
   const yearStart = await financialYearStartMonth();
   const data = portfolioData();
+  const scope = group ? {
+    ...data,
+    assets: data.assets.filter((asset) => all.some((row) => row.asset.id === asset.id && row.group === group)),
+    txns: data.txns.filter((txn) => all.some((row) => row.asset.id === txn.assetId && row.group === group)),
+  } : data;
+  const first = scope.txns.reduce<string | null>((earliest, txn) =>
+    earliest === null || txn.date < earliest ? txn.date : earliest, null);
+  const range = first ? pickReturnRange({
+    range: typeof params.range === 'string' ? params.range : undefined,
+    from: typeof params.from === 'string' ? params.from : undefined,
+    to: typeof params.to === 'string' ? params.to : undefined,
+  }, date, first) : null;
+  const points = range && !range.error ? returnSeries(scope, range.to, range.from) : [];
+  const groups = GROUPS.filter(({ key }) => scope.assets.some((asset) =>
+    all.some((row) => row.asset.id === asset.id && row.group === key) &&
+    scope.txns.some((txn) => txn.assetId === asset.id)));
+  const lines: ReturnLine[] = points.length ? [
+    ...(!group && groups.length > 1 ? [{ key: 'portfolio', label: 'Portfolio', color: 'var(--c1)',
+      values: points.map((point) => point.portfolio) }] : []),
+    ...groups.map(({ key, title }, index) => ({ key, label: title,
+      color: `var(--c${(index + (group ? 1 : 2)) % 8 + 1})`,
+      values: points.map((point) => point.groups[key] ?? null) })),
+  ] : [];
+  const benchmarks = benchmarkList();
+  const compared = new Set(typeof params.compare === 'string'
+    ? params.compare.split(',').map(Number) : []);
+  const selected = benchmarks.filter((item) => compared.has(item.id));
+  const history = benchmarkHistory(selected.map((item) => item.id));
+  const notices: string[] = [];
+  for (const [index, item] of selected.entries()) {
+    const compared = benchmarkReturns(scope, points, range?.from ?? null,
+      history.filter((row) => row.benchmarkId === item.id));
+    if (compared.error) notices.push(`${item.name}: ${compared.error}`);
+    if (points.length) lines.push({ key: `benchmark-${item.id}`, label: item.name,
+      color: `var(--c${(index + 4) % 8 + 1})`, dashed: true, values: compared.values });
+  }
   const changes = investmentPeriodRows(data, period, date, yearStart);
   const changeById = new Map(changes.map((r) => [r.row.asset.id, r]));
 
@@ -290,6 +305,12 @@ export default async function OverviewPage({
     if (g) p.set('group', g);
     if (next.sold ?? showSold) p.set('sold', '1');
     if (period !== '1d') p.set('period', period);
+    if (selected.length) p.set('compare', selected.map((item) => item.id).join(','));
+    if (range && range.range !== '1y') p.set('range', range.range);
+    if (range?.range === 'custom') {
+      if (typeof params.from === 'string') p.set('from', params.from);
+      if (typeof params.to === 'string') p.set('to', params.to);
+    }
     const sortKey = next.sort ?? sort?.key;
     const sortDir = next.dir ?? sort?.dir;
     if (sortKey && sortDir) {
@@ -320,6 +341,9 @@ export default async function OverviewPage({
         />
       )}
       <div className="wrap page-body">
+        {first && range && <ReturnsCard dates={points.map((point) => point.date)} lines={lines}
+          range={range.range} available={range.available} from={range.from} to={range.to} asOf={date}
+          first={first} error={range.error} params={params} benchmarks={benchmarks} notices={notices} />}
         {hiddenSold > 0 && (
           <p className="tbl-note">
             {showSold ? (
@@ -408,7 +432,6 @@ export default async function OverviewPage({
                   footer={
                     <tr>
                       <td className="l">Total</td>
-                      <td />
                       <td className="r">
                         <Amount
                           tone={gainClass(groupChange.gain)}
@@ -425,17 +448,17 @@ export default async function OverviewPage({
                         <Amount>{formatAmount(t.value)}</Amount>
                       </td>
                       <td className="r">
-                        <Amount>
-                          {portfolioValue ? ((t.value / portfolioValue) * 100).toFixed(2) : '0.00'}
-                        </Amount>
-                      </td>
-                      <td className="r">
                         <Amount
                           tone={gainClass(t.totalReturn)}
                           sub={formatReturn(t.ret)}
                           subTone={retTone(t.ret)}
                         >
                           {formatAmountSigned(t.totalReturn)}
+                        </Amount>
+                      </td>
+                      <td className="r">
+                        <Amount>
+                          {portfolioValue ? ((t.value / portfolioValue) * 100).toFixed(2) : '0.00'}
                         </Amount>
                       </td>
                       <td />

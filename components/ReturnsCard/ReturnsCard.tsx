@@ -1,0 +1,63 @@
+import Link from 'next/link';
+import { Card } from '@/components/Card/Card';
+import { ChipLinks } from '@/components/Chips/Chips';
+import { ReturnChart, type ReturnLine } from '@/components/charts/ReturnChart';
+import { LegendInline, LegendKey } from '@/components/charts/Tip';
+import { formatDate, formatPercent } from '@/lib/domain/format';
+import { RETURN_RANGES, type ReturnRange } from '@/lib/domain/returns';
+import type { IsoDate } from '@/lib/domain/dates';
+import styles from './ReturnsCard.module.css';
+import { CompareBenchmarks } from './CompareBenchmarks';
+
+export function ReturnsCard({ dates, lines, range, available, from, to, asOf, first, error, params, benchmarks, notices }: {
+  dates: IsoDate[];
+  lines: ReturnLine[];
+  range: ReturnRange;
+  available: typeof RETURN_RANGES[number][];
+  from: IsoDate | null;
+  to: IsoDate;
+  asOf: IsoDate;
+  first: IsoDate;
+  error: string | null;
+  params: Record<string, string | string[] | undefined>;
+  benchmarks: { id: number; name: string }[];
+  notices: string[];
+}) {
+  const retained = new URLSearchParams();
+  for (const key of ['group', 'sold', 'period', 'sort', 'dir', 'compare']) {
+    const value = params[key];
+    if (typeof value === 'string') retained.set(key, value);
+  }
+  const href = (next: ReturnRange) => {
+    const query = new URLSearchParams(retained);
+    query.set('range', next);
+    if (next === 'custom') {
+      query.set('from', from ?? first);
+      query.set('to', to);
+    }
+    return `/investments?${query}`;
+  };
+  return <Card title="Returns" sub="Gain on money put in. YTD starts on 1 January.">
+    <ChipLinks label="Return range" items={available.map(([value, label]) => ({
+      href: href(value), label, current: range === value,
+    }))} />
+    {range === 'custom' && <form action="/investments" className={styles.dates}>
+      {[...retained.entries(), ['range', 'custom']].map(([key, value]) =>
+        <input key={key} type="hidden" name={key} value={value} />)}
+      <label>From <input type="date" name="from" defaultValue={typeof params.from === 'string' ? params.from : from ?? first} max={asOf} required /></label>
+      <label>To <input type="date" name="to" defaultValue={typeof params.to === 'string' ? params.to : to} max={asOf} required /></label>
+      <button type="submit">Show returns</button>
+    </form>}
+    {benchmarks.length ? <CompareBenchmarks items={benchmarks} /> :
+      <p className={styles.note}>To compare with an index fund, <Link href="/settings">add a benchmark in Settings</Link>.</p>}
+    {notices.map((message) => <p className={styles.note} key={message}>{message}</p>)}
+    {error ? <p role="alert" className={styles.error}>{error}</p> : <>
+      <LegendInline>{lines.map((line) => <LegendKey key={line.key} color={line.color} dashed={line.dashed}>
+        {line.label}: {line.values.at(-1) === null || line.values.at(-1) === undefined
+          ? '—' : formatPercent(line.values.at(-1)! * 100)}
+      </LegendKey>)}</LegendInline>
+      <ReturnChart dates={dates} lines={lines} />
+      <p className={styles.note}>{formatDate(dates[0] ?? from ?? first)} to {formatDate(to)} · Comparisons use the same money added and taken out on the same dates.</p>
+    </>}
+  </Card>;
+}
