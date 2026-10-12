@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyFeedPrices } from '@/lib/actions/applyPrices';
+import { applyBenchmarkPrices, applyFeedPrices } from '@/lib/actions/applyPrices';
 import { openDatabase, type Connection } from '@/lib/db/connect';
-import { assets, prices } from '@/lib/db/schema';
+import { assets, benchmarkPrices, benchmarks, prices } from '@/lib/db/schema';
 
 /** PLAN section 11, phase 8, on a seeded database. */
 
@@ -69,5 +69,19 @@ describe('applyFeedPrices', () => {
       ]),
     ).toThrow();
     expect(priceOn('2030-03-01')).toBeUndefined();
+  });
+});
+
+describe('applyBenchmarkPrices', () => {
+  it('stores absent days and replaces them when a NAV arrives, without erasing saved NAVs', () => {
+    const id = Number(conn.db.insert(benchmarks).values({ name: 'Invented index fund',
+      isin: 'INF000BM0011' }).run().lastInsertRowid);
+    const absent = { benchmarkId: id, date: '2026-01-02', price: null };
+    expect(applyBenchmarkPrices(conn.db, [absent])).toBe(1);
+    expect(applyBenchmarkPrices(conn.db, [{ ...absent, price: '12.5' }])).toBe(1);
+    expect(applyBenchmarkPrices(conn.db, [absent])).toBe(0);
+    expect(conn.db.select().from(benchmarkPrices).where(and(
+      eq(benchmarkPrices.benchmarkId, id), eq(benchmarkPrices.date, absent.date),
+    )).get()?.price).toBe('12.5');
   });
 });

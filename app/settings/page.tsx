@@ -4,11 +4,14 @@ import { PageHead } from '@/components/PageHead/PageHead';
 import { AutoPricesSwitch, PastPrices, UpdatePricesButton } from '@/components/Prices/Prices';
 import {
   PreferencesForm,
+  BenchmarkForm,
+  RemoveBenchmark,
   RestoreForm,
   SettingRow,
   StartFreshForm,
 } from '@/components/SettingsForms/SettingsForms';
 import { pastPriceDates } from '@/lib/queries/investments';
+import { benchmarkList } from '@/lib/queries/benchmarks';
 import {
   autoPrices,
   databaseInfo,
@@ -35,6 +38,7 @@ export default async function SettingsPage() {
     priceUpdate(),
   ]);
   const info = databaseInfo();
+  const benchmarks = benchmarkList();
 
   return (
     <>
@@ -110,7 +114,7 @@ export default async function SettingsPage() {
           >
             <SettingRow title="Automatic prices" control={<AutoPricesSwitch on={auto} />}>
               <p>
-                Once a day, when the app opens, funds get their latest NAV from AMFI and stocks and
+                Once a day, when the app opens, funds and benchmarks get their latest NAV from AMFI and stocks and
                 ETFs their closing price from NSE, or BSE if NSE has no price. It works for investments whose symbol is an ISIN.
                 Prices you enter or import are never replaced.
               </p>
@@ -120,11 +124,21 @@ export default async function SettingsPage() {
             </SettingRow>
             <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
               <p>
-                Fetches daily prices for every trading day back to your first purchase. Existing
+                Fetches daily holding and benchmark prices for every trading day back to your first purchase. Existing
                 prices, weekends, dates with no exchange files for three days, and pre-NAV NFO
                 dates are skipped. The estimate appears before starting. Progress and Stop stay
                 available on every page; an unfinished run resumes when the app reopens.
               </p>
+            </SettingRow>
+          </Card>
+
+          <Card title="Benchmarks" sub="Compare your returns with index funds using AMFI NAVs in rupees.">
+            {benchmarks.map((benchmark) => <SettingRow key={benchmark.id} title={benchmark.name}
+              control={<RemoveBenchmark id={benchmark.id} />}>
+              <p>{benchmark.isin}</p>
+            </SettingRow>)}
+            <SettingRow title="Add an index fund" control={<BenchmarkForm />}>
+              <p>Enter the name and ISIN of an AMFI-listed index fund. Benchmarks use the same public NAV files as fund prices; nothing about your holdings is sent.</p>
             </SettingRow>
           </Card>
 

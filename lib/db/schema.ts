@@ -187,6 +187,25 @@ export const prices = sqliteTable(
   (t) => [primaryKey({ columns: [t.assetId, t.date] })],
 );
 
+export const benchmarks = sqliteTable('benchmarks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  isin: text('isin').notNull().unique(),
+  ...stamps,
+});
+
+export const benchmarkPrices = sqliteTable(
+  'benchmark_prices',
+  {
+    benchmarkId: integer('benchmark_id').notNull().references(() => benchmarks.id),
+    date: text('date').notNull(),
+    /** Null records that a published AMFI file had no NAV for this ISIN on this date. */
+    price: text('price'),
+    ...stamps,
+  },
+  (table) => [primaryKey({ columns: [table.benchmarkId, table.date] })],
+);
+
 export const valuations = sqliteTable(
   'valuations',
   {

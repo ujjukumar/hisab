@@ -65,6 +65,7 @@ describe('migration history upgrade', () => {
       initial.sqlite.exec(
         'DROP TABLE sms_pairing_invites; DROP TABLE sms_messages; DROP TABLE sms_rules; DROP TABLE sms_devices;',
       );
+      initial.sqlite.exec('DROP TABLE benchmark_prices; DROP TABLE benchmarks;');
       initial.sqlite.prepare('INSERT INTO accounts (name, type, opening_date) VALUES (?, ?, ?)')
         .run('Example cash', 'cash', '2026-09-01');
       initial.sqlite.exec(`DROP TABLE __drizzle_migrations;

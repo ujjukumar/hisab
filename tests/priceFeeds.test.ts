@@ -486,6 +486,18 @@ describe('pastPriceNeeds', () => {
     );
   });
 
+  it('schedules benchmarks from the first transaction and skips saved and attempted dates', () => {
+    const unlinked = { ...data, assets: [asset(3, 'mutual_fund', null)],
+      txns: [trade(3, 3, '2024-04-01', 'buy', '1')] };
+    const benchmark = [{ id: 7, isin: 'INF000BM0011' }];
+    const known = [{ benchmarkId: 7, date: '2024-04-01' }];
+    const needs = pastPriceNeeds(unlinked, '2024-04-03', new Set(), benchmark, known);
+    expect(needs.map((need) => need.date)).toEqual(['2024-04-02', '2024-04-03']);
+    expect(needs[0]?.benchmarks).toEqual(benchmark);
+    expect(pendingPriceNeeds(unlinked, '2024-04-03', new Set(['2024-04-02:daily:benchmark:7']),
+      new Set(), benchmark, known).map((need) => need.date)).toEqual(['2024-04-03']);
+  });
+
   it('crosses the year end', () => {
     const late: PortfolioData = {
       ...data,

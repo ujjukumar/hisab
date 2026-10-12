@@ -1,7 +1,7 @@
-import { applyFeedPrices } from '@/lib/actions/applyPrices';
+import { applyBenchmarkPrices, applyFeedPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
-import { LOOK_BACK_DAYS, pricesFor, type FeedAsset, type PriceMap } from '@/lib/domain/priceFeeds';
-import type { IsoDate } from '@/lib/domain/dates';
+import { LOOK_BACK_DAYS, pricesFor, type BenchmarkFeed, type FeedAsset, type PriceMap } from '@/lib/domain/priceFeeds';
+import { addDays, today, type IsoDate } from '@/lib/domain/dates';
 import { FeedError, bseLatest, listedPricesOn, nseLatest } from '@/lib/feeds';
 
 const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
@@ -17,12 +17,14 @@ export async function fetchAndSave(
   lookBackDays = LOOK_BACK_DAYS,
   canSave: () => boolean = () => true,
   dailyBackfill = false,
+  benchmarkFeed: BenchmarkFeed[] = [],
 ): Promise<{ updated: number; problems: string[]; unavailable: boolean; noMarketFile: boolean }> {
   const amfi = linked.filter((a) => a.feed === 'amfi');
   const nse = linked.filter((a) => a.feed === 'nse');
   const earliestDates = new Map(
     amfi.flatMap((asset) => asset.navStartDate ? [[asset.isin, asset.navStartDate] as const] : []),
   );
+  const fundIsins = [...new Set([...amfi, ...benchmarkFeed].map((asset) => asset.isin))];
   const none: PriceMap = new Map();
   let noMarketFile = false;
   let marketFileFound = !dailyBackfill;
@@ -36,19 +38,21 @@ export async function fetchAndSave(
         })
       : nseLatest(date, lookBackDays, nse.map((asset) => asset.isin));
   const got = await Promise.allSettled([
-    amfi.length ? funds(amfi.map((a) => a.isin), earliestDates) : none,
+    fundIsins.length ? funds(fundIsins, earliestDates) : none,
     listedRequest,
   ]);
   const problems: string[] = [];
   let unavailable = false;
   const fundResult = got[0]!;
   let fundRows: ReturnType<typeof pricesFor> = [];
-  if (amfi.length && fundResult.status === 'rejected') {
+  if (fundIsins.length && fundResult.status === 'rejected') {
     if (!(fundResult.reason instanceof FeedError)) throw fundResult.reason;
     problems.push(fundResult.reason.message);
     unavailable = true;
-  } else if (amfi.length && fundResult.status === 'fulfilled') {
-    fundRows = pricesFor(amfi, fundResult.value);
+  } else if (fundIsins.length && fundResult.status === 'fulfilled') {
+    const fundMap = dailyBackfill ? new Map([...fundResult.value].filter(([isin, found]) =>
+      found.date === date && date >= (earliestDates.get(isin) ?? date))) : fundResult.value;
+    fundRows = pricesFor(amfi, fundMap);
     const missing = amfi.length - fundRows.length;
     if (missing && !(lookBackDays === 1 && fundResult.value.size === 0)) {
       problems.push(
@@ -56,6 +60,23 @@ export async function fetchAndSave(
       );
     }
   }
+
+  const benchmarkRows = fundResult.status === 'fulfilled' ? benchmarkFeed.flatMap((item): {
+    benchmarkId: number; date: IsoDate; price: string | null;
+  }[] => {
+    const found = fundResult.value.get(item.isin);
+    if (found && (!dailyBackfill || found.date === date))
+      return [{ benchmarkId: item.id, date: found.date, price: found.price }];
+    if (dailyBackfill && fundResult.value.size && date <= addDays(today(), -3))
+      return [{ benchmarkId: item.id, date, price: null }];
+    return [];
+  }) : [];
+  if (benchmarkFeed.length && !dailyBackfill && fundResult.status === 'fulfilled') {
+    const missing = benchmarkFeed.length - benchmarkRows.length;
+    if (missing) problems.push(`AMFI had no NAV for ${missing} benchmark${missing === 1 ? '' : 's'}. Check the ISIN in Settings.`);
+  }
+  if (fundIsins.length && fundResult.status === 'fulfilled' && fundResult.value.size)
+    noMarketFile = false;
 
   const nseResult = got[1]!;
   if (nseResult.status === 'rejected' && !(nseResult.reason instanceof FeedError))
@@ -116,7 +137,10 @@ export async function fetchAndSave(
     });
   }
   return {
-    updated: rows.length && canSave() ? applyFeedPrices(db, rows) : 0,
+    updated: canSave()
+      ? (rows.length ? applyFeedPrices(db, rows) : 0) +
+        (benchmarkRows.length ? applyBenchmarkPrices(db, benchmarkRows) : 0)
+      : 0,
     problems,
     unavailable,
     noMarketFile,

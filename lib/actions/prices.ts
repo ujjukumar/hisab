@@ -12,8 +12,9 @@ import {
   LOOK_BACK_DAYS,
   pastPriceNeeds,
 } from '@/lib/domain/priceFeeds';
-import { amfiFor, amfiLatest } from '@/lib/feeds';
+import { amfiFor, amfiLatest, amfiOn } from '@/lib/feeds';
 import { portfolio, portfolioData } from '@/lib/queries/investments';
+import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { autoPrices, priceUpdate, type PriceUpdate } from '@/lib/queries/settings';
 import { failed, invalid, type ActionFailure } from '@/lib/validation/money';
 
@@ -46,9 +47,11 @@ async function update(): Promise<PriceResult> {
       .map((r) => r.asset.id),
   );
   const linked = feedAssets(portfolioData().assets).filter((a) => held.has(a.id));
+  const benchmarkFeed = benchmarkList();
   const date = today();
-  const { updated, problems } = linked.length
-    ? await fetchAndSave(linked, date, () => amfiLatest())
+  const { updated, problems } = linked.length || benchmarkFeed.length
+    ? await fetchAndSave(linked, date, () => amfiLatest(), LOOK_BACK_DAYS,
+      () => true, false, benchmarkFeed)
     : {
         updated: 0,
         problems: ['No investments have an ISIN to update. Add one in each investment.'],
@@ -124,14 +127,21 @@ export async function fetchPastPrices(date: string): Promise<PriceResult> {
   const parsed = pastSchema.safeParse(date);
   if (!parsed.success) return invalid(parsed.error);
   const day = parsed.data as IsoDate;
-  const need = pastPriceNeeds(portfolioData(), today()).find((n) => n.date === day);
+  const benchmarks = benchmarkList();
+  const need = pastPriceNeeds(portfolioData(), today(), new Set(), benchmarks,
+    benchmarkHistory(benchmarks.map((item) => item.id))).find((n) => n.date === day);
   if (!need) return { ok: true, updated: 0 };
   const lookBackDays = need.cadence === 'daily' ? 1 : LOOK_BACK_DAYS;
   const { updated, problems } = await fetchAndSave(
     need.linked,
     day,
-    (isins, earliestDates) => amfiFor(day, isins, lookBackDays, earliestDates),
+    (isins, earliestDates) => need.benchmarks?.length
+      ? amfiOn(day)
+      : amfiFor(day, isins, lookBackDays, earliestDates),
     lookBackDays,
+    () => true,
+    true,
+    need.benchmarks,
   );
   revalidate();
   return problems.length ? failed(problems.join(' ')) : { ok: true, updated };

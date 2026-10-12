@@ -5,9 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/client';
 import { addDays, today } from '@/lib/domain/dates';
 import { settings } from '@/lib/db/schema';
-import { NO_MARKET_FILE_DATES_SETTING, pendingPriceNeeds, priceWorkKey } from '@/lib/domain/priceFeeds';
-import { amfiFor } from '@/lib/feeds';
+import { NO_MARKET_FILE_DATES_SETTING, benchmarkWorkKey, pendingPriceNeeds, priceWorkKey } from '@/lib/domain/priceFeeds';
+import { amfiFor, amfiOn } from '@/lib/feeds';
 import { freshPortfolioData, noMarketFileDates } from '@/lib/queries/investments';
+import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { fetchAndSave } from './priceDownloads';
 import {
   claimPriceJob,
@@ -52,11 +53,14 @@ async function runJob(id: string, owner: string): Promise<void> {
         return;
       }
       const asOf = today();
+      const benchmarks = benchmarkList();
       const needs = pendingPriceNeeds(
         freshPortfolioData(),
         asOf,
         new Set(job.attempted),
         noMarketFileDates(),
+        benchmarks,
+        benchmarkHistory(benchmarks.map((item) => item.id)),
       );
       const need = needs[0];
       if (!need) {
@@ -79,10 +83,13 @@ async function runJob(id: string, owner: string): Promise<void> {
       const result = await fetchAndSave(
         need.linked,
         need.date,
-        (isins, earliestDates) => amfiFor(need.date, isins, lookBack, earliestDates),
+        (isins, earliestDates) => need.benchmarks?.length
+          ? amfiOn(need.date)
+          : amfiFor(need.date, isins, lookBack, earliestDates),
         lookBack,
         () => current(id, owner)?.state === 'running',
         true,
+        need.benchmarks,
       );
       const latest = current(id, owner);
       if (!latest) return;
@@ -115,6 +122,7 @@ async function runJob(id: string, owner: string): Promise<void> {
         attempted: [
           ...latest.attempted,
           ...need.linked.map((asset) => priceWorkKey(need, asset.id)),
+          ...(need.benchmarks ?? []).map((item) => benchmarkWorkKey(need, item.id)),
         ],
         done: latest.done + 1,
         updated: latest.updated + result.updated,

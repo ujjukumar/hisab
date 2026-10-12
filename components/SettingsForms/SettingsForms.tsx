@@ -5,6 +5,7 @@ import { Button } from '@/components/Button/Button';
 import { FieldError, SelectField, TextField } from '@/components/Field/Field';
 import { useToast } from '@/components/Toast/Toast';
 import { restoreBackup, savePreferences, startFresh } from '@/lib/actions/settings';
+import { addBenchmark, removeBenchmark } from '@/lib/actions/benchmarks';
 import { COMPOUNDING, COMPOUNDING_LABELS } from '@/lib/domain/assets';
 import { MONTH_NAMES } from '@/lib/domain/dates';
 import type { ActionResult } from '@/lib/validation/money';
@@ -156,4 +157,26 @@ export function PreferencesForm({
       </Button>
     </form>
   );
+}
+
+export function BenchmarkForm() {
+  const form = useActionForm(addBenchmark, 'Benchmark added');
+  return <form className={styles.form} onSubmit={form.submit} noValidate aria-busy={form.pending}>
+    <TextField label="Name" name="name" placeholder="Index fund" {...form.describe('name')} />
+    {form.error('name')}
+    <TextField label="Fund ISIN" name="isin" placeholder="INF…" autoComplete="off"
+      {...form.describe('isin')} />
+    {form.error('isin')}
+    {form.summary}
+    <Button type="submit" disabled={form.pending}>Add benchmark</Button>
+  </form>;
+}
+
+export function RemoveBenchmark({ id }: { id: number }) {
+  const form = useActionForm(removeBenchmark, 'Benchmark removed');
+  return <form onSubmit={form.submit} aria-busy={form.pending}>
+    <input type="hidden" name="id" value={id} />
+    {form.summary}
+    <Button type="submit" variant="secondary" disabled={form.pending}>Remove</Button>
+  </form>;
 }

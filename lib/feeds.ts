@@ -65,7 +65,7 @@ export async function amfiLatest(): Promise<PriceMap> {
 }
 
 /** Fund NAVs published for one day. Weekend lists hold only the few funds priced every day. */
-async function amfiOn(date: IsoDate): Promise<PriceMap> {
+export async function amfiOn(date: IsoDate): Promise<PriceMap> {
   const { year, month, day } = parts(date);
   const dayText = `${pad(day)}-${SHORT_MONTHS[month - 1]}-${year}`;
   const url = `${AMFI_HISTORY}?frmdt=${dayText}&todt=${dayText}`;

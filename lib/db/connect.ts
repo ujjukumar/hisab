@@ -101,8 +101,10 @@ export const TABLES = [
   'transactions',
   'investment_transactions',
   'prices',
+  'benchmark_prices',
   'valuations',
   'budgets',
+  'benchmarks',
   'assets',
   'categories',
   'accounts',
@@ -111,7 +113,7 @@ export const TABLES = [
 const REQUIRED_BACKUP_TABLES = TABLES.filter(
   (table) =>
     !(
-      ['sms_messages', 'sms_pairing_invites', 'sms_rules', 'sms_devices'] as readonly string[]
+      ['sms_messages', 'sms_pairing_invites', 'sms_rules', 'sms_devices', 'benchmark_prices', 'benchmarks'] as readonly string[]
     ).includes(table),
 );
 

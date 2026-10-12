@@ -143,18 +143,22 @@ export function pricesFor(
 export const LOOK_BACK_DAYS = 7;
 export const NO_MARKET_FILE_DATES_SETTING = 'price_no_market_file_dates';
 
-export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily' };
+export type BenchmarkFeed = { id: number; isin: string };
+export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily'; benchmarks?: BenchmarkFeed[] };
 
 /** Missing daily trading-date prices from each holding's first eligible date through `asOf`. */
 export function pastPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   noFileDates: ReadonlySet<IsoDate> = new Set(),
+  benchmarks: BenchmarkFeed[] = [],
+  benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
   const linked = feedAssets(data.assets);
   const ids = new Set(linked.map((a) => a.id));
   const txns = data.txns.filter((t) => ids.has(t.assetId));
-  const first = txns.reduce<IsoDate | null>(
+  const startTxns = benchmarks.length ? data.txns : txns;
+  const first = startTxns.reduce<IsoDate | null>(
     (m, t) => (m === null || t.date < m ? t.date : m),
     null,
   );
@@ -166,6 +170,7 @@ export function pastPriceNeeds(
   }
 
   const needs: PriceNeed[] = [];
+  const benchmarkKnown = new Set(benchmarkDates.map((row) => `${row.benchmarkId}:${row.date}`));
   for (let date = first; date <= asOf; date = addDays(date, 1)) {
     const weekday = dayOfWeek(date);
     if (weekday === 0 || weekday === 6 || noFileDates.has(date)) continue;
@@ -175,7 +180,11 @@ export function pastPriceNeeds(
       if (own.length === 0 || computeHolding(own).units.lte(0)) return false;
       return !(priceDates.get(a.id) ?? []).includes(date);
     });
-    if (missing.length) needs.push({ date, linked: missing, cadence: 'daily' });
+    const missingBenchmarks = benchmarks.filter((item) => !benchmarkKnown.has(`${item.id}:${date}`));
+    if (missing.length || missingBenchmarks.length) needs.push({
+      date, linked: missing, cadence: 'daily',
+      ...(missingBenchmarks.length ? { benchmarks: missingBenchmarks } : {}),
+    });
   }
   return needs;
 }
@@ -184,14 +193,22 @@ export function priceWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, assetId:
   return `${need.date}:${need.cadence}:${assetId}`;
 }
 
+export function benchmarkWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, id: number): string {
+  return `${need.date}:${need.cadence}:benchmark:${id}`;
+}
+
 export function pendingPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   attempted: ReadonlySet<string>,
   noFileDates: ReadonlySet<IsoDate> = new Set(),
+  benchmarks: BenchmarkFeed[] = [],
+  benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
-  return pastPriceNeeds(data, asOf, noFileDates).flatMap((need) => {
+  return pastPriceNeeds(data, asOf, noFileDates, benchmarks, benchmarkDates).flatMap((need) => {
     const linked = need.linked.filter((asset) => !attempted.has(priceWorkKey(need, asset.id)));
-    return linked.length ? [{ ...need, linked }] : [];
+    const missing = need.benchmarks?.filter((item) => !attempted.has(benchmarkWorkKey(need, item.id))) ?? [];
+    return linked.length || missing.length ? [{ ...need, linked,
+      ...(missing.length ? { benchmarks: missing } : {}) }] : [];
   });
 }
