@@ -9,7 +9,9 @@ import {
   RestoreForm,
   SettingRow,
   StartFreshForm,
+  SuggestedBenchmarks,
 } from '@/components/SettingsForms/SettingsForms';
+import { SUGGESTED_BENCHMARKS } from '@/lib/domain/benchmarks';
 import { pastPriceDates } from '@/lib/queries/investments';
 import { benchmarkList } from '@/lib/queries/benchmarks';
 import {
@@ -39,6 +41,9 @@ export default async function SettingsPage() {
   ]);
   const info = databaseInfo();
   const benchmarks = benchmarkList();
+  const suggestions = SUGGESTED_BENCHMARKS.filter(
+    (item) => !benchmarks.some((benchmark) => benchmark.isin === item.isin),
+  );
 
   return (
     <>
@@ -135,8 +140,13 @@ export default async function SettingsPage() {
           <Card title="Benchmarks" sub="Compare your returns with index funds using AMFI NAVs in rupees.">
             {benchmarks.map((benchmark) => <SettingRow key={benchmark.id} title={benchmark.name}
               control={<RemoveBenchmark id={benchmark.id} />}>
-              <p>{benchmark.isin}</p>
+              <p>{[SUGGESTED_BENCHMARKS.find((item) => item.isin === benchmark.isin)?.fund, benchmark.isin]
+                .filter(Boolean).join(' · ')}</p>
             </SettingRow>)}
+            {suggestions.length > 0 && <SettingRow title="Suggested index funds"
+              control={<SuggestedBenchmarks items={suggestions} />}>
+              <p>Long-running direct-growth funds that track common Indian indices, so comparisons reach further back. Each is added under its index&rsquo;s name.</p>
+            </SettingRow>}
             <SettingRow title="Add an index fund" control={<BenchmarkForm />}>
               <p>Enter the name and ISIN of an AMFI-listed index fund. Benchmarks use the same public NAV files as fund prices; nothing about your holdings is sent.</p>
             </SettingRow>

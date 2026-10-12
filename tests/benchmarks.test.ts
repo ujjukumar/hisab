@@ -43,4 +43,18 @@ describe('benchmark settings', () => {
     expect(connection.db.select().from(benchmarks).all()).toEqual([]);
     expect(connection.db.select().from(benchmarkPrices).all()).toEqual([]);
   });
+
+  it('accepts every suggested index fund as a benchmark', async () => {
+    const { addBenchmark } = await import('@/lib/actions/benchmarks');
+    const { SUGGESTED_BENCHMARKS } = await import('@/lib/domain/benchmarks');
+    expect(new Set(SUGGESTED_BENCHMARKS.map((item) => item.isin)).size).toBe(SUGGESTED_BENCHMARKS.length);
+    for (const { name, isin } of SUGGESTED_BENCHMARKS) {
+      const data = new FormData();
+      data.set('name', name);
+      data.set('isin', isin);
+      expect(await addBenchmark(data)).toEqual({ ok: true });
+    }
+    expect(connection.db.select().from(benchmarks).all().map((row) => row.isin))
+      .toEqual(SUGGESTED_BENCHMARKS.map((item) => item.isin));
+  });
 });

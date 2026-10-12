@@ -7,6 +7,7 @@ import { useToast } from '@/components/Toast/Toast';
 import { restoreBackup, savePreferences, startFresh } from '@/lib/actions/settings';
 import { addBenchmark, removeBenchmark } from '@/lib/actions/benchmarks';
 import { COMPOUNDING, COMPOUNDING_LABELS } from '@/lib/domain/assets';
+import type { SuggestedBenchmark } from '@/lib/domain/benchmarks';
 import { MONTH_NAMES } from '@/lib/domain/dates';
 import type { ActionResult } from '@/lib/validation/money';
 import styles from './SettingsForms.module.css';
@@ -170,6 +171,30 @@ export function BenchmarkForm() {
     {form.summary}
     <Button type="submit" disabled={form.pending}>Add benchmark</Button>
   </form>;
+}
+
+export function SuggestedBenchmarks({ items }: { items: readonly SuggestedBenchmark[] }) {
+  return <ul className={styles.suggestions}>
+    {items.map((item) => <SuggestedBenchmarkItem key={item.isin} {...item} />)}
+  </ul>;
+}
+
+function SuggestedBenchmarkItem({ name, fund, isin }: SuggestedBenchmark) {
+  const form = useActionForm(addBenchmark, 'Benchmark added');
+  return <li>
+    <form className={styles.suggestion} onSubmit={form.submit} aria-busy={form.pending}>
+      <input type="hidden" name="name" value={name} />
+      <input type="hidden" name="isin" value={isin} />
+      <span className={styles.suggestionText}>
+        <strong>{name}</strong>
+        <span>{fund}</span>
+      </span>
+      <Button type="submit" variant="secondary" disabled={form.pending}>
+        Add<span className="sr-only"> {name}</span>
+      </Button>
+      {form.summary}
+    </form>
+  </li>;
 }
 
 export function RemoveBenchmark({ id }: { id: number }) {
