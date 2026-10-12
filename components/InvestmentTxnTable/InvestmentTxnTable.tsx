@@ -17,6 +17,12 @@ import type { InvTxnRow } from '@/lib/queries/investments';
 const MUTED = <Amount tone="muted">—</Amount>;
 const PAID = new Set(['buy', 'deposit', 'fee']);
 
+/** Money out of the owner's pocket; an intraday trade only when it lost money. */
+const paid = (t: InvTxnRow) =>
+  t.action === 'intraday' ? (t.total ?? 0) < 0 : PAID.has(t.action);
+
+const price = (p: string) => formatAmount(unitsAmount('1', p), 2);
+
 /** Whole numbers without decimals, everything else to three places. */
 const units = (u: string) => formatUnits(u, Number.isInteger(Number(u)) ? 0 : 3);
 
@@ -62,7 +68,12 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     header: 'Price',
     sortable: true,
     sortValue: (t) => t.price ? Number(t.price) : null,
-    cell: (t) => (t.price ? <Amount>{formatAmount(unitsAmount('1', t.price), 2)}</Amount> : MUTED),
+    cell: (t) =>
+      t.price ? (
+        <Amount sub={t.sellPrice ? `Sold ${price(t.sellPrice)}` : undefined}>{price(t.price)}</Amount>
+      ) : (
+        MUTED
+      ),
   },
   {
     key: 'units',
@@ -76,8 +87,8 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
           {t.splitFrom}:{t.splitTo}
         </Amount>
       ) : t.units ? (
-        <Amount>
-          {t.action === 'sell' ? MINUS : '+'}
+        <Amount sub={t.action === 'intraday' ? 'Same day' : undefined}>
+          {t.action === 'sell' ? MINUS : t.action === 'intraday' ? '' : '+'}
           {units(t.units)}
         </Amount>
       ) : (
@@ -111,9 +122,12 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
       t.total === null ? (
         MUTED
       ) : (
-        <Amount sub={t.fees ? formatAmount(t.fees, 2) : undefined}>
-          {PAID.has(t.action) ? MINUS : '+'}
-          {formatAmount(t.total, 2)}
+        <Amount
+          sub={t.fees ? formatAmount(t.fees, 2) : undefined}
+          tone={t.action === 'intraday' && t.total ? (t.total < 0 ? 'neg' : 'pos') : undefined}
+        >
+          {paid(t) ? MINUS : '+'}
+          {formatAmount(Math.abs(t.total), 2)}
         </Amount>
       ),
   },

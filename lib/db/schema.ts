@@ -57,6 +57,7 @@ export const investmentTransactions = sqliteTable(
       enum: [
         'buy',
         'sell',
+        'intraday',
         'split',
         'deposit',
         'withdrawal',
@@ -66,7 +67,11 @@ export const investmentTransactions = sqliteTable(
       ],
     }).notNull(),
     units: text('units'),
+    /** The buy price for an intraday trade. */
     price: text('price'),
+    /** Intraday only. */
+    sellPrice: text('sell_price'),
+    /** For an intraday trade, sale value − purchase value, so negative for a loss. */
     amount: integer('amount'),
     fees: integer('fees').notNull().default(0),
     splitFrom: integer('split_from'),

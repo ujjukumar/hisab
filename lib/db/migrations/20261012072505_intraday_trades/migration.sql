@@ -1,0 +1,1 @@
+ALTER TABLE `investment_transactions` ADD `sell_price` text;

@@ -50,6 +50,7 @@ export const COMPOUNDING_LABELS: Record<(typeof COMPOUNDING)[number], string> = 
 export const ACTION_LABELS: Record<InvestmentAction, string> = {
   buy: 'Buy',
   sell: 'Sell',
+  intraday: 'Intraday',
   split: 'Split',
   deposit: 'Deposit',
   withdrawal: 'Withdrawal',
@@ -109,11 +110,14 @@ export function defaultAssetClass(type: AssetType): Asset['assetClass'] {
   return type === 'other' ? 'other' : 'debt';
 }
 
-/** The actions an asset can record, in the drawer's order. */
-export function actionsFor(valuation: Asset['valuation']): InvestmentAction[] {
-  return valuation === 'units'
-    ? ['buy', 'sell', 'dividend', 'split', 'fee']
-    : ['deposit', 'withdrawal', 'interest', 'fee'];
+/** The actions an investment of this kind can record, in the drawer's order. */
+export function actionsFor(type: AssetType): InvestmentAction[] {
+  if (type === 'stock' || type === 'etf') {
+    return ['buy', 'sell', 'intraday', 'dividend', 'split', 'fee'];
+  }
+  if (type === 'mutual_fund') return ['buy', 'sell', 'dividend', 'fee'];
+  if (type === 'gold') return ['buy', 'sell', 'fee'];
+  return ['deposit', 'withdrawal', 'interest', 'fee'];
 }
 
 /** 'Folio 12347731' → 'Folio ••7731'. Only runs of 5+ characters that contain a digit are masked. */

@@ -106,6 +106,13 @@ asset groups and defaults. Do not maintain parallel copies of these definitions.
   never searches AMFI before this date.
 - Settings are JSON values keyed by name. Default financial year starts in April,
   default FD compounding is quarterly, and `sample_data` controls the sample pill.
+- The kind of investment decides which actions it offers (`actionsFor`): stocks
+  and ETFs buy, sell, intraday, dividend, split and fee; mutual funds buy, sell,
+  dividend and fee; gold buy, sell and fee; manual and FD kinds deposit,
+  withdrawal, interest and fee. An existing row keeps its action when edited.
+- An intraday trade (bought and sold the same day) is one row: units, the buy
+  price in `price`, the sell price in `sell_price`, `amount` = sale value −
+  purchase value (each rounded to the paisa, negative for a loss) and fees.
 
 ### Linked money transactions
 
@@ -113,6 +120,8 @@ Picking "Paid from" or "Received in" creates a Money row in the same transaction
 
 - Buy/deposit/fee: transfer from the account to Investments, amount plus fees.
 - Sell/withdrawal: transfer from Investments to the account, amount minus fees.
+- Intraday: amount minus fees; a profit is a transfer into the account, a loss a
+  transfer out of it. Nothing is linked when it breaks even.
 - Dividend/interest: income in the matching Dividends/Interest category.
 
 The Money row stores `investment_txn_id`. Edit through the investment transaction;
@@ -164,6 +173,8 @@ Process each asset's transactions in date order (then by id):
   - units −= u; cost −= cost removed.
   - Reject a sale of more units than held on that date, with the error "You only hold X units on that date."
 - **Split:** units × (split_to ÷ split_from). Cost is unchanged.
+- **Intraday:** realised gain += amount − fees. Units and cost are unchanged, so
+  the trade never blends into the average cost and is not limited by units held.
 - **Deposit / withdrawal** (manual and fd assets): invested += / −= amount.
 - **Dividend / interest:** income received += amount. This does not change cost.
 - **Fee:** cost += amount.
@@ -197,8 +208,8 @@ Test vector:
 
 **Cash flows:**
 
-- Negative: buys and deposits (including fees), fees.
-- Positive: sells and withdrawals (after fees), dividends and interest.
+- Negative: buys and deposits (including fees), fees, intraday losses after fees.
+- Positive: sells and withdrawals (after fees), dividends and interest, intraday profits after fees.
 - Final positive flow: current value, dated today (or the "as of" date).
 
 **Method:** annual rate with a 365-day year. Newton–Raphson starting at 0.1 (tolerance 1e-7, max 100 iterations). If it fails to converge, fall back to bisection on [−0.9999, 100]. Return `null` when there is no sign change in the flows.
@@ -341,7 +352,7 @@ Use [tests/](../tests/) as the executable reference, including:
 - **dates:** month boundaries, leap years, financial-year boundaries (31 Mar / 1 Apr).
 - **balances:** income, spending, transfers in and out, opening date cut-off, credit card sign.
 - **budgets:** carry-forward, amount 0, category without a budget.
-- **holdings:** the section 6 vector; sell everything; split; bonus at price 0; oversell rejected; fees.
+- **holdings:** the section 6 vector; sell everything; split; bonus at price 0; oversell rejected; fees; intraday profit, loss and break-even.
 - **valuation:** latest price on or before a date; missing price falls back to the buy price; FD vector; simple interest; maturity cap.
 - **xirr:** both section 6 vectors; all-negative flows return `null`; under-365-days produces "abs.".
 - **performance:** daily available dates for short ranges, weekly for medium ranges, monthly for long/all-time; missing prices carried forward.
@@ -417,6 +428,7 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | SMS transfers | Done | 11 Oct 2026 | An SMS can be approved as a transfer between two of the owner's accounts, such as a card bill paid from a bank account. Rules can learn either side as a transfer (`sms_transfers` migration), and the next match imports as one. A transfer already in Money for the same amount within three days is offered for linking instead of being added twice, and a rule never auto-imports it. The parser reads "Acct … debited; NAME credited" as money out and understands month-name dates, which also keeps such SMS on one learned rule across days. Waiting SMS are re-read after a parser change. No new dependencies. |
 | Dev migration check | Done | 11 Oct 2026 | A running `npm run dev` keeps its database connection across hot reloads, so a migration pulled in meanwhile used to surface as "no such column". Now a schema change makes pages say to restart, and the restart applies the migration after a backup. Nothing is migrated mid-session. |
 | SMS parser v3 | Done | 11 Oct 2026 | A survey of three months of real bank SMS (read in memory only) found most recurring messages could never auto-import. Fixed: a card's name and "credit limit" no longer read as a flow, "Sent Rs…" is money out, a quoted balance or limit is no longer a second amount, references that join letters to a long number are masked in the fingerprint, and new rules match a bank's registered sender ID across route prefixes. Waiting SMS are re-read. No new dependencies. |
+| Intraday trades | Done | 12 Oct 2026 | Stocks and ETFs can record a same-day buy and sell as one Intraday entry with buy and sell prices (`intraday_trades` migration adds `sell_price`). Only the profit or loss after charges counts, so it no longer blends into the delivery holding's average cost. The drawer offers actions by kind of investment; existing rows keep theirs. No new dependencies. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

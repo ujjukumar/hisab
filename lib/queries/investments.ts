@@ -41,6 +41,7 @@ const txnColumns = {
   action: investmentTransactions.action,
   units: investmentTransactions.units,
   price: investmentTransactions.price,
+  sellPrice: investmentTransactions.sellPrice,
   amount: investmentTransactions.amount,
   fees: investmentTransactions.fees,
   splitFrom: investmentTransactions.splitFrom,
@@ -226,6 +227,8 @@ export function invTxnFilterParams(f: InvTxnFilters): URLSearchParams {
 export type InvTxnRow = HoldingTxn & {
   assetId: number;
   assetName: string;
+  /** Intraday only. */
+  sellPrice: string | null;
   /** Masked folio or demat number. */
   ref: string;
   group: GroupKey;
@@ -235,7 +238,7 @@ export type InvTxnRow = HoldingTxn & {
   balanceUnits: string | null;
   accountId: number | null;
   accountName: string | null;
-  /** Money that moved: paid for buys, deposits and fees; received for the rest. Null for splits. */
+  /** Money that moved: paid for buys, deposits and fees; received for the rest; an intraday result, negative for a loss. Null for splits. */
   total: Paise | null;
 };
 

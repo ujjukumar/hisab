@@ -23,9 +23,13 @@ describe('asset defaults', () => {
     expect(defaultAssetClass('stock')).toBe('equity');
   });
 
-  it('offers buy and sell only for units assets', () => {
-    expect(actionsFor('units')).toContain('sell');
-    expect(actionsFor('fd')).toEqual(['deposit', 'withdrawal', 'interest', 'fee']);
+  it('offers actions that suit each kind of investment', () => {
+    expect(actionsFor('stock')).toEqual(['buy', 'sell', 'intraday', 'dividend', 'split', 'fee']);
+    expect(actionsFor('etf')).toEqual(actionsFor('stock'));
+    expect(actionsFor('mutual_fund')).toEqual(['buy', 'sell', 'dividend', 'fee']);
+    expect(actionsFor('gold')).toEqual(['buy', 'sell', 'fee']);
+    expect(actionsFor('fixed_deposit')).toEqual(['deposit', 'withdrawal', 'interest', 'fee']);
+    expect(actionsFor('epf')).toEqual(['deposit', 'withdrawal', 'interest', 'fee']);
   });
 });
 

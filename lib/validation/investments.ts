@@ -3,13 +3,14 @@ import { z } from 'zod';
 import type { InvestmentAction } from '@/lib/db/schema';
 import { ASSET_CLASSES, ASSET_TYPES, COMPOUNDING, defaultValuation } from '@/lib/domain/assets';
 import { isValidDate } from '@/lib/domain/dates';
-import { unitsAmount } from '@/lib/domain/holdings';
+import { intradayAmount, moneyMoved, unitsAmount } from '@/lib/domain/holdings';
 import { parsePaise, parsePositivePaise } from '@/lib/domain/money';
 import { optionalId, optionalText, requiredText } from './money';
 
 export const INVESTMENT_ACTIONS = [
   'buy',
   'sell',
+  'intraday',
   'split',
   'deposit',
   'withdrawal',
@@ -104,6 +105,7 @@ export const investmentTxnSchema = z
     date: z.string().refine(isValidDate, 'Pick the date of this transaction.'),
     units: text,
     price: text,
+    sellPrice: text,
     amount: text,
     fees: text,
     splitFrom: text,
@@ -121,17 +123,20 @@ export const investmentTxnSchema = z
 
     let units: string | null = null;
     let price: string | null = null;
+    let sellPrice: string | null = null;
     let amount = 0;
     let fees = 0;
     let splitFrom: number | null = null;
     let splitTo: number | null = null;
     let accountId = t.accountId;
 
-    if (t.action === 'buy' || t.action === 'sell') {
+    if (t.action === 'buy' || t.action === 'sell' || t.action === 'intraday') {
       const bought = t.action === 'buy';
+      const intraday = t.action === 'intraday';
       units = parseDecimal(t.units, 6);
       if (!units || new Decimal(units).lte(0)) {
-        issue('units', `Enter how many units you ${bought ? 'bought' : 'sold'}.`);
+        const did = intraday ? 'bought and sold' : bought ? 'bought' : 'sold';
+        issue('units', `Enter how many units you ${did}.`);
       }
       price = parseDecimal(t.price, 6);
       if (!price || (!bought && new Decimal(price).lte(0))) {
@@ -139,14 +144,25 @@ export const investmentTxnSchema = z
           'price',
           bought
             ? 'Enter the price per unit, or 0 for bonus units.'
-            : 'Enter the price you sold at.',
+            : intraday
+              ? 'Enter the price you bought at.'
+              : 'Enter the price you sold at.',
         );
+      }
+      if (intraday) {
+        sellPrice = parseDecimal(t.sellPrice, 6);
+        if (!sellPrice || new Decimal(sellPrice).lte(0)) {
+          issue('sellPrice', 'Enter the price you sold at.');
+        }
       }
       const f = t.fees ? parsePaise(t.fees) : { ok: true as const, value: 0 };
       if (!f.ok || f.value < 0) issue('fees', 'Enter fees of zero or more, or leave it empty.');
       else fees = f.value;
-      if (units && price) amount = unitsAmount(units, price);
-      if (!bought && units && price && fees >= amount) {
+      if (units && price) {
+        if (!intraday) amount = unitsAmount(units, price);
+        else if (sellPrice) amount = intradayAmount(units, price, sellPrice);
+      }
+      if (t.action === 'sell' && units && price && fees >= amount) {
         issue('fees', 'Fees must be less than the sale amount.');
       }
     } else if (t.action === 'split') {
@@ -165,8 +181,8 @@ export const investmentTxnSchema = z
       else amount = a.value;
     }
 
-    // Nothing to link when no money moved, e.g. bonus units.
-    if (accountId && amount + (t.action === 'buy' ? fees : 0) === 0) accountId = null;
+    // Nothing to link when no money moved, e.g. bonus units or a trade that broke even.
+    if (accountId && moneyMoved({ action: t.action, amount, fees }) === 0) accountId = null;
 
     return {
       assetId: assetId ?? 'new',
@@ -174,6 +190,7 @@ export const investmentTxnSchema = z
       date: t.date,
       units,
       price,
+      sellPrice,
       amount: t.action === 'split' ? null : amount,
       fees,
       splitFrom,

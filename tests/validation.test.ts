@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assetSchema } from '@/lib/validation/investments';
+import { assetSchema, investmentTxnSchema } from '@/lib/validation/investments';
 import { accountSchema, budgetSchema, transactionSchema } from '@/lib/validation/money';
 
 const base = {
@@ -131,5 +131,65 @@ describe('budgetSchema', () => {
     const paths = result.error?.issues.map((i) => i.path[0]);
     expect(paths).toContain('amount');
     expect(paths).toContain('month');
+  });
+});
+
+describe('investmentTxnSchema', () => {
+  const day = {
+    assetId: '4',
+    action: 'intraday',
+    date: '2026-09-14',
+    units: '40',
+    price: '120.50',
+    sellPrice: '118.25',
+    amount: '',
+    fees: '35.40',
+    splitFrom: '',
+    splitTo: '',
+    accountId: '2',
+    note: '',
+  };
+  const issues = (input: object) => {
+    const r = investmentTxnSchema.safeParse(input);
+    return r.success
+      ? {}
+      : Object.fromEntries(r.error.issues.map((i) => [String(i.path[0]), i.message]));
+  };
+
+  it('stores an intraday trade as its result before fees, with both prices', () => {
+    expect(investmentTxnSchema.parse(day)).toMatchObject({
+      action: 'intraday',
+      units: '40',
+      price: '120.5',
+      sellPrice: '118.25',
+      amount: -9000,
+      fees: 3540,
+      accountId: 2,
+    });
+  });
+
+  it('allows charges larger than an intraday profit', () => {
+    const r = investmentTxnSchema.parse({ ...day, sellPrice: '120.6', fees: '35.40' });
+    expect(r.amount).toBe(400);
+    expect(r.fees).toBe(3540);
+  });
+
+  it('unlinks the account when an intraday trade broke even', () => {
+    const r = investmentTxnSchema.parse({ ...day, sellPrice: '120.5', fees: '' });
+    expect(r.amount).toBe(0);
+    expect(r.accountId).toBeNull();
+  });
+
+  it('asks for units and both prices of an intraday trade', () => {
+    const e = issues({ ...day, units: '', price: '0', sellPrice: '' });
+    expect(e.units).toBe('Enter how many units you bought and sold.');
+    expect(e.price).toBe('Enter the price you bought at.');
+    expect(e.sellPrice).toBe('Enter the price you sold at.');
+  });
+
+  it('ignores a sell price on other actions', () => {
+    const r = investmentTxnSchema.parse({ ...day, action: 'buy' });
+    expect(r.sellPrice).toBeNull();
+    expect(r.amount).toBe(482000);
   });
 });

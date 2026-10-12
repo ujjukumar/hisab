@@ -25,9 +25,9 @@ export type Holding = {
   realised: Paise;
   /** Dividends and interest paid out. */
   income: Paise;
-  /** Buys, deposits and every fee. */
+  /** Buys, deposits, every fee and intraday losses. */
   outflows: Paise;
-  /** Sale and withdrawal proceeds after fees. */
+  /** Sale and withdrawal proceeds after fees, and intraday profits. */
   inflows: Paise;
   /** Price of the last buy above zero, the fallback when no price has been entered. */
   lastBuyPrice: string | null;
@@ -103,6 +103,15 @@ export function computeHolding(txns: HoldingTxn[]): Holding {
       case 'split':
         if (t.splitFrom && t.splitTo) held = held.times(t.splitTo).div(t.splitFrom);
         break;
+      case 'intraday': {
+        // Bought and sold the same day: only the result counts, units and cost stay as they were.
+        const net = amount - t.fees;
+        realised = realised.plus(net);
+        if (net < 0) outflows -= net;
+        else inflows += net;
+        if (net !== 0) flows.push({ date: t.date, amount: net });
+        break;
+      }
       case 'dividend':
       case 'interest':
         income += amount;
@@ -139,13 +148,16 @@ export function isSold(h: Holding, valuation: 'units' | 'manual' | 'fd'): boolea
 /**
  * The money a transaction moved, which is also its linked Money row's amount: paid for
  * buys, deposits and fees (with fees); received for sells and withdrawals (after fees),
- * dividends and interest. Null for splits.
+ * dividends and interest. An intraday trade's result after fees, negative for a loss.
+ * Null for splits.
  */
 export function moneyMoved(t: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>): Paise | null {
   const amount = t.amount ?? 0;
   if (t.action === 'split') return null;
   if (t.action === 'buy' || t.action === 'deposit') return amount + t.fees;
-  if (t.action === 'sell' || t.action === 'withdrawal') return amount - t.fees;
+  if (t.action === 'sell' || t.action === 'withdrawal' || t.action === 'intraday') {
+    return amount - t.fees;
+  }
   return amount;
 }
 
@@ -159,18 +171,28 @@ export function linkedMoneyRow(
   if (t.action === 'dividend' || t.action === 'interest') {
     return { type: 'income', amount, accountId, toAccountId: null, categoryId };
   }
+  if (t.action === 'intraday') {
+    return amount < 0
+      ? { type: 'transfer', amount: -amount, accountId, toAccountId: null, categoryId: null }
+      : { type: 'transfer', amount, accountId: null, toAccountId: accountId, categoryId: null };
+  }
   const paid = t.action === 'buy' || t.action === 'deposit' || t.action === 'fee';
   return paid
     ? { type: 'transfer', amount, accountId, toAccountId: null, categoryId: null }
     : { type: 'transfer', amount, accountId: null, toAccountId: accountId, categoryId: null };
 }
 
-/** Money put into investments less money taken out: buys and deposits minus sells and withdrawals. */
+/**
+ * Money put into investments less money taken out: buys and deposits minus sells and
+ * withdrawals. An intraday loss counts as money put in, a profit as money taken out.
+ */
 export function netInvested(txns: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>[]): Paise {
   let net = 0;
   for (const t of txns) {
     if (t.action === 'buy' || t.action === 'deposit') net += moneyMoved(t)!;
-    if (t.action === 'sell' || t.action === 'withdrawal') net -= moneyMoved(t)!;
+    if (t.action === 'sell' || t.action === 'withdrawal' || t.action === 'intraday') {
+      net -= moneyMoved(t)!;
+    }
   }
   return net;
 }
@@ -178,4 +200,9 @@ export function netInvested(txns: Pick<HoldingTxn, 'action' | 'amount' | 'fees'>
 /** units × price in paise, rounded. Buy and sell amounts are stored this way. */
 export function unitsAmount(u: string | Decimal, price: string | Decimal): Paise {
   return new Decimal(u).times(price).times(100).round().toNumber();
+}
+
+/** An intraday trade's stored amount: sale value − purchase value, each rounded like a trade. */
+export function intradayAmount(u: string, buyPrice: string, sellPrice: string): Paise {
+  return unitsAmount(u, sellPrice) - unitsAmount(u, buyPrice);
 }

@@ -57,10 +57,6 @@ export async function saveInvestmentTxn(
     const asset =
       t.assetId === 'new' ? null : tx.select().from(assets).where(eq(assets.id, t.assetId)).get();
     if (t.assetId !== 'new' && !asset) return failed(GONE, 'assetId');
-    const valuation = asset?.valuation ?? newAsset?.data?.valuation ?? 'units';
-    if (!actionsFor(valuation).includes(t.action)) {
-      return failed('Choose something this investment can record.', 'action');
-    }
 
     const current = existingId
       ? tx
@@ -71,11 +67,19 @@ export async function saveInvestmentTxn(
       : null;
     if (existingId && !current) return failed('That transaction no longer exists.');
 
+    const type = asset?.type ?? newAsset?.data?.type ?? 'mutual_fund';
+    // An older entry keeps its action even when its kind no longer offers it.
+    const kept = current?.action === t.action && current.assetId === asset?.id;
+    if (!kept && !actionsFor(type).includes(t.action)) {
+      return failed('Choose something this investment can record.', 'action');
+    }
+
     const values = {
       date: t.date,
       action: t.action,
       units: t.units,
       price: t.price,
+      sellPrice: t.sellPrice,
       amount: t.amount,
       fees: t.fees,
       splitFrom: t.splitFrom,

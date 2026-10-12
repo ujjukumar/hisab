@@ -37,12 +37,11 @@ import {
   COMPOUNDING,
   COMPOUNDING_LABELS,
   defaultAssetClass,
-  defaultValuation,
   GROUPS,
 } from '@/lib/domain/assets';
 import { today } from '@/lib/domain/dates';
 import { formatAmount, formatDate } from '@/lib/domain/format';
-import { moneyMoved, unitsAmount } from '@/lib/domain/holdings';
+import { intradayAmount, moneyMoved, unitsAmount } from '@/lib/domain/holdings';
 import { paiseToInput, parsePaise } from '@/lib/domain/money';
 import type { AccountRow } from '@/lib/queries/money';
 import type { AssetOption, InvTxnRow } from '@/lib/queries/investments';
@@ -185,6 +184,7 @@ const PAID: InvestmentAction[] = ['buy', 'deposit', 'fee'];
 const TOTAL_LABELS: Record<InvestmentAction, string> = {
   buy: 'You pay',
   sell: 'You receive',
+  intraday: 'Profit or loss',
   split: '',
   deposit: 'You pay',
   withdrawal: 'You receive',
@@ -201,12 +201,12 @@ const AMOUNT_LABELS: Partial<Record<InvestmentAction, string>> = {
   fee: 'Fee amount',
 };
 
-type Figures = { units: string; price: string; fees: string; amount: string };
+type Figures = { units: string; price: string; sellPrice: string; fees: string; amount: string };
 
 /** The running total, worked out the same way the server will. Null while a figure is unreadable. */
 function liveTotal(action: InvestmentAction, f: Figures): number | null {
   if (action === 'split') return null;
-  const trade = action === 'buy' || action === 'sell';
+  const trade = action === 'buy' || action === 'sell' || action === 'intraday';
   const fees = trade && f.fees.trim() ? parsePaise(f.fees) : { ok: true as const, value: 0 };
   if (!fees.ok) return null;
   let amount: number;
@@ -214,7 +214,13 @@ function liveTotal(action: InvestmentAction, f: Figures): number | null {
     const units = parseDecimal(f.units, 6);
     const price = parseDecimal(f.price, 6);
     if (!units || !price) return null;
-    amount = unitsAmount(units, price);
+    if (action === 'intraday') {
+      const sellPrice = parseDecimal(f.sellPrice, 6);
+      if (!sellPrice) return null;
+      amount = intradayAmount(units, price, sellPrice);
+    } else {
+      amount = unitsAmount(units, price);
+    }
   } else {
     const parsed = parsePaise(f.amount);
     if (!parsed.ok) return null;
@@ -242,14 +248,19 @@ function TxnForm({
   );
   const [type, setType] = useState<AssetType>('mutual_fund');
   const asset = options.find((o) => String(o.id) === assetId);
-  const valuation = asset?.valuation ?? defaultValuation(type);
-  const actions = actionsFor(valuation);
+  const offered = actionsFor(asset?.type ?? type);
+  // An older entry keeps its action even when its kind no longer offers it.
+  const actions =
+    row && String(row.assetId) === assetId && !offered.includes(row.action)
+      ? [...offered, row.action]
+      : offered;
   const [picked, setPicked] = useState<InvestmentAction>(row?.action ?? actions[0] ?? 'buy');
   const action = actions.includes(picked) ? picked : (actions[0] ?? 'buy');
 
   const [figures, setFigures] = useState<Figures>({
     units: row?.units ?? '',
     price: row?.price ?? (asset?.valuation === 'units' ? (asset.lastPrice ?? '') : ''),
+    sellPrice: row?.sellPrice ?? '',
     fees: row?.fees ? paiseToInput(row.fees) : '',
     amount: row?.amount && !row.units ? paiseToInput(row.amount) : '',
   });
@@ -276,7 +287,8 @@ function TxnForm({
   );
 
   const total = liveTotal(action, figures);
-  const trade = action === 'buy' || action === 'sell';
+  const intraday = action === 'intraday';
+  const trade = action === 'buy' || action === 'sell' || intraday;
   const shares = asset && GROUPS.find((g) => g.key === asset.group)?.unitWord === 'shares';
   const accountChoices = accounts.filter((a) => !a.archived || a.id === row?.accountId);
 
@@ -351,7 +363,7 @@ function TxnForm({
             {...describe('units')}
           />
           <TextField
-            label="Price per unit"
+            label={intraday ? 'Buy price' : 'Price per unit'}
             placeholder="0.00"
             {...figure('price')}
             {...describe('price')}
@@ -359,6 +371,17 @@ function TxnForm({
         </FieldPair>
         {error('units')}
         {error('price')}
+        {intraday && (
+          <>
+            <TextField
+              label="Sell price"
+              placeholder="0.00"
+              {...figure('sellPrice')}
+              {...describe('sellPrice')}
+            />
+            {error('sellPrice')}
+          </>
+        )}
         <TextField
           label="Fees and charges (optional)"
           placeholder="0"
@@ -410,7 +433,7 @@ function TxnForm({
       {action !== 'split' && (
         <>
           <SelectField
-            label={PAID.includes(action) ? 'Paid from' : 'Received in'}
+            label={PAID.includes(action) ? 'Paid from' : intraday ? 'Settled in' : 'Received in'}
             name="accountId"
             defaultValue={row?.accountId ?? ''}
             {...describe('accountId')}
@@ -437,8 +460,10 @@ function TxnForm({
 
       {action !== 'split' && (
         <FormTotal
-          label={TOTAL_LABELS[action]}
-          value={total === null ? '—' : `₹${formatAmount(total, 2)}`}
+          label={intraday && total !== null ? (total < 0 ? 'Loss' : 'Profit') : TOTAL_LABELS[action]}
+          value={
+            total === null ? '—' : `₹${formatAmount(intraday ? Math.abs(total) : total, 2)}`
+          }
         />
       )}
       {formError && <FieldError>{formError}</FieldError>}

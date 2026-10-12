@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   byDateThenId,
   computeHolding,
+  intradayAmount,
   isSold,
   linkedMoneyRow,
   moneyMoved,
@@ -32,6 +33,10 @@ const t = (
 /** A buy or sell with its amount worked out the way the app stores it. */
 const trade = (date: string, action: 'buy' | 'sell', units: string, price: string, fees = 0) =>
   t(date, action, { units, price, amount: unitsAmount(units, price), fees: fees * 100 });
+
+/** A same-day buy and sell, stored as its result before fees. */
+const intraday = (date: string, units: string, buy: string, sell: string, fees = 0) =>
+  t(date, 'intraday', { units, price: buy, amount: intradayAmount(units, buy, sell), fees: fees * 100 });
 
 describe('computeHolding', () => {
   it('matches the section 6 vector', () => {
@@ -143,6 +148,34 @@ describe('computeHolding', () => {
     expect(isSold(h, 'units')).toBe(true);
     expect(h.firstDate).toBeNull();
   });
+
+  it('counts intraday results as realised gain without touching units or cost', () => {
+    const loss = intraday('2026-01-12', '50', '200', '198', 30);
+    const h = computeHolding([
+      trade('2026-01-10', 'buy', '10', '100'),
+      loss,
+      intraday('2026-01-13', '20', '100', '110', 10),
+    ]);
+    // Loss ₹100 + ₹30 fees; profit ₹200 − ₹10 fees.
+    expect(h.units.toString()).toBe('10');
+    expect(h.cost).toBe(100000);
+    expect(h.realised).toBe(-13000 + 19000);
+    expect(h.outflows).toBe(100000 + 13000);
+    expect(h.inflows).toBe(19000);
+    expect(h.unitsAfter.get(loss.id)?.toString()).toBe('10');
+    expect(h.flows).toEqual([
+      { date: '2026-01-10', amount: -100000 },
+      { date: '2026-01-12', amount: -13000 },
+      { date: '2026-01-13', amount: 19000 },
+    ]);
+  });
+
+  it('allows an intraday trade larger than the holding and skips a break-even flow', () => {
+    const h = computeHolding([intraday('2026-01-12', '500', '10', '10')]);
+    expect(h.units.isZero()).toBe(true);
+    expect(h.realised).toBe(0);
+    expect(h.flows).toEqual([]);
+  });
 });
 
 describe('byDateThenId', () => {
@@ -163,6 +196,20 @@ describe('unitsAmount', () => {
   });
 });
 
+describe('intradayAmount', () => {
+  it('is the sale value less the purchase value', () => {
+    expect(intradayAmount('100', '50', '52.5')).toBe(25000);
+    expect(intradayAmount('100', '52.5', '50')).toBe(-25000);
+    expect(intradayAmount('100', '50', '50')).toBe(0);
+    expect(intradayAmount('0', '50', '52.5')).toBe(0);
+  });
+
+  it('rounds each side to the paisa, as the contract note does', () => {
+    // ₹10.01 − ₹10.00, not ₹0.00 from rounding the ₹0.001 difference.
+    expect(intradayAmount('1', '10.004', '10.005')).toBe(1);
+  });
+});
+
 describe('moneyMoved', () => {
   it('adds fees to what was paid and takes them off what was received', () => {
     expect(moneyMoved(trade('2026-01-01', 'buy', '10', '100', 20))).toBe(102000);
@@ -174,6 +221,12 @@ describe('moneyMoved', () => {
   it('is zero for bonus units and null for a split', () => {
     expect(moneyMoved(trade('2026-01-01', 'buy', '10', '0'))).toBe(0);
     expect(moneyMoved(t('2026-01-01', 'split', { splitFrom: 1, splitTo: 5 }))).toBeNull();
+  });
+
+  it('is an intraday result after fees, negative for a loss', () => {
+    expect(moneyMoved(intraday('2026-01-01', '10', '100', '110', 20))).toBe(8000);
+    expect(moneyMoved(intraday('2026-01-01', '10', '100', '95', 20))).toBe(-7000);
+    expect(moneyMoved(intraday('2026-01-01', '10', '100', '102', 20))).toBe(0);
   });
 });
 
@@ -208,6 +261,23 @@ describe('linkedMoneyRow', () => {
       categoryId: 9,
     });
   });
+
+  it('takes an intraday loss from the account and puts a profit into it', () => {
+    expect(linkedMoneyRow(intraday('2026-01-01', '10', '100', '95', 20), 3, 9)).toEqual({
+      type: 'transfer',
+      amount: 7000,
+      accountId: 3,
+      toAccountId: null,
+      categoryId: null,
+    });
+    expect(linkedMoneyRow(intraday('2026-01-01', '10', '100', '110', 20), 3, 9)).toEqual({
+      type: 'transfer',
+      amount: 8000,
+      accountId: null,
+      toAccountId: 3,
+      categoryId: null,
+    });
+  });
 });
 
 describe('netInvested', () => {
@@ -227,5 +297,12 @@ describe('netInvested', () => {
   it('is zero with nothing, and negative when more came out than went in', () => {
     expect(netInvested([])).toBe(0);
     expect(netInvested([trade('2026-01-01', 'sell', '1', '500')])).toBe(-50000);
+  });
+
+  it('counts an intraday loss in and a profit out', () => {
+    const loss = intraday('2026-01-01', '10', '100', '95', 20);
+    const profit = intraday('2026-01-02', '10', '100', '110', 20);
+    expect(netInvested([loss])).toBe(7000);
+    expect(netInvested([loss, profit])).toBe(7000 - 8000);
   });
 });

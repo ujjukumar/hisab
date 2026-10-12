@@ -8,7 +8,7 @@ export function GET(request: Request) {
   const { rows } = listInvestmentTxns(f, { all: true });
   return csvResponse(
     `investment-transactions-${today()}.csv`,
-    'date,investment,action,units,price,split,balance_units,amount,fees,total,account,note',
+    'date,investment,action,units,price,sell_price,split,balance_units,amount,fees,total,account,note',
     rows.map((t) =>
       [
         t.date,
@@ -16,6 +16,7 @@ export function GET(request: Request) {
         t.action,
         t.units ?? '',
         t.price ?? '',
+        t.sellPrice ?? '',
         t.action === 'split' ? `${t.splitFrom}:${t.splitTo}` : '',
         t.balanceUnits ?? '',
         t.amount === null ? '' : rupees(t.amount),

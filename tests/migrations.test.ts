@@ -61,6 +61,7 @@ describe('migration history upgrade', () => {
     try {
       const initial = openDatabase();
       initial.sqlite.exec('ALTER TABLE assets DROP COLUMN nav_start_date');
+      initial.sqlite.exec('ALTER TABLE investment_transactions DROP COLUMN sell_price');
       initial.sqlite.exec(
         'DROP TABLE sms_pairing_invites; DROP TABLE sms_messages; DROP TABLE sms_rules; DROP TABLE sms_devices;',
       );

@@ -1,7 +1,6 @@
 .seg {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  display: flex;
+  flex-wrap: wrap;
   border: 1px solid var(--line-strong);
   border-radius: 5px;
   padding: 3px;
@@ -9,6 +8,8 @@
 }
 
 .seg button {
+  flex: 1 1 0;
+  min-width: max-content;
   background: none;
   border: 0;
   border-radius: 3px;
