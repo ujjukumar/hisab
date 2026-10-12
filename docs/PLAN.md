@@ -466,6 +466,7 @@ Keep outcomes brief; details and superseded decisions belong in Git history.
 | Overview holdings table | Done | 12 Oct 2026 | Last price and its date now appear below unit-priced investment names instead of in a separate column; portfolio share follows total return. Totals, sorting and mobile table scrolling verified with invented data. |
 | Holding chart trade dates | Done | 12 Oct 2026 | Individual invested-and-worth charts now show trades between monthly or weekly checkpoints, including a full sale and repurchase. Invented-data regression confirms the zero holding and new cost. |
 | Dashboard net-worth chart | Done | 12 Oct 2026 | Replaced the investment-only chart with historical net worth (accounts including cards plus investments), one line and a hover breakdown. Added 1- and 3-month views and kept YTD, 6 months, 1/3 years and All. A signed range change and optional account/investment changes show what drove the move; invented-data mobile, desktop and past-month checks match the headline. Lint, typecheck, tests and build passed; no new dependencies. |
+| Wider page layout | Done | 13 Oct 2026 | Pages now use up to 1600px of width (was 1180px), and side padding scales from 24 to 48px, so wide screens show less empty margin. Checked at 1920px on Dashboard and Investments with invented data. |
 
 Outstanding verification/limitations from delivery: end-to-end import with the
 owner's download and real-account balance verification remain owner checks. The

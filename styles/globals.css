@@ -47,9 +47,9 @@ a {
 
 /* ---------- layout ---------- */
 .wrap {
-  max-width: 1180px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding-inline: 24px;
+  padding-inline: clamp(24px, 3vw, 48px);
 }
 
 /* Block padding only, so it combines with .wrap's side padding on the same element. */
