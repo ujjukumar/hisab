@@ -1,13 +1,23 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/client';
 import { addDays, today } from '@/lib/domain/dates';
 import { settings } from '@/lib/db/schema';
-import { NO_MARKET_FILE_DATES_SETTING, benchmarkWorkKey, pendingPriceNeeds, priceWorkKey } from '@/lib/domain/priceFeeds';
-import { amfiFor, amfiOn } from '@/lib/feeds';
-import { freshPortfolioData, noMarketFileDates } from '@/lib/queries/investments';
+import {
+  ABSENT_PRICES_SETTING,
+  NO_MARKET_FILE_DATES_SETTING,
+  PUBLISH_GRACE_DAYS,
+  absentPriceKey,
+  benchmarkWorkKey,
+  pendingPriceNeeds,
+  priceWorkKey,
+} from '@/lib/domain/priceFeeds';
+import { amfiOn } from '@/lib/feeds';
+import { freshPortfolioData, priceGaps } from '@/lib/queries/investments';
+import { failed, type ActionFailure } from '@/lib/validation/money';
 import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { fetchAndSave } from './priceDownloads';
 import {
@@ -58,12 +68,13 @@ async function runJob(id: string, owner: string): Promise<void> {
         freshPortfolioData(),
         asOf,
         new Set(job.attempted),
-        noMarketFileDates(),
+        priceGaps(),
         benchmarks,
         benchmarkHistory(benchmarks.map((item) => item.id)),
       );
       const need = needs[0];
       if (!need) {
+        const skipped = job.failedDates ?? 0;
         writePriceJob(db, {
           ...job,
           state: 'done',
@@ -71,6 +82,9 @@ async function runJob(id: string, owner: string): Promise<void> {
           total: job.done,
           owner: null,
           pid: null,
+          message: skipped
+            ? `${skipped === 1 ? '1 date' : `${skipped} dates`} couldn't be fetched. Retry missing prices to try again. ${job.message}`
+            : '',
         });
         return;
       }
@@ -79,14 +93,12 @@ async function runJob(id: string, owner: string): Promise<void> {
         date: need.date,
         total: Math.max(job.total, job.done + needs.length),
       });
-      const lookBack = 1;
+      // One whole-market AMFI file per date; its size tells a published file from a missing one.
       const result = await fetchAndSave(
         need.linked,
         need.date,
-        (isins, earliestDates) => need.benchmarks?.length
-          ? amfiOn(need.date)
-          : amfiFor(need.date, isins, lookBack, earliestDates),
-        lookBack,
+        () => amfiOn(need.date),
+        1,
         () => current(id, owner)?.state === 'running',
         true,
         need.benchmarks,
@@ -94,29 +106,21 @@ async function runJob(id: string, owner: string): Promise<void> {
       const latest = current(id, owner);
       if (!latest) return;
       if (latest.state !== 'running') continue;
-      if (result.noMarketFile && need.date <= addDays(asOf, -3)) {
-        const noFileDates = noMarketFileDates();
-        noFileDates.add(need.date);
-        const value = JSON.stringify([...noFileDates].sort());
-        db.insert(settings)
-          .values({ key: NO_MARKET_FILE_DATES_SETTING, value })
-          .onConflictDoUpdate({
-            target: settings.key,
-            set: { value, updatedAt: new Date().toISOString() },
-          })
-          .run();
-      }
-      const message = result.problems.join(' ');
-      if (result.unavailable) {
+      if (result.noMarketFile && need.date <= addDays(asOf, -PUBLISH_GRACE_DAYS))
+        addToListSetting(NO_MARKET_FILE_DATES_SETTING, [need.date]);
+      if (result.absent.length)
+        addToListSetting(ABSENT_PRICES_SETTING, result.absent.map((assetId) => absentPriceKey(assetId, need.date)));
+      if (result.unreachable) {
         writePriceJob(db, {
           ...latest,
           state: 'failed',
           date: null,
           updated: latest.updated + result.updated,
-          message,
+          message: result.problems.join(' '),
         });
         return;
       }
+      // A date that failed is left for the next run; the rest of this run carries on.
       writePriceJob(db, {
         ...latest,
         attempted: [
@@ -126,12 +130,31 @@ async function runJob(id: string, owner: string): Promise<void> {
         ],
         done: latest.done + 1,
         updated: latest.updated + result.updated,
-        message: message || latest.message,
+        failedDates: result.unavailable ? (latest.failedDates ?? 0) + 1 : latest.failedDates,
+        message: result.problems.length ? result.problems.join(' ') : latest.message,
       });
     }
   } finally {
     clearInterval(heartbeat);
   }
+}
+
+function addToListSetting(key: string, items: string[]): void {
+  db.transaction((tx) => {
+    const row = tx.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).get();
+    let current: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(row?.value ?? '[]');
+      if (Array.isArray(parsed)) current = parsed.filter((item): item is string => typeof item === 'string');
+    } catch {
+      // A damaged list is rebuilt from this run.
+    }
+    const value = JSON.stringify([...new Set([...current, ...items])].sort());
+    tx.insert(settings)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date().toISOString() } })
+      .run();
+  });
 }
 
 function kickJob(): void {
@@ -202,4 +225,16 @@ export async function stopPriceJob(): Promise<PriceJobStatus | null> {
   });
   revalidatePath('/settings');
   return priceJobStatus();
+}
+
+/** Forget prices recorded as not published, so the next run looks for them again. */
+export async function recheckMissingPrices(): Promise<{ ok: true } | ActionFailure> {
+  const job = readPriceJob(db);
+  if (job?.state === 'running' || job?.state === 'stopping')
+    return failed('Wait for past prices to finish, then check again.');
+  db.transaction((tx) => {
+    tx.delete(settings).where(eq(settings.key, ABSENT_PRICES_SETTING)).run();
+  });
+  revalidatePath('/settings');
+  return { ok: true };
 }

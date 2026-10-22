@@ -12,7 +12,14 @@ import {
   pendingPriceNeeds,
   pricesFor,
 } from '@/lib/domain/priceFeeds';
-import { amfiFor, bseLatest, FeedError, listedPricesOn, nseLatest } from '@/lib/feeds';
+import {
+  amfiFor,
+  bseLatest,
+  FeedNotReadyError,
+  FeedUnreachableError,
+  listedPricesOn,
+  nseLatest,
+} from '@/lib/feeds';
 
 vi.mock('server-only', () => ({}));
 
@@ -196,7 +203,22 @@ describe('historical downloads', () => {
       '<!doctype html><html><body>Request rejected</body></html>',
       { headers: { 'content-type': 'text/html' } },
     ));
-    await expect(amfiFor('2026-10-06', ['INF000MF0012'], 1)).rejects.toThrow(FeedError);
+    await expect(amfiFor('2026-10-06', ['INF000MF0012'], 1)).rejects.toThrow(FeedNotReadyError);
+  });
+
+  it('looks back past an AMFI day that is not published yet, and fails fast when offline', async () => {
+    vi.stubGlobal('fetch', async (url: string) => {
+      const date = new URL(String(url)).searchParams.get('frmdt');
+      if (date === '02-Apr-2024') return new Response('<html>Not yet</html>');
+      return new Response([
+        'Scheme Code;Scheme Name;ISIN Div Payout/ ISIN Growth;Net Asset Value;Date',
+        '100001;Invented Fund;INF000MF0012;12;01-Apr-2024',
+      ].join('\n'));
+    });
+    expect((await amfiFor('2024-04-02', ['INF000MF0012'], 3)).get('INF000MF0012')?.date)
+      .toBe('2024-04-01');
+    vi.stubGlobal('fetch', async () => new Response('', { status: 503 }));
+    await expect(amfiFor('2024-04-02', ['INF000MF0012'], 3)).rejects.toThrow(FeedUnreachableError);
   });
 
   it('treats a missing daily NSE file as a day without trading', async () => {
@@ -467,16 +489,21 @@ describe('pastPriceNeeds', () => {
     expect(ids('2024-04-29')).toEqual([1]);
   });
 
-  it('skips dates learned to have no whole-market files', () => {
+  it('skips listed investments on dates learned to have no exchange files, and settled absent prices', () => {
     const listed: PortfolioData = {
       ...data,
-      assets: [asset(2, 'stock', 'INE000KP0011')],
-      txns: [trade(2, 2, '2024-02-05', 'buy', '5')],
+      assets: [asset(2, 'stock', 'INE000KP0011'), asset(3, 'mutual_fund', 'INF000MF0012')],
+      txns: [trade(2, 2, '2024-02-05', 'buy', '5'), trade(3, 3, '2024-02-05', 'buy', '5')],
       prices: [],
     };
-    expect(pastPriceNeeds(listed, '2024-02-28').some((need) => need.date === '2024-02-26')).toBe(true);
-    expect(pastPriceNeeds(listed, '2024-02-28', new Set(['2024-02-26']))
-      .some((need) => need.date === '2024-02-26')).toBe(false);
+    const on = (gaps: Parameters<typeof pastPriceNeeds>[2]) =>
+      pastPriceNeeds(listed, '2024-02-28', gaps).find((need) => need.date === '2024-02-26')
+        ?.linked.map((item) => item.id);
+    expect(on({})).toEqual([2, 3]);
+    // An exchange holiday still leaves the fund's NAV to be checked.
+    expect(on({ noFileDates: new Set(['2024-02-26']) })).toEqual([3]);
+    expect(on({ noFileDates: new Set(['2024-02-26']), absent: new Set(['3:2024-02-26']) })).toBeUndefined();
+    expect(on({ absent: new Set(['2:2024-02-26']) })).toEqual([3]);
   });
 
   it('is empty when nothing is linked or nothing was bought', () => {
@@ -491,11 +518,11 @@ describe('pastPriceNeeds', () => {
       txns: [trade(3, 3, '2024-04-01', 'buy', '1')] };
     const benchmark = [{ id: 7, isin: 'INF000BM0011' }];
     const known = [{ benchmarkId: 7, date: '2024-04-01' }];
-    const needs = pastPriceNeeds(unlinked, '2024-04-03', new Set(), benchmark, known);
+    const needs = pastPriceNeeds(unlinked, '2024-04-03', {}, benchmark, known);
     expect(needs.map((need) => need.date)).toEqual(['2024-04-02', '2024-04-03']);
     expect(needs[0]?.benchmarks).toEqual(benchmark);
     expect(pendingPriceNeeds(unlinked, '2024-04-03', new Set(['2024-04-02:daily:benchmark:7']),
-      new Set(), benchmark, known).map((need) => need.date)).toEqual(['2024-04-03']);
+      {}, benchmark, known).map((need) => need.date)).toEqual(['2024-04-03']);
   });
 
   it('crosses the year end', () => {

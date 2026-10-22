@@ -12,6 +12,7 @@ const jobSchema = z.object({
   date: z.string().nullable(),
   updated: z.number(),
   message: z.string(),
+  failedDates: z.number().optional(),
   owner: z.string().nullable(),
   pid: z.number().nullable(),
   heartbeat: z.string(),

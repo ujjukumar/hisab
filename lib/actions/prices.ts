@@ -13,7 +13,7 @@ import {
   pastPriceNeeds,
 } from '@/lib/domain/priceFeeds';
 import { amfiFor, amfiLatest, amfiOn } from '@/lib/feeds';
-import { portfolio, portfolioData } from '@/lib/queries/investments';
+import { portfolio, portfolioData, priceGaps } from '@/lib/queries/investments';
 import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { autoPrices, priceUpdate, type PriceUpdate } from '@/lib/queries/settings';
 import { failed, invalid, type ActionFailure } from '@/lib/validation/money';
@@ -128,7 +128,7 @@ export async function fetchPastPrices(date: string): Promise<PriceResult> {
   if (!parsed.success) return invalid(parsed.error);
   const day = parsed.data as IsoDate;
   const benchmarks = benchmarkList();
-  const need = pastPriceNeeds(portfolioData(), today(), new Set(), benchmarks,
+  const need = pastPriceNeeds(portfolioData(), today(), priceGaps(), benchmarks,
     benchmarkHistory(benchmarks.map((item) => item.id))).find((n) => n.date === day);
   if (!need) return { ok: true, updated: 0 };
   const lookBackDays = need.cadence === 'daily' ? 1 : LOOK_BACK_DAYS;

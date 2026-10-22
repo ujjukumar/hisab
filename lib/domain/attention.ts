@@ -3,7 +3,7 @@ import { formatDate } from './format';
 import type { Paise } from './money';
 
 /**
- * What the dashboard puts in its "Needs attention" strip (PLAN section 9).
+ * What the dashboard puts in its "Needs attention" strip (PLAN section 7).
  *
  * The rules are pure so they can be tested without a database: the page passes
  * in what it has already loaded. Nothing here reads the database, so the input

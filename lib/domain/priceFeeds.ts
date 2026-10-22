@@ -141,16 +141,28 @@ export function pricesFor(
 
 /** Maximum lookback for a latest-price request or a manually requested weekly target. */
 export const LOOK_BACK_DAYS = 7;
+/** Days a source may take to publish a file before its absence is treated as final. */
+export const PUBLISH_GRACE_DAYS = 3;
 export const NO_MARKET_FILE_DATES_SETTING = 'price_no_market_file_dates';
+export const ABSENT_PRICES_SETTING = 'price_absent_dates';
 
 export type BenchmarkFeed = { id: number; isin: string };
 export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily'; benchmarks?: BenchmarkFeed[] };
+/**
+ * Settled gaps the backfill skips: dates when neither exchange published a file (listed
+ * investments only), and investment-dates whose published file didn't list the investment.
+ */
+export type PriceGaps = { noFileDates?: ReadonlySet<IsoDate>; absent?: ReadonlySet<string> };
+
+export function absentPriceKey(assetId: number, date: IsoDate): string {
+  return `${assetId}:${date}`;
+}
 
 /** Missing daily trading-date prices from each holding's first eligible date through `asOf`. */
 export function pastPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
-  noFileDates: ReadonlySet<IsoDate> = new Set(),
+  gaps: PriceGaps = {},
   benchmarks: BenchmarkFeed[] = [],
   benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
@@ -173,9 +185,12 @@ export function pastPriceNeeds(
   const benchmarkKnown = new Set(benchmarkDates.map((row) => `${row.benchmarkId}:${row.date}`));
   for (let date = first; date <= asOf; date = addDays(date, 1)) {
     const weekday = dayOfWeek(date);
-    if (weekday === 0 || weekday === 6 || noFileDates.has(date)) continue;
+    if (weekday === 0 || weekday === 6) continue;
+    const exchangesClosed = gaps.noFileDates?.has(date) ?? false;
     const missing = linked.filter((a) => {
       if (a.navStartDate && date < a.navStartDate) return false;
+      if (exchangesClosed && a.feed === 'nse') return false;
+      if (gaps.absent?.has(absentPriceKey(a.id, date))) return false;
       const own = txns.filter((t) => t.assetId === a.id && t.date <= date);
       if (own.length === 0 || computeHolding(own).units.lte(0)) return false;
       return !(priceDates.get(a.id) ?? []).includes(date);
@@ -201,11 +216,11 @@ export function pendingPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   attempted: ReadonlySet<string>,
-  noFileDates: ReadonlySet<IsoDate> = new Set(),
+  gaps: PriceGaps = {},
   benchmarks: BenchmarkFeed[] = [],
   benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
-  return pastPriceNeeds(data, asOf, noFileDates, benchmarks, benchmarkDates).flatMap((need) => {
+  return pastPriceNeeds(data, asOf, gaps, benchmarks, benchmarkDates).flatMap((need) => {
     const linked = need.linked.filter((asset) => !attempted.has(priceWorkKey(need, asset.id)));
     const missing = need.benchmarks?.filter((item) => !attempted.has(benchmarkWorkKey(need, item.id))) ?? [];
     return linked.length || missing.length ? [{ ...need, linked,

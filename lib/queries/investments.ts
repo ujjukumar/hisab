@@ -31,7 +31,12 @@ import {
   type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
-import { NO_MARKET_FILE_DATES_SETTING, pastPriceNeeds } from '@/lib/domain/priceFeeds';
+import {
+  ABSENT_PRICES_SETTING,
+  NO_MARKET_FILE_DATES_SETTING,
+  pastPriceNeeds,
+  type PriceGaps,
+} from '@/lib/domain/priceFeeds';
 import { INVESTMENT_ACTIONS } from '@/lib/validation/investments';
 import { PAGE_SIZE, paramReader, type Params } from './money';
 
@@ -402,7 +407,7 @@ export function pastPriceDates(): {
   cadence: 'daily';
 }[] {
   const benchmarks = benchmarkList();
-  return pastPriceNeeds(portfolioData(), today(), noMarketFileDates(), benchmarks,
+  return pastPriceNeeds(portfolioData(), today(), priceGaps(), benchmarks,
     benchmarkHistory(benchmarks.map((item) => item.id))).map((n) => ({
     date: n.date,
     cadence: n.cadence,
@@ -411,17 +416,28 @@ export function pastPriceDates(): {
   }));
 }
 
-/** Dates when neither exchange had a whole-market file in a settled backfill run. */
-export function noMarketFileDates(): Set<IsoDate> {
+function stringListSetting(key: string): string[] {
   const row = db.select({ value: settings.value }).from(settings)
-    .where(eq(settings.key, NO_MARKET_FILE_DATES_SETTING)).get();
-  if (!row?.value) return new Set();
+    .where(eq(settings.key, key)).get();
+  if (!row?.value) return [];
   try {
     const parsed: unknown = JSON.parse(row.value);
-    return new Set(Array.isArray(parsed)
-      ? parsed.filter((date): date is IsoDate => typeof date === 'string' && isValidDate(date))
-      : []);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
   } catch {
-    return new Set();
+    return [];
   }
+}
+
+/** Dates when neither exchange had a whole-market file in a settled backfill run. */
+export function noMarketFileDates(): Set<IsoDate> {
+  return new Set(stringListSetting(NO_MARKET_FILE_DATES_SETTING).filter(isValidDate));
+}
+
+/** `assetId:date` pairs whose settled source file didn't list the investment. */
+export function absentPriceKeys(): Set<string> {
+  return new Set(stringListSetting(ABSENT_PRICES_SETTING));
+}
+
+export function priceGaps(): PriceGaps {
+  return { noFileDates: noMarketFileDates(), absent: absentPriceKeys() };
 }

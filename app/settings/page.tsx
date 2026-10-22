@@ -12,7 +12,7 @@ import {
   SuggestedBenchmarks,
 } from '@/components/SettingsForms/SettingsForms';
 import { SUGGESTED_BENCHMARKS } from '@/lib/domain/benchmarks';
-import { pastPriceDates } from '@/lib/queries/investments';
+import { absentPriceKeys, pastPriceDates } from '@/lib/queries/investments';
 import { benchmarkList } from '@/lib/queries/benchmarks';
 import {
   autoPrices,
@@ -127,12 +127,14 @@ export default async function SettingsPage() {
             <SettingRow title="Update prices now" control={<UpdatePricesButton />}>
               <p>{last ? priceStatus(last) : 'Prices not updated automatically yet.'}</p>
             </SettingRow>
-            <SettingRow title="Fetch past prices" control={<PastPrices dates={pastPriceDates()} />}>
+            <SettingRow title="Fetch past prices"
+              control={<PastPrices dates={pastPriceDates()} unpublished={absentPriceKeys().size} />}>
               <p>
                 Fetches daily holding and benchmark prices for every trading day back to your first purchase. Existing
-                prices, weekends, dates with no exchange files for three days, and pre-NAV NFO
-                dates are skipped. The estimate appears before starting. Progress and Stop stay
-                available on every page; an unfinished run resumes when the app reopens.
+                prices, weekends, exchange holidays and pre-NAV NFO dates are skipped. A file that isn&apos;t out yet
+                is tried on a later run; after three days, a missing file or price counts as not published. The
+                estimate appears before starting. Progress and Stop stay available on every page; an unfinished run
+                resumes when the app reopens.
               </p>
             </SettingRow>
           </Card>

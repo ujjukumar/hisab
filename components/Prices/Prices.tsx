@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, useTransition, 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button/Button';
 import { useToast } from '@/components/Toast/Toast';
-import { priceJobStatus, startPriceJob, stopPriceJob } from '@/lib/actions/priceJob';
+import { priceJobStatus, recheckMissingPrices, startPriceJob, stopPriceJob } from '@/lib/actions/priceJob';
 import type { PriceJobStatus } from '@/lib/actions/priceJobStore';
 import { refreshPrices, setAutoPrices } from '@/lib/actions/prices';
 import type { IsoDate } from '@/lib/domain/dates';
@@ -120,7 +120,8 @@ export function PriceJobProvider({ children }: { children: ReactNode }) {
         if (last && (last.state === 'running' || last.state === 'stopping') &&
           next?.state !== 'running' && next?.state !== 'stopping') {
           router.refresh();
-          toast(next?.state === 'failed' ? next.message : next?.state === 'stopped' ? 'Past prices stopped' : 'Past prices fetched');
+          toast(next?.state === 'failed' || (next?.state === 'done' && next.message) ? next.message
+            : next?.state === 'stopped' ? 'Past prices stopped' : 'Past prices fetched');
         }
         if (next?.state === 'running' || next?.state === 'stopping') {
           timer = setTimeout(() => void poll(), 2500);
@@ -188,15 +189,19 @@ export function PriceJobProgress() {
 }
 
 /** Start another pass to retry missing prices or newly linked investments. */
-export function PastPrices({ dates }: { dates: PastDate[] }) {
+export function PastPrices({ dates, unpublished = 0 }: { dates: PastDate[]; unpublished?: number }) {
   const { status, busy, start, stop } = usePriceJob();
   const active = status?.state === 'running' || status?.state === 'stopping';
+  const unpublishedNote = unpublished > 0 && !active && <UnpublishedPrices count={unpublished} />;
 
   if (dates.length === 0 && !active) {
     return (
-      <p className="muted">
-        Nothing to fetch: scheduled prices are filled, or no investment has an ISIN yet.
-      </p>
+      <div className={styles.past}>
+        <p className="muted">
+          Nothing to fetch: scheduled prices are filled, or no investment has an ISIN yet.
+        </p>
+        {unpublishedNote}
+      </div>
     );
   }
   return (
@@ -211,6 +216,26 @@ export function PastPrices({ dates }: { dates: PastDate[] }) {
         onClick={() => void (active ? stop() : start())}>
         {active ? 'Stop' : status ? 'Retry missing prices' : 'Fetch past prices'}
       </Button>
+      {unpublishedNote}
     </div>
+  );
+}
+
+/** Prices a source's settled file didn't include; checking again lets the next run look once more. */
+function UnpublishedPrices({ count }: { count: number }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <p className="muted">
+      {count === 1 ? '1 price was' : `${count} prices were`} not published by AMFI, NSE or BSE, so they are skipped.{' '}
+      <button type="button" className="linkish" aria-disabled={pending} onClick={() => !pending && start(async () => {
+        const r = await recheckMissingPrices();
+        toast(r.ok ? 'Skipped prices will be checked again' : r.message);
+        if (r.ok) router.refresh();
+      })}>
+        {pending ? 'Checking…' : 'Check them again'}
+      </button>
+    </p>
   );
 }

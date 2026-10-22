@@ -8,12 +8,17 @@ vi.mock('@/lib/actions/applyPrices', () => ({
   applyFeedPrices: vi.fn((_db, rows: unknown[]) => rows.length),
   applyBenchmarkPrices: vi.fn((_db, rows: unknown[]) => rows.length),
 }));
-vi.mock('@/lib/feeds', () => ({
-  FeedError: class FeedError extends Error {},
-  nseLatest: vi.fn(),
+vi.mock('@/lib/feeds', () => {
+  class FeedError extends Error {}
+  return {
+    FeedError,
+    FeedNotReadyError: class FeedNotReadyError extends FeedError {},
+    FeedUnreachableError: class FeedUnreachableError extends FeedError {},
+    nseLatest: vi.fn(),
   bseLatest: vi.fn(),
-  listedPricesOn: vi.fn(),
-}));
+    listedPricesOn: vi.fn(),
+  };
+});
 
 const linked = [
   { id: 1, isin: 'INE000KP0011', feed: 'nse' as const },
@@ -57,12 +62,41 @@ describe('listed price fallback', () => {
   it('classifies closed dates only when neither exchange publishes a file', async () => {
     vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: false });
     const closed = await fetchAndSave(linked, '2024-07-08', async () => new Map(), 1, () => true, true);
-    expect(closed).toMatchObject({ noMarketFile: true, problems: [], unavailable: false });
+    expect(closed).toMatchObject({ noMarketFile: true, problems: [], unavailable: false, absent: [] });
 
     vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: true });
     const absentIsin = await fetchAndSave(linked, '2024-07-08', async () => new Map(), 1, () => true, true);
-    expect(absentIsin.noMarketFile).toBe(false);
-    expect(absentIsin.problems).toEqual(['No exchange price was found for 2 investments. Check the ISIN.']);
+    expect(absentIsin).toMatchObject({ noMarketFile: false, problems: [], absent: [1, 2] });
+  });
+
+  it('treats an exchange holiday as closed even when AMFI publishes a holiday list', async () => {
+    vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: false });
+    const funds = [{ id: 3, isin: 'INF000MF0012', feed: 'amfi' as const }];
+    const result = await fetchAndSave([...linked, ...funds], '2024-07-08', async () => new Map([
+      ['INF000MF0012', { date: '2024-07-08', price: '15' }],
+    ]), 1, () => true, true);
+    expect(result).toMatchObject({ updated: 1, noMarketFile: true, absent: [] });
+  });
+
+  it('waits quietly for recent files and records only settled problems', async () => {
+    const { FeedNotReadyError, FeedUnreachableError } = await import('@/lib/feeds');
+    const { today } = await import('@/lib/domain/dates');
+    const date = today();
+    vi.mocked(listedPricesOn).mockRejectedValue(new FeedNotReadyError('Not out yet'));
+    const notReady = async () => {
+      throw new FeedNotReadyError('AMFI not out yet');
+    };
+    const funds = [{ id: 3, isin: 'INF000MF0012', feed: 'amfi' as const }];
+    expect(await fetchAndSave([...linked, ...funds], date, notReady, 1, () => true, true))
+      .toMatchObject({ updated: 0, problems: [], unavailable: false, absent: [] });
+
+    const settled = await fetchAndSave([...linked, ...funds], '2024-07-08', notReady, 1, () => true, true);
+    expect(settled).toMatchObject({ unavailable: true, unreachable: false });
+    expect(settled.problems).toEqual(['AMFI not out yet', 'Not out yet']);
+
+    vi.mocked(listedPricesOn).mockRejectedValue(new FeedUnreachableError('Offline'));
+    expect(await fetchAndSave(linked, date, async () => new Map(), 1, () => true, true))
+      .toMatchObject({ unavailable: true, unreachable: true, problems: ['Offline'] });
   });
 
   it('keeps the NSE price for dual-listed shares and adds a BSE-only share', async () => {

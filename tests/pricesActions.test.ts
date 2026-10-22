@@ -45,7 +45,7 @@ beforeEach(() => {
   vi.mocked(portfolio).mockReturnValue(
     assets.map((item) => ({ asset: item, sold: item.id === 4 })) as ReturnType<typeof portfolio>,
   );
-  vi.mocked(fetchAndSave).mockResolvedValue({ updated: 1, problems: [], unavailable: false, noMarketFile: false });
+  vi.mocked(fetchAndSave).mockResolvedValue({ updated: 1, problems: [], unavailable: false, noMarketFile: false, unreachable: false, absent: [] });
 });
 
 describe('fetchInvestmentPrices', () => {
@@ -67,7 +67,7 @@ describe('fetchInvestmentPrices', () => {
   });
 
   it('reports missing published prices without claiming an update', async () => {
-    vi.mocked(fetchAndSave).mockResolvedValue({ updated: 0, problems: [], unavailable: false, noMarketFile: false });
+    vi.mocked(fetchAndSave).mockResolvedValue({ updated: 0, problems: [], unavailable: false, noMarketFile: false, unreachable: false, absent: [] });
     const result = await fetchInvestmentPrices([1]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message).toMatch(/No new prices were found/);

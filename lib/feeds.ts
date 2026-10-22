@@ -22,6 +22,10 @@ const NSE = 'https://nsearchives.nseindia.com/content';
 const BSE = 'https://www.bseindia.com/download/BhavCopy/Equity';
 
 export class FeedError extends Error {}
+/** The source couldn't be reached or refused the request, so later dates would fail too. */
+export class FeedUnreachableError extends FeedError {}
+/** The source answered, but the day's file isn't ready (not published yet, or empty). */
+export class FeedNotReadyError extends FeedError {}
 
 /** The file, or null when the server says it doesn't exist (a holiday, or not published yet). */
 async function download(url: string, source: string): Promise<Buffer | null> {
@@ -34,7 +38,7 @@ async function download(url: string, source: string): Promise<Buffer | null> {
     });
   } catch (error) {
     if (DEBUG_FEEDS) console.error('[price-feed] request failed', { source, url, error });
-    throw new FeedError(`Couldn't reach ${source}. Check the internet connection and try again.`);
+    throw new FeedUnreachableError(`Couldn't reach ${source}. Check the internet connection and try again.`);
   }
   if (DEBUG_FEEDS) {
     console.info('[price-feed] response', {
@@ -48,7 +52,7 @@ async function download(url: string, source: string): Promise<Buffer | null> {
   }
   if (res.status === 404) return null;
   if (!res.ok)
-    throw new FeedError(`${source} didn't send its prices (error ${res.status}). Try again later.`);
+    throw new FeedUnreachableError(`${source} didn't send its prices (error ${res.status}). Try again later.`);
   const body = Buffer.from(await res.arrayBuffer());
   if (DEBUG_FEEDS) console.info('[price-feed] body read', { source, bytes: body.byteLength });
   return body;
@@ -74,7 +78,8 @@ export async function amfiOn(date: IsoDate): Promise<PriceMap> {
   const text = file.toString('utf8');
   if (/^\s*(?:<!doctype html|<html\b)/i.test(text)) {
     if (DEBUG_FEEDS) console.error('[price-feed] AMFI returned HTML instead of NAV data', { date });
-    throw new FeedError(`AMFI returned a webpage instead of NAV data for ${date}. Try again later.`);
+    // AMFI answers with a webpage for a day it hasn't published yet.
+    throw new FeedNotReadyError(`AMFI returned a webpage instead of NAV data for ${date}. Try again later.`);
   }
   return parseAmfiNav(text);
 }
@@ -87,13 +92,21 @@ export async function amfiFor(
   earliestDates: ReadonlyMap<string, IsoDate> = new Map(),
 ): Promise<PriceMap> {
   const out: PriceMap = new Map();
+  let notReady: FeedNotReadyError | null = null;
   for (let i = 0; i < lookBackDays && out.size < isins.length; i++) {
     const dayDate = addDays(date, -i);
     const eligible = isins.filter(
       (isin) => !out.has(isin) && dayDate >= (earliestDates.get(isin) ?? dayDate),
     );
     if (eligible.length === 0) continue;
-    const day = await amfiOn(dayDate);
+    let day: PriceMap;
+    try {
+      day = await amfiOn(dayDate);
+    } catch (error) {
+      if (!(error instanceof FeedNotReadyError)) throw error;
+      notReady ??= error;
+      continue;
+    }
     if (DEBUG_FEEDS) {
       console.info('[price-feed] AMFI history lookup', {
         targetDate: date,
@@ -108,6 +121,7 @@ export async function amfiFor(
       if (found?.date === dayDate && !out.has(isin)) out.set(isin, found);
     }
   }
+  if (notReady && out.size === 0) throw notReady;
   return out;
 }
 
@@ -179,7 +193,7 @@ async function bseOn(date: IsoDate): Promise<PriceMap | null> {
   const text = file.toString('utf8');
   if (/^\s*(?:<!doctype html|<html\b)/i.test(text)) return null;
   const map = parseBhavcopy(text);
-  if (!map.size) throw new FeedError("BSE's closing prices couldn't be read. Try again later.");
+  if (!map.size) throw new FeedNotReadyError("BSE's closing prices couldn't be read. Try again later.");
   return map;
 }
 
@@ -214,12 +228,22 @@ export async function bseLatest(
   lookBackDays = LOOK_BACK_DAYS,
   isins?: readonly string[],
 ): Promise<PriceMap> {
+  let notReady: FeedNotReadyError | null = null;
+  const fileOn = async (fileDate: IsoDate) => {
+    try {
+      return await bseOn(fileDate);
+    } catch (error) {
+      if (!(error instanceof FeedNotReadyError)) throw error;
+      notReady ??= error;
+      return null;
+    }
+  };
   if (isins) {
     const out: PriceMap = new Map();
     const requested = new Set(isins);
     for (let i = 0; i < lookBackDays && out.size < requested.size; i++) {
       const fileDate = addDays(date, -i);
-      const map = await bseOn(fileDate);
+      const map = await fileOn(fileDate);
       if (DEBUG_FEEDS) {
         console.info('[price-feed] BSE history lookup', {
           targetDate: date,
@@ -235,11 +259,13 @@ export async function bseLatest(
         if (found && !out.has(isin)) out.set(isin, found);
       }
     }
+    if (notReady && out.size === 0) throw notReady;
     return out;
   }
   for (let i = 0; i < lookBackDays; i++) {
-    const map = await bseOn(addDays(date, -i));
+    const map = await fileOn(addDays(date, -i));
     if (map) return map;
   }
+  if (notReady) throw notReady;
   return new Map();
 }

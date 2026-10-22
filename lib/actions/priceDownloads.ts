@@ -1,14 +1,41 @@
 import { applyBenchmarkPrices, applyFeedPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
-import { LOOK_BACK_DAYS, pricesFor, type BenchmarkFeed, type FeedAsset, type PriceMap } from '@/lib/domain/priceFeeds';
+import {
+  LOOK_BACK_DAYS,
+  PUBLISH_GRACE_DAYS,
+  pricesFor,
+  type BenchmarkFeed,
+  type FeedAsset,
+  type PriceMap,
+} from '@/lib/domain/priceFeeds';
 import { addDays, today, type IsoDate } from '@/lib/domain/dates';
-import { FeedError, bseLatest, listedPricesOn, nseLatest } from '@/lib/feeds';
+import {
+  FeedError,
+  FeedNotReadyError,
+  FeedUnreachableError,
+  bseLatest,
+  listedPricesOn,
+  nseLatest,
+} from '@/lib/feeds';
 
 const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
 
 function maskIsin(isin: string): string {
   return `${isin.slice(0, 3)}***${isin.slice(-4)}`;
 }
+
+export type FetchResult = {
+  updated: number;
+  problems: string[];
+  /** A source failed for this date. */
+  unavailable: boolean;
+  /** A source couldn't be reached at all, so later dates would fail too. */
+  unreachable: boolean;
+  /** Neither exchange published a file for this date (daily backfill only). */
+  noMarketFile: boolean;
+  /** Investments a settled, published file didn't list on this date (daily backfill only). */
+  absent: number[];
+};
 
 export async function fetchAndSave(
   linked: FeedAsset[],
@@ -18,13 +45,15 @@ export async function fetchAndSave(
   canSave: () => boolean = () => true,
   dailyBackfill = false,
   benchmarkFeed: BenchmarkFeed[] = [],
-): Promise<{ updated: number; problems: string[]; unavailable: boolean; noMarketFile: boolean }> {
+): Promise<FetchResult> {
   const amfi = linked.filter((a) => a.feed === 'amfi');
   const nse = linked.filter((a) => a.feed === 'nse');
   const earliestDates = new Map(
     amfi.flatMap((asset) => asset.navStartDate ? [[asset.isin, asset.navStartDate] as const] : []),
   );
   const fundIsins = [...new Set([...amfi, ...benchmarkFeed].map((asset) => asset.isin))];
+  // In a daily backfill, a file missing after the grace period is final; before it, try again later.
+  const settled = dailyBackfill && date <= addDays(today(), -PUBLISH_GRACE_DAYS);
   const none: PriceMap = new Map();
   let noMarketFile = false;
   let marketFileFound = !dailyBackfill;
@@ -43,18 +72,29 @@ export async function fetchAndSave(
   ]);
   const problems: string[] = [];
   let unavailable = false;
+  let unreachable = false;
+  const fail = (reason: unknown) => {
+    if (!(reason instanceof FeedError)) throw reason;
+    if (reason instanceof FeedNotReadyError && dailyBackfill && !settled) return;
+    if (!problems.includes(reason.message)) problems.push(reason.message);
+    unavailable = true;
+    if (reason instanceof FeedUnreachableError) unreachable = true;
+  };
+  const absent: number[] = [];
+
   const fundResult = got[0]!;
   let fundRows: ReturnType<typeof pricesFor> = [];
   if (fundIsins.length && fundResult.status === 'rejected') {
-    if (!(fundResult.reason instanceof FeedError)) throw fundResult.reason;
-    problems.push(fundResult.reason.message);
-    unavailable = true;
+    fail(fundResult.reason);
   } else if (fundIsins.length && fundResult.status === 'fulfilled') {
     const fundMap = dailyBackfill ? new Map([...fundResult.value].filter(([isin, found]) =>
       found.date === date && date >= (earliestDates.get(isin) ?? date))) : fundResult.value;
     fundRows = pricesFor(amfi, fundMap);
     const missing = amfi.length - fundRows.length;
-    if (missing && !(lookBackDays === 1 && fundResult.value.size === 0)) {
+    if (settled && fundResult.value.size) {
+      absent.push(...amfi.filter((asset) => !fundRows.some((row) => row.assetId === asset.id))
+        .map((asset) => asset.id));
+    } else if (missing && !dailyBackfill) {
       problems.push(
         `AMFI had no price for ${missing === 1 ? '1 investment' : `${missing} investments`}. Check the ISIN in each one.`,
       );
@@ -67,7 +107,7 @@ export async function fetchAndSave(
     const found = fundResult.value.get(item.isin);
     if (found && (!dailyBackfill || found.date === date))
       return [{ benchmarkId: item.id, date: found.date, price: found.price }];
-    if (dailyBackfill && fundResult.value.size && date <= addDays(today(), -3))
+    if (settled && fundResult.value.size)
       return [{ benchmarkId: item.id, date, price: null }];
     return [];
   }) : [];
@@ -75,8 +115,6 @@ export async function fetchAndSave(
     const missing = benchmarkFeed.length - benchmarkRows.length;
     if (missing) problems.push(`AMFI had no NAV for ${missing} benchmark${missing === 1 ? '' : 's'}. Check the ISIN in Settings.`);
   }
-  if (fundIsins.length && fundResult.status === 'fulfilled' && fundResult.value.size)
-    noMarketFile = false;
 
   const nseResult = got[1]!;
   if (nseResult.status === 'rejected' && !(nseResult.reason instanceof FeedError))
@@ -88,9 +126,7 @@ export async function fetchAndSave(
     try {
       bseMap = await bseLatest(date, lookBackDays, missingNse.map((a) => a.isin));
     } catch (error) {
-      if (!(error instanceof FeedError)) throw error;
-      problems.push(error.message);
-      unavailable = true;
+      fail(error);
     }
   }
   const nseRows = pricesFor(nse, nseMap);
@@ -98,14 +134,14 @@ export async function fetchAndSave(
   const listedRows = nseRows.concat(bseRows);
   const missing = nse.length - listedRows.length;
   if (missing && nseResult.status === 'rejected') {
-    problems.push(nseResult.reason.message);
-    unavailable = true;
-  } else if (missing && !unavailable && !noMarketFile) {
-    if (dailyBackfill && marketFileFound) {
-      problems.push(
-        `No exchange price was found for ${missing === 1 ? '1 investment' : `${missing} investments`}. Check the ISIN.`,
-      );
-    } else if (nseMap.size === 0 && bseMap.size === 0) {
+    fail(nseResult.reason);
+  } else if (dailyBackfill) {
+    if (settled && missing && marketFileFound) {
+      absent.push(...nse.filter((asset) => !listedRows.some((row) => row.assetId === asset.id))
+        .map((asset) => asset.id));
+    }
+  } else if (missing && !unavailable) {
+    if (nseMap.size === 0 && bseMap.size === 0) {
       if (lookBackDays > 1)
         problems.push('NSE and BSE had no closing prices for this week. Run again later to retry.');
     } else {
@@ -133,6 +169,7 @@ export async function fetchAndSave(
       },
       unavailable,
       noMarketFile,
+      absent,
       problems,
     });
   }
@@ -143,6 +180,8 @@ export async function fetchAndSave(
       : 0,
     problems,
     unavailable,
+    unreachable,
     noMarketFile,
+    absent,
   };
 }
