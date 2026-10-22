@@ -42,6 +42,24 @@
 
 .headline .rangeChange { flex-wrap: wrap; }
 
+.rangeSplit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font: 12px/1.4 var(--sans);
+  color: var(--text-3);
+}
+
+.rangeSplit strong {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.rangeSplit strong:global(.pos) { color: var(--gain); }
+.rangeSplit strong:global(.neg) { color: var(--loss); }
+
 .rangeFrom {
   font: 12px/1.4 var(--sans);
   color: var(--text-3);

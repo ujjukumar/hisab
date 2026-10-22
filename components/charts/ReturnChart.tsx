@@ -31,6 +31,9 @@ export type ValueSeries = {
   /** Gain and net money added since the start of the range. */
   gain: number[];
   added: number[];
+  /** Gain locked in by sales and withdrawals, and dividends and interest, since the start of the range. */
+  booked: number[];
+  income: number[];
   /** Gain since the start of the range as a share of the money at work. */
   gainPercent: (number | null)[];
   /** Short name of the range, such as 6M. */
@@ -102,6 +105,8 @@ export function ReturnChart({ dates, lines, value }: {
 
   const last = dates.length - 1;
   const gainAt = (index: number) => value ? value.worth[index]! - value.invested[index]! : 0;
+  const paperAt = (index: number) => value
+    ? value.gain[index]! - value.booked[index]! - value.income[index]! : 0;
   const percentAt = (index: number) => value?.percent[index] ?? null;
   const percentText = (index: number) => percentAt(index) === null ? '' : ` (${formatPercent(percentAt(index)! * 100)})`;
   const rangePercentText = (index: number) => value?.gainPercent[index] === null || value?.gainPercent[index] === undefined
@@ -123,6 +128,8 @@ export function ReturnChart({ dates, lines, value }: {
       { label: 'Gain on cost', value: `${formatShortINRSigned(gainAt(at))}${percentText(at)}`, tone: gainClass(gainAt(at)) },
       { label: 'Added since start', value: formatShortINRSigned(value.added[at]!) },
       { label: 'Gain since start', value: `${formatShortINRSigned(value.gain[at]!)}${rangePercentText(at)}`, tone: gainClass(value.gain[at]!) },
+      ...(value.booked[at] ? [{ label: 'Booked since start', value: formatShortINRSigned(value.booked[at]!), tone: gainClass(value.booked[at]!) }] : []),
+      ...(value.income[at] ? [{ label: 'Dividends since start', value: formatShortINRSigned(value.income[at]!) }] : []),
       ...value.benchmarks.map((line) => ({
         color: line.color,
         label: line.label,
@@ -165,6 +172,13 @@ export function ReturnChart({ dates, lines, value }: {
               {formatShortINRSigned(value.gain[last]!)}{rangePercentText(last)}
             </strong></span>
           </span>
+          {(value.booked[last] || value.income[last]) ? <span className={styles.rangeSplit}>
+            <span>Booked <strong className={gainClass(value.booked[last]!)}>{formatShortINRSigned(value.booked[last]!)}</strong></span>
+            {value.income[last] ? <><span>·</span>
+              <span>Dividends <strong>{formatShortINRSigned(value.income[last]!)}</strong></span></> : null}
+            <span>·</span>
+            <span>On paper <strong className={gainClass(paperAt(last))}>{formatShortINRSigned(paperAt(last))}</strong></span>
+          </span> : null}
           {value.worth[0]! > 0 && last > 0 && <span className={styles.rangeFrom}>
             {formatShortINR(value.worth[0]!)} on {formatDate(dates[0]!)} → {formatShortINR(value.worth[last]!)}
           </span>}

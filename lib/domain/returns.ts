@@ -54,6 +54,10 @@ export type ReturnPoint = {
   gain: number;
   /** Paise. Money paid in less money taken out since the start of the range. */
   added: number;
+  /** Paise. Gain or loss locked in by sales and withdrawals since the start of the range (average cost). */
+  booked: number;
+  /** Paise. Dividends and interest paid out since the start of the range. */
+  income: number;
   groups: Partial<Record<GroupKey, number | null>>;
 };
 
@@ -86,13 +90,19 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
   if (!first || first > to) return [];
   const atStart = from ? buildPortfolio(data, from) : [];
   const startValues = new Map(atStart.map((row) => [row.asset.id, row.value]));
+  const startBooked = new Map(atStart.map((row) => [row.asset.id, row.holding.realised]));
+  const startIncome = new Map(atStart.map((row) => [row.asset.id, row.holding.income]));
 
   return returnDates(data, first, to, from).map((date) => {
     const groups: Partial<Record<GroupKey, { gain: number; paidIn: number; start: number }>> = {};
     let value = 0;
     let invested = 0;
     let added = 0;
+    let booked = 0;
+    let income = 0;
     for (const row of buildPortfolio(data, date)) {
+      booked += row.holding.realised - (startBooked.get(row.asset.id) ?? 0);
+      income += row.holding.income - (startIncome.get(row.asset.id) ?? 0);
       const startValue = startValues.get(row.asset.id) ?? 0;
       const flows = row.holding.flows.filter((flow) => !from || flow.date > from);
       const paidIn = flows.reduce((sum, flow) => sum + Math.max(0, -flow.amount), 0);
@@ -123,6 +133,8 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
       invested,
       gain: total.gain,
       added,
+      booked,
+      income,
       groups: Object.fromEntries(GROUPS.flatMap(({ key }) => groups[key]
         ? [[key, percent(groups[key])]] : [])) as ReturnPoint['groups'],
     };

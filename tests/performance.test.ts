@@ -111,6 +111,27 @@ describe('returnSeries', () => {
     expect([ranged[0]!.gain, ranged[0]!.added]).toEqual([0, 0]);
   });
 
+  it('splits the gain into booked, dividends and the rest, only counting sales inside the range', () => {
+    expect(returnSeries(data, '2025-04-20', null).at(-1)!.booked).toBe(10000);
+    expect(returnSeries(data, '2025-04-20', '2025-01-31').at(-1)!.booked).toBe(10000);
+    expect(returnSeries(data, '2025-04-20', '2025-02-10').at(-1)!.booked).toBe(0);
+
+    // 100 units at ₹10, ₹50 dividend, 40 sold at ₹12, priced at ₹13 at the end.
+    const partial: PortfolioData = {
+      ...data,
+      assets: [asset(1, 'Meridian')],
+      txns: [trade(1, 1, '2025-01-15', 'buy', '100', '10'),
+        { ...trade(2, 1, '2025-02-01', 'buy', '0', '10'), action: 'dividend',
+          amount: 5000, units: null, price: null },
+        trade(3, 1, '2025-03-01', 'sell', '40', '12')],
+      prices: [{ assetId: 1, date: '2025-04-01', price: '13' }],
+    };
+    const end = returnSeries(partial, '2025-04-01', '2025-01-20').at(-1)!;
+    expect([end.booked, end.income]).toEqual([8000, 5000]);
+    expect(end.gain).toBe(31000);
+    expect(end.gain - end.booked - end.income).toBe(18000);
+  });
+
   it('samples about daily and always includes transaction dates', () => {
     const dates = returnDates(data, '2025-01-15', '2025-03-15', '2025-01-01');
     expect(dates[0]).toBe('2025-01-15');

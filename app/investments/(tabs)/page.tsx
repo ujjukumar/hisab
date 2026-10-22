@@ -308,6 +308,8 @@ export default async function OverviewPage({
     percent: points.map((point) => point.invested > 0 ? (point.value - point.invested) / point.invested : null),
     gain: points.map((point) => point.gain),
     added: points.map((point) => point.added),
+    booked: points.map((point) => point.booked),
+    income: points.map((point) => point.income),
     gainPercent: points.map((point) => point.portfolio),
     rangeLabel: range?.range === 'all' ? 'All time' : range?.range === 'custom' ? 'In range'
       : RETURN_RANGES.find(([key]) => key === range?.range)?.[1] ?? '',
@@ -489,7 +491,8 @@ export default async function OverviewPage({
         <p className="footnote">
           All amounts in ₹. Total return is current value minus cost; sold investments show the gain
           they made. Change in period accounts for money added or withdrawn. Returns under a year
-          are shown as an absolute percentage (abs.).
+          are shown as an absolute percentage (abs.). Booked gains use average cost, so they can
+          differ from a broker&apos;s capital gains statement, which uses first in, first out.
         </p>
       </div>
     </>
