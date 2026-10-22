@@ -37,7 +37,7 @@ export function ReturnsCard({ dates, lines, value, range, available, from, to, a
     }
     return `/investments?${query}`;
   };
-  return <Card title="Performance" sub="What your investments are worth against the money put in. YTD starts on 1 January.">
+  return <Card title="Performance" sub="What your investments were worth on each day against what they cost. YTD starts on 1 January.">
     <ChipLinks label="Return range" items={available.map(([value, label]) => ({
       href: href(value), label, current: range === value,
     }))} />

@@ -48,7 +48,7 @@ export type ReturnPoint = {
   capital: number;
   /** Paise. What everything was worth on the day. */
   value: number;
-  /** Paise. Value at the start of the range plus money put in, less money taken out. */
+  /** Paise. What the holdings on the day cost, whatever the range. */
   invested: number;
   groups: Partial<Record<GroupKey, number | null>>;
 };
@@ -86,6 +86,7 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
   return returnDates(data, first, to, from).map((date) => {
     const groups: Partial<Record<GroupKey, { gain: number; paidIn: number; start: number }>> = {};
     let value = 0;
+    let invested = 0;
     for (const row of buildPortfolio(data, date)) {
       const startValue = startValues.get(row.asset.id) ?? 0;
       const flows = row.holding.flows.filter((flow) => !from || flow.date > from);
@@ -97,6 +98,7 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
       total.start += startValue;
       groups[row.group] = total;
       value += row.value;
+      if (!row.sold) invested += row.holding.cost;
     }
     const active = GROUPS.flatMap(({ key }) => groups[key] ? [groups[key]] : []);
     const total = active.reduce((sum, group) => ({
@@ -111,7 +113,7 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
       portfolio: percent(total),
       capital: total.start + total.paidIn,
       value,
-      invested: value - total.gain,
+      invested,
       groups: Object.fromEntries(GROUPS.flatMap(({ key }) => groups[key]
         ? [[key, percent(groups[key])]] : [])) as ReturnPoint['groups'],
     };

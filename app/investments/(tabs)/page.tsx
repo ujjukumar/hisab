@@ -303,7 +303,7 @@ export default async function OverviewPage({
   const value: ValueSeries | undefined = points.length ? {
     worth: points.map((point) => point.value),
     invested: points.map((point) => point.invested),
-    percent: points.map((point) => point.portfolio),
+    percent: points.map((point) => point.invested > 0 ? (point.value - point.invested) / point.invested : null),
     benchmarks: benchmarkWorth,
   } : undefined;
   const changes = investmentPeriodRows(data, period, date, yearStart);

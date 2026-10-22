@@ -88,15 +88,15 @@ describe('returnSeries', () => {
     );
   });
 
-  it('gives worth and money invested in rupees, worth less invested being the gain', () => {
+  it('gives worth and the cost of what is held in rupees, the same whatever the range', () => {
     const end = returnSeries(data, '2025-04-20', null).at(-1)!;
-    // Meridian 150 units at ₹12; ₹2,600 put in less ₹1,100 from Banyan's sale.
+    // Meridian 150 units at ₹12 that cost ₹1,600.
     expect(end.value).toBe(180000);
-    expect(end.invested).toBe(150000);
-    expect((end.value - end.invested) / end.capital).toBeCloseTo(end.portfolio!);
-    const ranged = returnSeries(data, '2025-04-20', '2025-03-01').at(0)!;
-    expect(ranged.date).toBe('2025-03-01');
-    expect(ranged.invested).toBe(ranged.value);
+    expect(end.invested).toBe(160000);
+    const ranged = returnSeries(data, '2025-04-20', '2025-03-01');
+    expect(ranged[0]!.date).toBe('2025-03-01');
+    expect(ranged[0]!.invested).toBe(returnSeries(data, '2025-03-01', null).at(-1)!.invested);
+    expect(ranged.at(-1)!.invested).toBe(end.invested);
   });
 
   it('samples about daily and always includes transaction dates', () => {
