@@ -6,9 +6,10 @@ import { formatDate } from '@/lib/domain/format';
 import { RETURN_RANGES, type ReturnRange } from '@/lib/domain/returns';
 import type { IsoDate } from '@/lib/domain/dates';
 import styles from './ReturnsCard.module.css';
+import { BenchmarkFill } from './BenchmarkFill';
 import { CompareBenchmarks } from './CompareBenchmarks';
 
-export function ReturnsCard({ dates, lines, value, range, available, from, to, asOf, first, error, params, benchmarks, notices }: {
+export function ReturnsCard({ dates, lines, value, range, available, from, to, asOf, first, error, params, benchmarks, notices, missing = [] }: {
   dates: IsoDate[];
   lines: ReturnLine[];
   value?: ValueSeries;
@@ -22,6 +23,8 @@ export function ReturnsCard({ dates, lines, value, range, available, from, to, a
   params: Record<string, string | string[] | undefined>;
   benchmarks: { id: number; name: string }[];
   notices: string[];
+  /** Benchmarks being compared whose NAV history still needs fetching. */
+  missing?: { id: number; name: string }[];
 }) {
   const retained = new URLSearchParams();
   for (const key of ['group', 'sold', 'period', 'sort', 'dir', 'compare']) {
@@ -50,7 +53,9 @@ export function ReturnsCard({ dates, lines, value, range, available, from, to, a
     </form>}
     {benchmarks.length ? <CompareBenchmarks items={benchmarks} /> :
       <p className={styles.note}>To compare with an index fund, <Link href="/settings">add a benchmark in Settings</Link>.</p>}
-    {notices.map((message) => <p className={styles.note} key={message}>{message}</p>)}
+    <BenchmarkFill missing={missing}>
+      {notices.map((message) => <p className={styles.note} key={message}>{message}</p>)}
+    </BenchmarkFill>
     {error ? <p role="alert" className={styles.error}>{error}</p> : <>
       <ReturnChart dates={dates} lines={lines} value={value} />
       <p className={styles.note}>{formatDate(dates[0] ?? from ?? first)} to {formatDate(to)} · Comparisons use the same money added and taken out on the same dates.</p>

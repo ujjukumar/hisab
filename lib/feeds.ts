@@ -3,14 +3,19 @@ import { SHORT_MONTHS, addDays, parts, type IsoDate } from '@/lib/domain/dates';
 import {
   LOOK_BACK_DAYS,
   parseAmfiNav,
+  parseAmfiSchemeCodes,
   parseBhavcopy,
+  parseMfapiHistory,
+  type FeedPrice,
   type PriceMap,
 } from '@/lib/domain/priceFeeds';
 import { unzipFirst } from '@/lib/zip';
 
 /**
  * The only place Hisaab goes online (PLAN section 11, phase 8). It downloads AMFI's and NSE's
- * public whole-market price files; every request is the same whatever the owner holds.
+ * public whole-market price files; every request is the same whatever the owner holds. The one
+ * exception is a benchmark's NAV history from mfapi.in, which names that benchmark fund (an
+ * index fund the owner chose to compare with, not a holding).
  */
 
 const HEADERS = { 'User-Agent': 'Hisaab (personal use)' };
@@ -18,6 +23,7 @@ const TIMEOUT_MS = 20_000;
 const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
 const AMFI_LATEST = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 const AMFI_HISTORY = 'https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx';
+const MFAPI = 'https://api.mfapi.in/mf';
 const NSE = 'https://nsearchives.nseindia.com/content';
 const BSE = 'https://www.bseindia.com/download/BhavCopy/Equity';
 
@@ -66,6 +72,23 @@ export async function amfiLatest(): Promise<PriceMap> {
   const map = file ? parseAmfiNav(file.toString('utf8')) : new Map();
   if (map.size === 0) throw new FeedError("AMFI's NAV list was empty. Try again later.");
   return map;
+}
+
+/** A benchmark fund's whole NAV history, oldest first: its scheme code from AMFI, then mfapi.in. */
+export async function benchmarkNavHistory(isin: string): Promise<FeedPrice[]> {
+  const list = await download(AMFI_LATEST, 'AMFI');
+  const code = list ? parseAmfiSchemeCodes(list.toString('utf8')).get(isin.toUpperCase()) : undefined;
+  if (!code) throw new FeedError(`AMFI doesn't list a fund with ISIN ${isin}. Check the benchmark in Settings.`);
+  const file = await download(`${MFAPI}/${code}`, 'mfapi.in');
+  let body: unknown = null;
+  try {
+    body = file ? JSON.parse(file.toString('utf8')) : null;
+  } catch {
+    body = null;
+  }
+  const history = parseMfapiHistory(body, isin);
+  if (!history?.length) throw new FeedError("mfapi.in didn't send this fund's NAV history. Try again later.");
+  return history;
 }
 
 /** Fund NAVs published for one day. Weekend lists hold only the few funds priced every day. */

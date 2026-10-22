@@ -39,8 +39,8 @@ import {
   type PeriodRow,
 } from '@/lib/domain/performance';
 import { totals, type HoldingRow } from '@/lib/domain/portfolio';
-import { benchmarkReturns, pickReturnRange, returnSeries } from '@/lib/domain/returns';
-import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
+import { RETURN_RANGES, benchmarkReturns, pickReturnRange, returnSeries } from '@/lib/domain/returns';
+import { benchmarkHistory, benchmarkList, benchmarksMissingHistory } from '@/lib/queries/benchmarks';
 import { assetOptions, pickHoldings, portfolio, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
@@ -288,6 +288,8 @@ export default async function OverviewPage({
     ? params.compare.split(',').map(Number) : []);
   const selected = benchmarks.filter((item) => compared.has(item.id));
   const history = benchmarkHistory(selected.map((item) => item.id));
+  const missingIds = new Set(benchmarksMissingHistory(selected.map((item) => item.id)));
+  const missing = selected.filter((item) => missingIds.has(item.id)).map(({ id, name }) => ({ id, name }));
   const notices: string[] = [];
   const benchmarkWorth: ReturnLine[] = [];
   for (const [index, item] of selected.entries()) {
@@ -304,6 +306,11 @@ export default async function OverviewPage({
     worth: points.map((point) => point.value),
     invested: points.map((point) => point.invested),
     percent: points.map((point) => point.invested > 0 ? (point.value - point.invested) / point.invested : null),
+    gain: points.map((point) => point.gain),
+    added: points.map((point) => point.added),
+    gainPercent: points.map((point) => point.portfolio),
+    rangeLabel: range?.range === 'all' ? 'All time' : range?.range === 'custom' ? 'In range'
+      : RETURN_RANGES.find(([key]) => key === range?.range)?.[1] ?? '',
     benchmarks: benchmarkWorth,
   } : undefined;
   const changes = investmentPeriodRows(data, period, date, yearStart);
@@ -353,7 +360,7 @@ export default async function OverviewPage({
       <div className="wrap page-body">
         {first && range && <ReturnsCard dates={points.map((point) => point.date)} lines={lines} value={value}
           range={range.range} available={range.available} from={range.from} to={range.to} asOf={date}
-          first={first} error={range.error} params={params} benchmarks={benchmarks} notices={notices} />}
+          first={first} error={range.error} params={params} benchmarks={benchmarks} notices={notices} missing={missing} />}
         {hiddenSold > 0 && (
           <p className="tbl-note">
             {showSold ? (

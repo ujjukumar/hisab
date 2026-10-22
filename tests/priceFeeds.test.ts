@@ -4,10 +4,13 @@ import { unitsAmount, type HoldingTxn } from '@/lib/domain/holdings';
 import type { PortfolioData } from '@/lib/domain/portfolio';
 import { zip } from '@/lib/zip';
 import {
+  benchmarkNeedsHistory,
   feedAssets,
   isDue,
   parseAmfiNav,
+  parseAmfiSchemeCodes,
   parseBhavcopy,
+  parseMfapiHistory,
   pastPriceNeeds,
   pendingPriceNeeds,
   pricesFor,
@@ -539,5 +542,46 @@ describe('pastPriceNeeds', () => {
     expect(needs.find((need) => need.date === '2025-01-02')?.cadence).toBe('daily');
     expect(needs.at(-1)?.date).toBe('2025-01-30');
     expect(needs.map((need) => need.date)).not.toContain('2025-01-04');
+  });
+});
+
+describe('benchmark history', () => {
+  it('reads scheme codes by ISIN from the AMFI list', () => {
+    const text = [
+      'Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Net Asset Value;Date',
+      '',
+      'Open Ended Schemes(Index Funds)',
+      '120716;INF789F01XA0;-;UTI Nifty 50 Index Fund - Direct Plan - Growth;160.6525;21-Oct-2026',
+      '999;INF000000001;inf000000002;Other;N.A.;21-Oct-2026',
+    ].join('\r\n');
+    const codes = parseAmfiSchemeCodes(text);
+    expect(codes.get('INF789F01XA0')).toBe('120716');
+    expect(codes.get('INF000000002')).toBe('999');
+  });
+
+  it('reads mfapi.in history oldest first and checks the fund', () => {
+    const body = {
+      meta: { scheme_code: 120716, isin_growth: 'INF789F01XA0', isin_div_reinvestment: null },
+      data: [
+        { date: '21-10-2026', nav: '160.65250' },
+        { date: '20-10-2026', nav: '159.10000' },
+        { date: '31-02-2026', nav: '1.0' },
+        { date: '19-10-2026', nav: '0.000' },
+      ],
+      status: 'SUCCESS',
+    };
+    expect(parseMfapiHistory(body, 'INF789F01XA0')).toEqual([
+      { date: '2026-10-20', price: '159.1' },
+      { date: '2026-10-21', price: '160.6525' },
+    ]);
+    expect(parseMfapiHistory(body, 'INF000000001')).toBeNull();
+    expect(parseMfapiHistory('nope', 'INF789F01XA0')).toBeNull();
+  });
+
+  it('asks for history until it covers the first investment and this week', () => {
+    expect(benchmarkNeedsHistory([], '2025-01-10', '2026-10-22')).toBe(true);
+    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-21'], '2025-01-10', '2026-10-22')).toBe(false);
+    expect(benchmarkNeedsHistory(['2025-02-01', '2026-10-21'], '2025-01-10', '2026-10-22')).toBe(true);
+    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-01'], '2025-01-10', '2026-10-22')).toBe(true);
   });
 });

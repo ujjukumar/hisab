@@ -99,6 +99,18 @@ describe('returnSeries', () => {
     expect(ranged.at(-1)!.invested).toBe(end.invested);
   });
 
+  it('gives the gain and money added since the start of the range, matching the period total', () => {
+    for (const from of [null, '2025-01-10', '2025-01-31', '2025-02-10']) {
+      const points = returnSeries(data, '2025-04-20', from);
+      const total = periodTotals(periodRows(data, from, '2025-04-20'), '2025-04-20');
+      const [start, end] = [points[0]!, points.at(-1)!];
+      expect(end.gain).toBe(total.gain);
+      expect(end.value - start.value).toBe(end.added - start.added + end.gain - start.gain);
+    }
+    const ranged = returnSeries(data, '2025-04-20', '2025-02-10');
+    expect([ranged[0]!.gain, ranged[0]!.added]).toEqual([0, 0]);
+  });
+
   it('samples about daily and always includes transaction dates', () => {
     const dates = returnDates(data, '2025-01-15', '2025-03-15', '2025-01-01');
     expect(dates[0]).toBe('2025-01-15');

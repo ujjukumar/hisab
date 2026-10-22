@@ -1,10 +1,13 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { applyBenchmarkPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
 import { benchmarkPrices, benchmarks } from '@/lib/db/schema';
+import { FeedError, benchmarkNavHistory } from '@/lib/feeds';
+import { benchmarksMissingHistory } from '@/lib/queries/benchmarks';
 import { failed, invalid, type ActionResult } from '@/lib/validation/money';
 
 const addSchema = z.object({
@@ -23,8 +26,43 @@ export async function addBenchmark(formData: FormData): Promise<ActionResult> {
     tx.insert(benchmarks).values(parsed.data).run();
     return { ok: true } as const;
   });
-  if (result.ok) { revalidatePath('/settings'); revalidatePath('/investments', 'layout'); }
+  if (result.ok) {
+    await fillHistory([...ids(parsed.data.isin)]).catch(() => undefined);
+    revalidatePath('/settings');
+    revalidatePath('/investments', 'layout');
+  }
   return result;
+}
+
+const ids = (isin: string) => db.select({ id: benchmarks.id }).from(benchmarks)
+  .where(eq(benchmarks.isin, isin)).all().map((row) => row.id);
+
+async function fillHistory(benchmarkIds: number[]): Promise<string[]> {
+  const missing = benchmarksMissingHistory(benchmarkIds);
+  const list = missing.length
+    ? db.select().from(benchmarks).where(inArray(benchmarks.id, missing)).all() : [];
+  const errors: string[] = [];
+  for (const item of list) {
+    try {
+      const history = await benchmarkNavHistory(item.isin);
+      applyBenchmarkPrices(db, history.map((row) => ({ benchmarkId: item.id, ...row })));
+    } catch (error) {
+      if (!(error instanceof FeedError)) throw error;
+      errors.push(`${item.name}: ${error.message}`);
+    }
+  }
+  return errors;
+}
+
+const fillSchema = z.array(z.number().int().positive()).max(8);
+
+/** Fetches the NAV history of benchmarks being compared, when it isn't stored yet. */
+export async function fillBenchmarkHistory(benchmarkIds: number[]): Promise<ActionResult> {
+  const parsed = fillSchema.safeParse(benchmarkIds);
+  if (!parsed.success) return invalid(parsed.error);
+  const errors = await fillHistory(parsed.data);
+  revalidatePath('/investments', 'layout');
+  return errors.length ? failed(errors.join(' ')) : { ok: true };
 }
 
 const removeSchema = z.coerce.number().int().positive();

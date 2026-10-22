@@ -49,6 +49,65 @@ export function parseAmfiNav(text: string): PriceMap {
   return out;
 }
 
+/** AMFI scheme codes by ISIN, from NAVAll.txt, to look up a fund's NAV history. */
+export function parseAmfiSchemeCodes(text: string): Map<string, string> {
+  const out = new Map<string, string>();
+  let cols: { isins: number[]; code: number } | null = null;
+  for (const line of text.split(/\r?\n/)) {
+    const cells = line.split(';').map((c) => c.trim());
+    if (cells.length < 5) continue;
+    if (!cols) {
+      const isins = cells.flatMap((c, i) => (/^ISIN/i.test(c) ? [i] : []));
+      const code = cells.findIndex((c) => /^Scheme Code$/i.test(c));
+      if (isins.length && code >= 0) cols = { isins, code };
+      continue;
+    }
+    const code = cells[cols.code] ?? '';
+    if (!/^\d+$/.test(code)) continue;
+    for (const i of cols.isins) {
+      const isin = (cells[i] ?? '').toUpperCase();
+      if (ISIN_RE.test(isin) && !out.has(isin)) out.set(isin, code);
+    }
+  }
+  return out;
+}
+
+/**
+ * A fund's full NAV history from mfapi.in (`{ meta, data: [{ date: 'dd-mm-yyyy', nav }] }`),
+ * oldest first. Null when the answer is for a different fund or can't be read.
+ */
+export function parseMfapiHistory(body: unknown, isin: string): FeedPrice[] | null {
+  if (!body || typeof body !== 'object') return null;
+  const { meta, data } = body as { meta?: Record<string, unknown>; data?: unknown };
+  const isins = [meta?.isin_growth, meta?.isin_div_reinvestment]
+    .filter((v): v is string => typeof v === 'string').map((v) => v.toUpperCase());
+  if (!isins.includes(isin.toUpperCase()) || !Array.isArray(data)) return null;
+  const out = new Map<IsoDate, string>();
+  for (const row of data) {
+    const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(row?.date ?? ''));
+    const p = price(String(row?.nav ?? ''));
+    if (!match || !p) continue;
+    const date = `${match[3]}-${match[2]}-${match[1]}`;
+    if (isValidDate(date) && !out.has(date)) out.set(date, p);
+  }
+  return [...out].map(([date, p]) => ({ date, price: p })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Whether a benchmark's stored NAVs miss the start of the investments or the last week, so its
+ * history should be fetched. A fund launched after `first` keeps a gap; callers try once.
+ */
+export function benchmarkNeedsHistory(dates: readonly IsoDate[], first: IsoDate, asOf: IsoDate): boolean {
+  if (!dates.length) return true;
+  let earliest = dates[0]!;
+  let latest = dates[0]!;
+  for (const date of dates) {
+    if (date < earliest) earliest = date;
+    if (date > latest) latest = date;
+  }
+  return earliest > addDays(first, 7) || latest < addDays(asOf, -7);
+}
+
 /**
  * NSE cash-market UDiFF and older CSV; BSE cash-market UDiFF and Equity-with-ISIN CSV.
  * An ISIN listed in several series keeps NSE's `EQ` or BSE's `A` close.

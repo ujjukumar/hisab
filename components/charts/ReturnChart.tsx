@@ -28,6 +28,13 @@ export type ValueSeries = {
   invested: number[];
   /** Portfolio return % per date, for the headline and tooltip. */
   percent: (number | null)[];
+  /** Gain and net money added since the start of the range. */
+  gain: number[];
+  added: number[];
+  /** Gain since the start of the range as a share of the money at work. */
+  gainPercent: (number | null)[];
+  /** Short name of the range, such as 6M. */
+  rangeLabel: string;
   /** What the same money would be worth in each benchmark. */
   benchmarks: ReturnLine[];
 };
@@ -97,6 +104,8 @@ export function ReturnChart({ dates, lines, value }: {
   const gainAt = (index: number) => value ? value.worth[index]! - value.invested[index]! : 0;
   const percentAt = (index: number) => value?.percent[index] ?? null;
   const percentText = (index: number) => percentAt(index) === null ? '' : ` (${formatPercent(percentAt(index)! * 100)})`;
+  const rangePercentText = (index: number) => value?.gainPercent[index] === null || value?.gainPercent[index] === undefined
+    ? '' : ` (${formatPercent(value.gainPercent[index]! * 100)})`;
 
   const valueLines: ReturnLine[] = value ? [
     { key: 'worth', label: 'Worth', color: WORTH, values: value.worth },
@@ -111,7 +120,9 @@ export function ReturnChart({ dates, lines, value }: {
     rows: showValue ? [
       { color: WORTH, label: 'Worth', value: formatShortINR(value.worth[at]!) },
       { color: INVESTED, label: 'Invested', value: formatShortINR(value.invested[at]!) },
-      { label: 'Gain', value: `${formatShortINRSigned(gainAt(at))}${percentText(at)}`, tone: gainClass(gainAt(at)) },
+      { label: 'Gain on cost', value: `${formatShortINRSigned(gainAt(at))}${percentText(at)}`, tone: gainClass(gainAt(at)) },
+      { label: 'Added since start', value: formatShortINRSigned(value.added[at]!) },
+      { label: 'Gain since start', value: `${formatShortINRSigned(value.gain[at]!)}${rangePercentText(at)}`, tone: gainClass(value.gain[at]!) },
       ...value.benchmarks.map((line) => ({
         color: line.color,
         label: line.label,
@@ -138,7 +149,7 @@ export function ReturnChart({ dates, lines, value }: {
     : null;
 
   const label = showValue
-    ? `Portfolio worth from ${formatDate(dates[0]!)} to ${formatDate(dates[last]!)}: ${formatShortINR(value.worth[0]!)} to ${formatShortINR(value.worth[last]!)}, invested ${formatShortINR(value.invested[last]!)}, gain ${formatShortINRSigned(gainAt(last))}${percentText(last)}.`
+    ? `Portfolio worth from ${formatDate(dates[0]!)} to ${formatDate(dates[last]!)}: ${formatShortINR(value.worth[0]!)} to ${formatShortINR(value.worth[last]!)}, invested ${formatShortINR(value.invested[last]!)}, ${value.rangeLabel} added ${formatShortINRSigned(value.added[last]!)}, gain ${formatShortINRSigned(value.gain[last]!)}${rangePercentText(last)}.`
     : `Returns from ${formatDate(dates[0]!)} to ${formatDate(dates[last]!)}. ${lines.map((line) => `${line.label}: ${legendValue(line)}`).join('; ')}`;
 
   return (
@@ -147,11 +158,16 @@ export function ReturnChart({ dates, lines, value }: {
         <div className={styles.headline}>
           <strong>{formatShortINR(value.worth[last]!)}</strong>
           <span className={styles.rangeChange}>
-            <strong className={gainClass(gainAt(last))}>
-              {formatShortINRSigned(gainAt(last))}{percentText(last)}
-            </strong>
-            <span>on {formatShortINR(value.invested[last]!)} invested</span>
+            <span>{value.rangeLabel}</span>
+            <span>Added <strong>{formatShortINRSigned(value.added[last]!)}</strong></span>
+            <span>·</span>
+            <span>Gain <strong className={gainClass(value.gain[last]!)}>
+              {formatShortINRSigned(value.gain[last]!)}{rangePercentText(last)}
+            </strong></span>
           </span>
+          {value.worth[0]! > 0 && last > 0 && <span className={styles.rangeFrom}>
+            {formatShortINR(value.worth[0]!)} on {formatDate(dates[0]!)} → {formatShortINR(value.worth[last]!)}
+          </span>}
         </div>
         <Segmented label="Chart shows" value={mode} onChange={setMode}
           items={[{ value: 'value' as const, label: 'Value ₹' }, { value: 'percent' as const, label: 'Return %' }]} />

@@ -50,6 +50,10 @@ export type ReturnPoint = {
   value: number;
   /** Paise. What the holdings on the day cost, whatever the range. */
   invested: number;
+  /** Paise. Gain since the start of the range, after money added or taken out. */
+  gain: number;
+  /** Paise. Money paid in less money taken out since the start of the range. */
+  added: number;
   groups: Partial<Record<GroupKey, number | null>>;
 };
 
@@ -87,11 +91,14 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
     const groups: Partial<Record<GroupKey, { gain: number; paidIn: number; start: number }>> = {};
     let value = 0;
     let invested = 0;
+    let added = 0;
     for (const row of buildPortfolio(data, date)) {
       const startValue = startValues.get(row.asset.id) ?? 0;
       const flows = row.holding.flows.filter((flow) => !from || flow.date > from);
       const paidIn = flows.reduce((sum, flow) => sum + Math.max(0, -flow.amount), 0);
-      const gain = row.value - startValue + flows.reduce((sum, flow) => sum + flow.amount, 0);
+      const net = flows.reduce((sum, flow) => sum + flow.amount, 0);
+      const gain = row.value - startValue + net;
+      added -= net;
       const total = groups[row.group] ?? { gain: 0, paidIn: 0, start: 0 };
       total.gain += gain;
       total.paidIn += paidIn;
@@ -114,6 +121,8 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
       capital: total.start + total.paidIn,
       value,
       invested,
+      gain: total.gain,
+      added,
       groups: Object.fromEntries(GROUPS.flatMap(({ key }) => groups[key]
         ? [[key, percent(groups[key])]] : [])) as ReturnPoint['groups'],
     };
@@ -146,7 +155,7 @@ export function benchmarkReturns(
   let units = new Decimal(0);
   if (initial) {
     const price = priceOn(from!);
-    if (!price) return fail('No benchmark NAV near the start date. Fetch past prices in Settings or choose a later range.');
+    if (!price) return fail('No benchmark NAV near the start date. The fund may have started later, so choose a later range.');
     units = new Decimal(initial).div(100).div(price);
   }
   const flows = data.txns.filter((txn) => (!from || txn.date > from) && txn.date <= points.at(-1)!.date)
@@ -165,7 +174,7 @@ export function benchmarkReturns(
         : (txn.amount ?? 0) + txn.fees;
       if (!amount) continue;
       const price = priceOn(txn.date);
-      if (!price) return fail(`No benchmark NAV near ${txn.date}. Fetch past prices in Settings.`);
+      if (!price) return fail(`No benchmark NAV near ${txn.date}. The fund may have started after this, so choose a later range.`);
       const change = new Decimal(amount).div(100).div(price);
       if (units.plus(change).lt(-0.00000001)) return fail('This benchmark could not cover a withdrawal in this range.');
       units = Decimal.max(0, units.plus(change));
