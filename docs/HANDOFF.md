@@ -4,8 +4,11 @@ Updated: 22 Oct 2026
 
 ## Current state
 
-`master` holds all work, including the unpublished-prices fix for daily backfill
-(PLAN section 11, phase 8). Nothing is pending locally.
+`master` holds all work, including the investment chart changes (smooth lines,
+rupee value, range gain split into booked/dividends/on paper, automatic benchmark
+history from mfapi.in, and dragging a range to open it on the Performance tab).
+From 22 Oct 2026 the owner works directly on the VM; the Windows checkout is no
+longer the main copy.
 
 ## VM deployment
 
