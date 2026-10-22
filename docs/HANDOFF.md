@@ -19,6 +19,12 @@ Updated: 22 Oct 2026
 - To deploy: `git pull` in the app folder, `npm ci`, `npm run build` with
   `DATABASE_PATH=/home/ujju/hisaab/data/finance.db` (the build backs up and
   migrates), then `sudo systemctl restart hisaab.service` and check the URL.
+- A fresh build on the VM failed to resolve the Google font files under Turbopack;
+  it succeeded once `.next/cache` from a previous build was present. Keep
+  `.next/cache` between builds (`git pull` does not touch it).
+- The pre-checkout folder and a copy of `data/` from 22 Oct are in
+  `~/hisaab-old-20261022T061013Z` and `~/hisaab-data-backup-20261022T061013Z`;
+  remove them once the owner is happy.
 - `HISAAB_PRICE_DEBUG=1` in the service environment logs price lookups to the journal.
 - Do not run `npm audit fix --force` without approval.
 
