@@ -7,6 +7,7 @@ import {
   endOfMonth,
   financialYearOf,
   financialYearRange,
+  isValidDate,
   makeDate,
   monthEndsBetween,
   monthOf,
@@ -300,3 +301,25 @@ export const PERIOD_LABELS: Record<Period, string> = {
   '3y': '3 years',
   all: 'All time',
 };
+
+/** A named period or a start date of the owner's choosing; only the Performance tab offers Custom. */
+export type PerformancePeriod = Period | 'custom';
+
+/**
+ * The Performance tab's period from its `?period=` and `?from=`. A custom start must be a real
+ * day before `asOf`; when it isn't, Custom starts a month back so there is still a date to edit.
+ */
+export function choosePeriod(
+  period: string,
+  from: string,
+  asOf: IsoDate,
+): { period: PerformancePeriod; customFrom: IsoDate | null } {
+  if (period === 'custom') {
+    const valid = isValidDate(from) && from < asOf;
+    return { period, customFrom: valid ? from : periodStart('1m', asOf, 1) };
+  }
+  return {
+    period: (PERIODS as readonly string[]).includes(period) ? (period as Period) : '1d',
+    customFrom: null,
+  };
+}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useId, useRef, useState, type PointerEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { Segmented } from '@/components/Segmented/Segmented';
 import { daysBetween, monthOf, shortMonthLabel, type IsoDate } from '@/lib/domain/dates';
 import {
@@ -16,6 +17,7 @@ import {
   niceValueRange,
 } from '@/lib/domain/format';
 import styles from './Chart.module.css';
+import { draggedRange, rangeHref } from './dragRange';
 import { smoothPath, stepPath, type PathPoint } from './smoothPath';
 import { LegendInline, LegendKey, Tip, type TipState } from './Tip';
 import { useWidth } from './useWidth';
@@ -49,17 +51,28 @@ const MARGIN = { left: 56, right: 14, top: 12, bottom: 28 };
 const WORTH = 'var(--c1)';
 const INVESTED = 'var(--text-3)';
 
-export function ReturnChart({ dates, lines, value }: {
+export function ReturnChart({ dates, lines, value, selectPath }: {
   dates: IsoDate[];
   lines: ReturnLine[];
   value?: ValueSeries;
+  /** Where a dragged range opens, with `period=custom&from=…&asof=…`; no dragging without it. */
+  selectPath?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const width = useWidth(box);
+  const router = useRouter();
   const fill = `worth-${useId().replace(/[^\w-]/g, '')}`;
   const [at, setAt] = useState<number | null>(null);
+  const [anchor, setAnchor] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>(value ? 'value' : 'percent');
+
+  useEffect(() => {
+    if (anchor === null) return;
+    const cancel = (event: KeyboardEvent) => { if (event.key === 'Escape') setAnchor(null); };
+    window.addEventListener('keydown', cancel);
+    return () => window.removeEventListener('keydown', cancel);
+  }, [anchor]);
 
   if (!dates.length || (!lines.length && !value)) {
     return <div className={styles.empty}>No history to show yet</div>;
@@ -92,16 +105,44 @@ export function ReturnChart({ dates, lines, value }: {
       ? [...shown, index] : shown;
   }, []));
 
-  function move(event: PointerEvent<SVGRectElement>) {
+  function closestTo(event: PointerEvent<SVGRectElement>) {
     const rect = svg.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) return null;
     const px = event.clientX - rect.left;
     let closest = 0;
     for (let index = 1; index < dates.length; index++) {
       if (Math.abs(x(index) - px) < Math.abs(x(closest) - px)) closest = index;
     }
-    setAt(closest);
+    return closest;
   }
+
+  function move(event: PointerEvent<SVGRectElement>) {
+    const closest = closestTo(event);
+    if (closest !== null) setAt(closest);
+  }
+
+  // Dragging with a mouse or pen picks a range; touch keeps scrolling the page.
+  function down(event: PointerEvent<SVGRectElement>) {
+    const closest = closestTo(event);
+    if (closest === null) return;
+    setAt(closest);
+    if (!selectPath || event.pointerType === 'touch' || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setAnchor(closest);
+  }
+
+  function up(event: PointerEvent<SVGRectElement>) {
+    if (anchor === null) return;
+    const end = closestTo(event) ?? at ?? anchor;
+    const range = draggedRange(dates, anchor, end);
+    setAnchor(null);
+    if (range && selectPath) router.push(rangeHref(selectPath, range));
+  }
+
+  const dragged = anchor === null || at === null ? null : draggedRange(dates, anchor, at);
+  const dragStart = dragged ? Math.min(anchor!, at!) : null;
+  const dragEnd = dragged ? Math.max(anchor!, at!) : null;
 
   const last = dates.length - 1;
   const gainAt = (index: number) => value ? value.worth[index]! - value.invested[index]! : 0;
@@ -120,7 +161,21 @@ export function ReturnChart({ dates, lines, value }: {
   const shown = showValue ? valueLines : lines;
   const dots = shown.filter((line) => line.key !== 'invested');
 
-  const tip: TipState = at === null ? null : {
+  const tip: TipState = at === null ? null : dragged ? {
+    x: x(at), y: MARGIN.top + 4, title: `${formatDate(dragged.from)} → ${formatDate(dragged.to)}`,
+    rows: [
+      ...(value ? [
+        { color: WORTH, label: 'Worth', value: `${formatShortINR(value.worth[dragStart!]!)} → ${formatShortINR(value.worth[dragEnd!]!)}` },
+        { label: 'Added', value: formatShortINRSigned(value.added[dragEnd!]! - value.added[dragStart!]!) },
+        {
+          label: 'Gain',
+          value: formatShortINRSigned(value.gain[dragEnd!]! - value.gain[dragStart!]!),
+          tone: gainClass(value.gain[dragEnd!]! - value.gain[dragStart!]!),
+        },
+      ] : []),
+      { label: 'Let go to open in Performance', value: '' },
+    ],
+  } : {
     x: x(at), y: MARGIN.top + 4, title: formatDate(dates[at]!),
     rows: showValue ? [
       { color: WORTH, label: 'Worth', value: formatShortINR(value.worth[at]!) },
@@ -214,6 +269,8 @@ export function ReturnChart({ dates, lines, value }: {
             <line x1={x(index)} x2={x(index)} y1={MARGIN.top} y2={MARGIN.top + innerHeight} stroke="var(--grid)" />
             <text x={x(index)} y={HEIGHT - 8} textAnchor="middle">{span > 365 ? shortMonthLabel(monthOf(date)) : formatDay(date)}</text>
           </g>)}
+          {dragged && <rect x={x(dragStart!)} y={MARGIN.top} width={x(dragEnd!) - x(dragStart!)}
+            height={innerHeight} className={styles.selection} />}
           {area && <path d={area} fill={`url(#${fill})`} stroke="none" />}
           {showValue && <path d={stepPath(pointsOf(value.invested))} fill="none" stroke={INVESTED}
             strokeWidth={1.5} strokeDasharray="4 3" />}
@@ -223,16 +280,21 @@ export function ReturnChart({ dates, lines, value }: {
             strokeLinejoin="round" strokeLinecap="round" />)}
           {dates.length === 1 && dots.map((line) => line.values[0] !== null &&
             <circle key={line.key} cx={x(0)} cy={y(unitOf(line.values[0]!))} r="4" fill={line.color} />)}
+          {dragged && <line x1={x(dragStart!)} x2={x(dragStart!)} y1={MARGIN.top} y2={MARGIN.top + innerHeight}
+            stroke="var(--line-strong)" strokeDasharray="3 3" />}
           {at !== null && <line x1={x(at)} x2={x(at)} y1={MARGIN.top} y2={MARGIN.top + innerHeight}
             stroke="var(--line-strong)" strokeDasharray="3 3" />}
           {at !== null && dots.map((line) => line.values[at] !== null && line.values[at] !== undefined &&
             <circle key={line.key} cx={x(at)} cy={y(unitOf(line.values[at]!))} r="4" fill={line.color}
               stroke="var(--surface)" strokeWidth="2" />)}
           <rect x={MARGIN.left} y={MARGIN.top} width={Math.max(0, innerWidth)} height={innerHeight}
-            fill="transparent" onPointerMove={move} onPointerDown={move} />
+            fill="transparent" className={selectPath ? styles.draggable : undefined}
+            onPointerMove={move} onPointerDown={down} onPointerUp={up}
+            onPointerCancel={() => setAnchor(null)} />
         </svg>
         <Tip state={tip} boxWidth={width} />
       </div>
+      {selectPath && <p className={styles.dragHint}>Drag across the chart to look at a period in detail.</p>}
     </>
   );
 }

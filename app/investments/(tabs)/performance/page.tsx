@@ -30,7 +30,7 @@ import {
   performanceSeries,
   periodTotals,
   seriesCadence,
-  type Period,
+  type PerformancePeriod,
   type PeriodResult,
   type PeriodRow,
 } from '@/lib/domain/performance';
@@ -55,7 +55,7 @@ function figures(r: PeriodResult) {
   ];
 }
 
-const columns = (period: Period): Column<PeriodRow>[] => [
+const columns = (period: PerformancePeriod): Column<PeriodRow>[] => [
   {
     key: 'name',
     header: 'Name',
@@ -64,7 +64,7 @@ const columns = (period: Period): Column<PeriodRow>[] => [
     sortValue: ({ row }) => row.asset.name,
     cell: ({ row }) => (
       <NameCell
-        href={`/investments/${row.asset.id}${period === '1d' ? '' : `?period=${period}`}`}
+        href={`/investments/${row.asset.id}${period === '1d' || period === 'custom' ? '' : `?period=${period}`}`}
         name={row.asset.name}
         sub={maskRef(row.asset.accountRef) || ASSET_TYPE_LABELS[row.asset.type]}
       />
@@ -112,11 +112,13 @@ export default async function PerformancePage({
   );
   const cadence = seriesCadence(from, asOf);
   const shown = linePoints(performanceSeries(portfolioData(), asOf, from), cadence);
-  const query = new URLSearchParams({ asof: asOf, period }).toString();
+  const kept = { asof: asOf, period, ...(period === 'custom' && from ? { from } : {}) };
+  const query = new URLSearchParams(kept).toString();
   const sortHref = (key: string, dir: 'asc' | 'desc') => {
-    const search = new URLSearchParams({ asof: asOf, period, sort: key, dir });
+    const search = new URLSearchParams({ ...kept, sort: key, dir });
     return `/investments/performance?${search}`;
   };
+  const periodLabel = period === 'custom' ? 'Custom' : PERIOD_LABELS[period];
 
   const span = period === '1d'
     ? `Latest daily prices per holding through ${formatDate(asOf)}`
@@ -129,21 +131,25 @@ export default async function PerformancePage({
       <FilterForm
         path="/investments/performance"
         label="Choose the period"
-        values={{ asof: asOf, period }}
+        values={kept}
       >
-        <TextField label="As of" name="asof" type="date" max={today()} defaultValue={asOf} />
         <SelectField label="Period" name="period" defaultValue={period}>
           {PERIODS.map((p) => (
             <option key={p} value={p}>
               {PERIOD_LABELS[p]}
             </option>
           ))}
+          <option value="custom">Custom</option>
         </SelectField>
+        {period === 'custom' && from && (
+          <TextField label="From" name="from" type="date" max={addDays(asOf, -1)} defaultValue={from} />
+        )}
+        <TextField label={period === 'custom' ? 'To' : 'As of'} name="asof" type="date" max={today()} defaultValue={asOf} />
       </FilterForm>
 
       <div className="stack">
         <Card
-          title={`Returns, ${PERIOD_LABELS[period].toLowerCase()}`}
+          title={period === 'custom' ? 'Returns' : `Returns, ${periodLabel.toLowerCase()}`}
           sub={span}
           action={
             rows.length > 0 && (

@@ -24,11 +24,11 @@ import { formatDate } from '@/lib/domain/format';
 import { computeHolding, moneyMoved, OversellError, type HoldingTxn } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
 import {
-  PERIODS,
+  choosePeriod,
   investmentPeriodRows,
+  periodRows,
   periodStart,
   sampleHistoryDates,
-  type Period,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type HoldingRow, type PortfolioData } from '@/lib/domain/portfolio';
 import {
@@ -382,15 +382,15 @@ export function holdingHistory(assetId: number, from: IsoDate | null = null): Hi
 
 /* ---------- performance ---------- */
 
-/** The Performance tab's `?asof=` and `?period=`, and each holding's figures for them. Shared with its CSV export. */
+/** The Performance tab's `?asof=`, `?period=` and custom `?from=`, and each holding's figures for them. Shared with its CSV export. */
 export function periodPerformance(params: Params, yearStartMonth: number) {
   const { one } = paramReader(params);
   const now = today();
   const asked = one('asof');
   const asOf = isValidDate(asked) && asked <= now ? asked : now;
-  const p = one('period');
-  const period: Period = (PERIODS as readonly string[]).includes(p) ? (p as Period) : '1d';
+  const { period, customFrom } = choosePeriod(one('period'), one('from'), asOf);
   const data = portfolioData();
+  if (period === 'custom') return { asOf, period, from: customFrom, rows: periodRows(data, customFrom, asOf) };
   const rows = investmentPeriodRows(data, period, asOf, yearStartMonth);
   const fallback = periodStart(period, asOf, yearStartMonth);
   const from = period === '1d'

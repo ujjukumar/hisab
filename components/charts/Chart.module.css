@@ -65,6 +65,25 @@
   color: var(--text-3);
 }
 
+.selection {
+  fill: var(--c1);
+  fill-opacity: 0.1;
+}
+
+.draggable {
+  cursor: crosshair;
+}
+
+.dragHint {
+  margin: 4px 0 0;
+  font: 12px/1.4 var(--sans);
+  color: var(--text-3);
+}
+
+@media (pointer: coarse) {
+  .dragHint { display: none; }
+}
+
 .chart svg {
   display: block;
   overflow: visible;
