@@ -158,7 +158,10 @@ export function absentPriceKey(assetId: number, date: IsoDate): string {
   return `${assetId}:${date}`;
 }
 
-/** Missing daily trading-date prices from each holding's first eligible date through `asOf`. */
+/**
+ * Missing daily trading-date prices from each holding's first eligible date up to the day
+ * before `asOf`. The day itself belongs to the latest-price check, not history.
+ */
 export function pastPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
@@ -183,7 +186,7 @@ export function pastPriceNeeds(
 
   const needs: PriceNeed[] = [];
   const benchmarkKnown = new Set(benchmarkDates.map((row) => `${row.benchmarkId}:${row.date}`));
-  for (let date = first; date <= asOf; date = addDays(date, 1)) {
+  for (let date = first; date < asOf; date = addDays(date, 1)) {
     const weekday = dayOfWeek(date);
     if (weekday === 0 || weekday === 6) continue;
     const exchangesClosed = gaps.noFileDates?.has(date) ?? false;

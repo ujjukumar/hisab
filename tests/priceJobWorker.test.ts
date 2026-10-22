@@ -23,7 +23,7 @@ vi.mock('@/lib/actions/priceDownloads', () => ({ fetchAndSave: vi.fn() }));
 vi.mock('@/lib/feeds', () => ({ amfiFor: vi.fn(), amfiOn: vi.fn() }));
 vi.mock('@/lib/domain/dates', async (original) => ({
   ...(await original<typeof import('@/lib/domain/dates')>()),
-  today: () => '2024-04-02',
+  today: () => '2024-04-03',
 }));
 
 const folder = mkdtempSync(join(tmpdir(), 'hisaab-worker-'));

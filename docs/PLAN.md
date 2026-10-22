@@ -285,7 +285,8 @@ Settings (backup → reset → restore round trip, full export), 7 and 8 below.
 - When `auto_prices` is on (default), check the latest prices once a day on open;
   failed checks count. Manual and per-holding updates can always fetch.
 - **Daily backfill** requests each missing weekday from the first purchase of each
-  held, linked investment, one whole-market download per source and date, after
+  held, linked investment up to yesterday (today belongs to the daily check), one
+  whole-market download per source and date, after
   showing an estimated size. A single worker checkpoints progress in SQLite, shows
   progress and Stop across pages, and resumes on reopen.
 - **Files not out yet:** within three days (`PUBLISH_GRACE_DAYS`) of a date, an
@@ -355,7 +356,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Tables and Dashboard | 7 Oct 2026 | Sortable tables everywhere; Dashboard leads with investments and a Needs-attention strip. |
 | SMS imports | 7–11 Oct 2026 | Encrypted receiver, QR pairing, review workspace, learned rules, transfers, parser v3, History. |
 | Investments | 12–13 Oct 2026 | Intraday trades, Returns chart with AMFI benchmarks and suggestions, net-worth chart, wider layout. |
-| Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, and no longer stops on one bad date. |
+| Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, leaves today to the daily check, and no longer stops on one bad date. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.

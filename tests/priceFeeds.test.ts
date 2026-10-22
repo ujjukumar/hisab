@@ -428,8 +428,9 @@ describe('pastPriceNeeds', () => {
       '2024-04-08', '2024-04-09', '2024-04-10', '2024-04-11', '2024-04-12',
       '2024-04-15', '2024-04-16', '2024-04-17', '2024-04-18', '2024-04-19',
       '2024-04-22', '2024-04-23', '2024-04-24', '2024-04-25', '2024-04-26',
-      '2024-04-30',
     ]);
+    // The as-of day itself is left to the latest-price check.
+    expect(needs).not.toContain('2024-04-30');
     expect(needs).toContain('2024-03-25');
     expect(needs).not.toContain('2024-03-31');
     expect(needs).toContain('2024-02-29');
@@ -468,14 +469,15 @@ describe('pastPriceNeeds', () => {
       valuations: [],
     };
     const date = '2024-04-02';
+    const asOf = '2024-04-03';
     const attempted = new Set([`${date}:daily:1`]);
-    expect(pendingPriceNeeds(first, date, attempted).find((n) => n.date === date)).toBeUndefined();
+    expect(pendingPriceNeeds(first, asOf, attempted).find((n) => n.date === date)).toBeUndefined();
     const added: PortfolioData = {
       ...first,
       assets: [...first.assets, asset(2, 'stock', 'INE000KP0011')],
       txns: [...first.txns, trade(2, 2, '2024-04-01', 'buy', '1')],
     };
-    expect(pendingPriceNeeds(added, date, attempted).find((n) => n.date === date)?.linked.map((a) => a.id))
+    expect(pendingPriceNeeds(added, asOf, attempted).find((n) => n.date === date)?.linked.map((a) => a.id))
       .toEqual([2]);
   });
 
@@ -518,10 +520,10 @@ describe('pastPriceNeeds', () => {
       txns: [trade(3, 3, '2024-04-01', 'buy', '1')] };
     const benchmark = [{ id: 7, isin: 'INF000BM0011' }];
     const known = [{ benchmarkId: 7, date: '2024-04-01' }];
-    const needs = pastPriceNeeds(unlinked, '2024-04-03', {}, benchmark, known);
+    const needs = pastPriceNeeds(unlinked, '2024-04-04', {}, benchmark, known);
     expect(needs.map((need) => need.date)).toEqual(['2024-04-02', '2024-04-03']);
     expect(needs[0]?.benchmarks).toEqual(benchmark);
-    expect(pendingPriceNeeds(unlinked, '2024-04-03', new Set(['2024-04-02:daily:benchmark:7']),
+    expect(pendingPriceNeeds(unlinked, '2024-04-04', new Set(['2024-04-02:daily:benchmark:7']),
       {}, benchmark, known).map((need) => need.date)).toEqual(['2024-04-03']);
   });
 
@@ -535,7 +537,7 @@ describe('pastPriceNeeds', () => {
     expect(needs[0]?.date).toBe('2024-12-02');
     expect(needs.find((need) => need.date === '2024-12-30')?.cadence).toBe('daily');
     expect(needs.find((need) => need.date === '2025-01-02')?.cadence).toBe('daily');
-    expect(needs.at(-1)?.date).toBe('2025-01-31');
+    expect(needs.at(-1)?.date).toBe('2025-01-30');
     expect(needs.map((need) => need.date)).not.toContain('2025-01-04');
   });
 });
