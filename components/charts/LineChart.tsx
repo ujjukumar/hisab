@@ -5,6 +5,7 @@ import { axisLabel, formatShortINR, formatShortINRSigned, gainClass, niceScale, 
 import { daysBetween, type IsoDate } from '@/lib/domain/dates';
 import { Segmented } from '@/components/Segmented/Segmented';
 import styles from './Chart.module.css';
+import { smoothPath } from './smoothPath';
 import { LegendInline, LegendKey, Tip, type TipState } from './Tip';
 import { useWidth } from './useWidth';
 
@@ -61,7 +62,7 @@ export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[];
     : (i / (n - 1)) * iw);
   const y = (paise: number) => M.t + (sc.top - paise / 100) / (sc.top - sc.bottom) * ih;
   const path = (key: 'invested' | 'worth' | 'investments') =>
-    points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(value(p, key)).toFixed(1)}`).join('');
+    smoothPath(points.map((p, i) => [x(i), y(value(p, key))]));
   const labelStep = Math.max(1, Math.ceil(n / (width < 520 ? 4 : 7)));
   const labelIndexes = new Set(points.reduce<number[]>((shown, _, index) => {
     const last = shown.at(-1);

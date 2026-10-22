@@ -13,7 +13,7 @@ import {
   periodTotals,
 } from '@/lib/domain/performance';
 import { buildPortfolio, type PortfolioData } from '@/lib/domain/portfolio';
-import { benchmarkReturns, pickReturnRange, returnRangeStart, returnSeries } from '@/lib/domain/returns';
+import { benchmarkReturns, pickReturnRange, returnDates, returnRangeStart, returnSeries } from '@/lib/domain/returns';
 
 const asset = (id: number, name: string): Asset => ({
   id,
@@ -86,6 +86,27 @@ describe('returnSeries', () => {
     expect(returnSeries(changed, '2025-01-15', '2025-01-01').at(-1)?.portfolio).toBeCloseTo(
       periodTotals(periodRows(changed, '2025-01-01', '2025-01-15'), '2025-01-15').absolute!,
     );
+  });
+
+  it('gives worth and money invested in rupees, worth less invested being the gain', () => {
+    const end = returnSeries(data, '2025-04-20', null).at(-1)!;
+    // Meridian 150 units at ₹12; ₹2,600 put in less ₹1,100 from Banyan's sale.
+    expect(end.value).toBe(180000);
+    expect(end.invested).toBe(150000);
+    expect((end.value - end.invested) / end.capital).toBeCloseTo(end.portfolio!);
+    const ranged = returnSeries(data, '2025-04-20', '2025-03-01').at(0)!;
+    expect(ranged.date).toBe('2025-03-01');
+    expect(ranged.invested).toBe(ranged.value);
+  });
+
+  it('samples about daily and always includes transaction dates', () => {
+    const dates = returnDates(data, '2025-01-15', '2025-03-15', '2025-01-01');
+    expect(dates[0]).toBe('2025-01-15');
+    expect(dates.at(-1)).toBe('2025-03-15');
+    expect(dates).toHaveLength(60);
+    const long = returnDates(data, '2015-01-01', '2025-03-15', null);
+    expect(long.length).toBeLessThanOrEqual(260);
+    expect(long).toEqual(expect.arrayContaining(['2025-01-20', '2025-02-10', '2025-03-10']));
   });
 
   it('selects available ranges and rejects reversed custom dates', () => {

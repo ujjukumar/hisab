@@ -29,6 +29,17 @@
 .rangeChange strong:global(.pos) { color: var(--gain); }
 .rangeChange strong:global(.neg) { color: var(--loss); }
 
+.headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.headline > strong {
+  font: 600 24px/1.2 var(--mono);
+  color: var(--heading);
+}
+
 .chart svg {
   display: block;
   overflow: visible;

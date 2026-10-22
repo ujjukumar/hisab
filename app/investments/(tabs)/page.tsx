@@ -16,7 +16,7 @@ import {
 } from '@/components/InvestmentDrawer/InvestmentDrawer';
 import { SubTabs } from '@/components/SubTabs/SubTabs';
 import { ReturnsCard } from '@/components/ReturnsCard/ReturnsCard';
-import type { ReturnLine } from '@/components/charts/ReturnChart';
+import type { ReturnLine, ValueSeries } from '@/components/charts/ReturnChart';
 import { ASSET_TYPE_LABELS, GROUPS, maskRef } from '@/lib/domain/assets';
 import { today } from '@/lib/domain/dates';
 import {
@@ -289,13 +289,23 @@ export default async function OverviewPage({
   const selected = benchmarks.filter((item) => compared.has(item.id));
   const history = benchmarkHistory(selected.map((item) => item.id));
   const notices: string[] = [];
+  const benchmarkWorth: ReturnLine[] = [];
   for (const [index, item] of selected.entries()) {
     const compared = benchmarkReturns(scope, points, range?.from ?? null,
       history.filter((row) => row.benchmarkId === item.id));
     if (compared.error) notices.push(`${item.name}: ${compared.error}`);
-    if (points.length) lines.push({ key: `benchmark-${item.id}`, label: item.name,
-      color: `var(--c${(index + 4) % 8 + 1})`, dashed: true, values: compared.values });
+    const color = `var(--c${(index + 4) % 8 + 1})`;
+    if (points.length) {
+      lines.push({ key: `benchmark-${item.id}`, label: item.name, color, dashed: true, values: compared.values });
+      benchmarkWorth.push({ key: `benchmark-${item.id}`, label: item.name, color, dashed: true, values: compared.worth });
+    }
   }
+  const value: ValueSeries | undefined = points.length ? {
+    worth: points.map((point) => point.value),
+    invested: points.map((point) => point.invested),
+    percent: points.map((point) => point.portfolio),
+    benchmarks: benchmarkWorth,
+  } : undefined;
   const changes = investmentPeriodRows(data, period, date, yearStart);
   const changeById = new Map(changes.map((r) => [r.row.asset.id, r]));
 
@@ -341,7 +351,7 @@ export default async function OverviewPage({
         />
       )}
       <div className="wrap page-body">
-        {first && range && <ReturnsCard dates={points.map((point) => point.date)} lines={lines}
+        {first && range && <ReturnsCard dates={points.map((point) => point.date)} lines={lines} value={value}
           range={range.range} available={range.available} from={range.from} to={range.to} asOf={date}
           first={first} error={range.error} params={params} benchmarks={benchmarks} notices={notices} />}
         {hiddenSold > 0 && (
