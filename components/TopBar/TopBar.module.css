@@ -95,7 +95,9 @@
   color: var(--avatar-fg);
 }
 
-@media (max-width: 760px) {
+/* The single row only fits above the grid's 1060px collapse point; below that the nav
+   moves to its own scrollable row, as it does on phones. */
+@media (max-width: 1060px) {
   .inner {
     flex-wrap: wrap;
     height: auto;
