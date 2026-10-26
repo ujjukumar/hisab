@@ -1,5 +1,10 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
 /* Base and layout rules, ported from docs/mockup.html.
    Component-specific styles live in each component's CSS module. */
+
+/* Hallmark · waive 39b · .linkish is a text link inside running notes, table notes and tab rows · its hit area is the 14px line box of the sentence it sits in, not a padded button */
+
+/* Hallmark · waive 26b · this file holds no interactive markup of its own · component states live in each component's module */
 
 *,
 *::before,
@@ -14,6 +19,7 @@
 html {
   box-sizing: border-box;
   scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 80px);
+  overflow-x: clip;
 }
 
 body {
@@ -22,6 +28,7 @@ body {
   color: var(--text);
   font: 400 14px/1.45 var(--sans);
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
 button,
@@ -54,13 +61,13 @@ a {
 
 /* Block padding only, so it combines with .wrap's side padding on the same element. */
 .page-body {
-  padding-block: 30px 64px;
+  padding-block: 32px 64px;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 15px;
+  gap: 16px;
 }
 
 .s4 {

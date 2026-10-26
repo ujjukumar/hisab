@@ -6,6 +6,8 @@
   --surface-2: #f0f0f0;
   --line: rgba(0, 0, 0, 0.1);
   --line-strong: rgba(0, 0, 0, 0.24);
+  /* Input boxes read as one shape, so their edge clears 3:1 against whatever fill they sit on. */
+  --field-edge: rgba(0, 0, 0, 0.46);
   --zebra: #f5f5f5;
   --heading: #000000;
   --text: #212529;
@@ -63,6 +65,7 @@
     --surface-2: #2e2722;
     --line: rgba(255, 255, 255, 0.1);
     --line-strong: rgba(255, 255, 255, 0.24);
+    --field-edge: rgba(255, 255, 255, 0.42);
     --zebra: rgba(255, 255, 255, 0.035);
     --heading: #ffffff;
     --text: #ece6e1;
@@ -109,6 +112,7 @@
   --surface-2: #2e2722;
   --line: rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.24);
+  --field-edge: rgba(255, 255, 255, 0.42);
   --zebra: rgba(255, 255, 255, 0.035);
   --heading: #ffffff;
   --text: #ece6e1;
@@ -152,6 +156,8 @@
   --surface-2: #f0f0f0;
   --line: rgba(0, 0, 0, 0.1);
   --line-strong: rgba(0, 0, 0, 0.24);
+  /* Input boxes read as one shape, so their edge clears 3:1 against whatever fill they sit on. */
+  --field-edge: rgba(0, 0, 0, 0.46);
   --zebra: #f5f5f5;
   --heading: #000000;
   --text: #212529;
