@@ -56,7 +56,7 @@ function historyHref(view: {
 }
 
 function amountCell(row: Row) {
-  if (row.amount === null) return <Amount tone="muted">—</Amount>;
+  if (row.amount === null) return null;
   if (row.outcome === 'rejected') return <Amount tone="muted">{formatAmount(row.amount)}</Amount>;
   // Transfers are grey and unsigned, as in Transactions.
   if (row.transactionType === 'transfer') {
@@ -159,7 +159,7 @@ export default async function SmsHistoryPage({
         row.ruleId && row.ruleName ? (
           <NameCell href={href({ rule: row.ruleId, outcome: 'all' })} name={row.ruleName} />
         ) : (
-          <span className="muted">—</span>
+          null
         ),
     },
     {

@@ -1,18 +1,18 @@
 .months {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-right: 8px;
 }
 
 .budgets {
   display: grid;
   gap: 16px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .empty {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   color: var(--text-2);
   display: grid;
   gap: 12px;
@@ -25,7 +25,7 @@
 
 .steps {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   counter-reset: step;
 }
@@ -35,8 +35,8 @@
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px 14px;
-  padding: 14px 0;
+  gap: 8px 16px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -53,7 +53,7 @@
 }
 
 .steps h3 {
-  margin: 0 0 2px;
+  margin: 0 0 4px;
   font-size: 15px;
   color: var(--heading);
 }

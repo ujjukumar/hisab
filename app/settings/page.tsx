@@ -171,12 +171,15 @@ export default async function SettingsPage() {
             <dl className={styles.about}>
               <dt>Database file</dt>
               <dd>
-                <code>{info.path}</code> · {size(info.bytes)}
+                <code>{info.path}</code>
+                <span className={styles.aboutMeta}>{size(info.bytes)}</span>
               </dd>
               <dt>Backups folder</dt>
               <dd>
-                <code>{info.backups}</code> ·{' '}
-                {info.backupCount === 1 ? '1 backup' : `${info.backupCount} backups`}
+                <code>{info.backups}</code>
+                <span className={styles.aboutMeta}>
+                  {info.backupCount === 1 ? '1 backup' : `${info.backupCount} backups`}
+                </span>
               </dd>
               <dt>App version</dt>
               <dd>{version}</dd>

@@ -46,7 +46,6 @@ import { financialYearStartMonth } from '@/lib/queries/settings';
 
 type Group = (typeof GROUPS)[number];
 
-const MUTED = <Amount tone="muted">—</Amount>;
 const SORT_KEYS = [
   'name',
   'change',
@@ -129,13 +128,13 @@ function columns(
         return change ? (
           <Amount
             tone={gainClass(change.gain)}
-            sub={change.absolute === null ? '—' : formatPercentNoPlus(change.absolute * 100)}
+            sub={change.absolute === null ? undefined : formatPercentNoPlus(change.absolute * 100)}
             subTone={gainClass(change.gain)}
           >
             {formatAmountSigned(change.gain)}
           </Amount>
         ) : (
-          MUTED
+          null
         );
       },
     },
@@ -160,7 +159,7 @@ function columns(
       ],
       cell: (r) =>
         r.sold ? (
-          MUTED
+          null
         ) : (
           <Amount
             sub={
@@ -454,7 +453,7 @@ export default async function OverviewPage({
                       <td className="r">
                         <Amount
                           tone={gainClass(groupChange.gain)}
-                          sub={groupChange.absolute === null ? '—' : formatPercentNoPlus(groupChange.absolute * 100)}
+                          sub={groupChange.absolute === null ? undefined : formatPercentNoPlus(groupChange.absolute * 100)}
                           subTone={gainClass(groupChange.gain)}
                         >
                           {formatAmountSigned(groupChange.gain)}

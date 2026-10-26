@@ -37,7 +37,7 @@ import {
 import { periodPerformance, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth } from '@/lib/queries/settings';
 
-const percent = (rate: number | null) => (rate === null ? '—' : formatPercent(rate * 100, 1));
+const percent = (rate: number | null) => (rate === null ? '' : formatPercent(rate * 100, 1));
 const SORT_KEYS = ['name', 'value', 'invested', 'gain', 'absolute', 'annual'] as const;
 
 /** The three period figures, as table cells. */

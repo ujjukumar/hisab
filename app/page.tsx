@@ -295,11 +295,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           return { key: g.key, name: g.title, amount: 'Not held in this period', tone: 'muted' };
         }
         const pt = periodTotals(mine, asOf);
-        const pct = pt.absolute === null ? '—' : formatPercent(pt.absolute * 100);
+        const pct = pt.absolute === null ? null : formatPercent(pt.absolute * 100);
         return {
           key: g.key,
           name: g.title,
-          amount: `${formatINRSigned(pt.gain)} (${pct})`,
+          amount: pct
+            ? `${formatINRSigned(pt.gain)} (${pct})`
+            : formatINRSigned(pt.gain),
           tone: gainClass(pt.gain),
         };
       }
