@@ -19,3 +19,6 @@ Inspiration-Sources/
 
 .DS_Store
 Thumbs.db
+
+# UI audit evidence and lint screenshots (untracked working artifact).
+.hallmark/

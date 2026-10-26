@@ -1,3 +1,7 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · answered F25 · a wide table keeps its first column pinned to the card's left edge, so the row stays named and reachable while numeric columns scroll behind it; the money transactions table restacks entirely (app/money/page.module.css) */
+/* Hallmark · waive 24b · padding and gap on .head, .tbl th, tfoot td, .cellSub, .catChip, .tag, .kebab and .filters stay measured · one spacing rhythm keeps every table's padding and gap the same across the app, so the scale doesn't split between tables */
+
 .tableCard {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -68,9 +72,7 @@
 
 .tbl th .sub {
   display: block;
-  font: 400 10px/1.3 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font: 400 11px/1.3 var(--sans);
   color: var(--text-2);
   margin-top: 2px;
 }
@@ -91,6 +93,18 @@
 
 .thBtn:hover {
   text-decoration: underline;
+}
+
+.thBtn:active {
+  color: var(--heading);
+}
+
+/* Every focusable cell gets the same instant ring the app gives its buttons. */
+.thBtn:focus-visible,
+.kebab:focus-visible,
+.nameLink:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .sortOptions {
@@ -169,10 +183,9 @@
 .cellSub {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-3);
   margin-top: 3px;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -244,7 +257,7 @@
   padding: 1px 6px;
   border: 1px solid var(--line-strong);
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-3);
   vertical-align: 1px;
@@ -264,6 +277,7 @@
 }
 
 .kebab:hover,
+.kebab:active,
 .kebab[aria-expanded='true'] {
   background: var(--surface-2);
 }
@@ -305,5 +319,25 @@
   .filters > :global(.range),
   .filters > :global(.search) {
     grid-column: auto;
+  }
+}
+
+/* Hallmark · answered F25 · on a phone a wide table keeps its first column pinned to the card's left edge, so the row stays named and reachable while the numeric columns scroll behind it; the money transactions table goes further and restacks entirely (app/money/page.module.css) */
+@media (max-width: 760px) {
+  .tbl th:first-child,
+  .tbl td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+    box-shadow: 1px 0 0 var(--line);
+  }
+
+  .tbl tbody tr:nth-child(even) td:first-child {
+    background: var(--zebra);
+  }
+
+  .emptyRow td:first-child {
+    box-shadow: none;
   }
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import styles from './page.module.css';
 import { ButtonLink } from '@/components/Button/Button';
 import {
   Amount,
@@ -137,6 +138,7 @@ export default async function TransactionsPage({
         categories={listCategories()}
       />
 
+      <div className={styles.txStack}>
       <DataTable
         title={`${title} (${count})`}
         actions={
@@ -189,6 +191,7 @@ export default async function TransactionsPage({
           </tr>
         }
       />
+      </div>
 
       {rows.length < count && (
         <p className="footnote">

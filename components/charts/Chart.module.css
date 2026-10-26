@@ -1,3 +1,7 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · gaps and padding on .rangeTools, .tip, .tipRow, .legendList li, .legendText and .legendInline stay as measured · chart furniture pairs one step off the 4px scale, so every chart's gap rhythm stays even across the app */
+/* Hallmark · waive 38iii · strong inside .headline · the .headline > strong line is the whole heading itself, one word-figure in it at one size, not a lone accented word */
+
 .chart {
   position: relative;
   margin-top: 8px;
@@ -163,6 +167,7 @@
 /* ---------- donut and its legend ---------- */
 .split {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
