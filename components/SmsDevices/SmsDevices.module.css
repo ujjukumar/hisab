@@ -57,15 +57,10 @@
 .meta {
   display: flex;
   flex-wrap: wrap;
+  gap: 0 12px;
   margin: 0;
   font-size: 13px;
   color: var(--text-3);
-}
-
-.meta > * + *::before {
-  content: '·';
-  content: '·' / '';
-  margin-inline: 6px;
 }
 
 .code {

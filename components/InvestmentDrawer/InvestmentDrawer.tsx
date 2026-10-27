@@ -462,7 +462,7 @@ function TxnForm({
         <FormTotal
           label={intraday && total !== null ? (total < 0 ? 'Loss' : 'Profit') : TOTAL_LABELS[action]}
           value={
-            total === null ? '—' : `₹${formatAmount(intraday ? Math.abs(total) : total, 2)}`
+            total === null ? '₹0.00' : `₹${formatAmount(intraday ? Math.abs(total) : total, 2)}`
           }
         />
       )}

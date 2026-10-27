@@ -282,9 +282,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           key: g.key,
           name: g.title,
           amount: (
-            <span className="muted">
-              Not added · <AddInvestmentLink label={`Add ${g.title}`} />
-            </span>
+            <>
+              <span className="muted">Not added.</span>{' '}
+              <AddInvestmentLink label={`Add ${g.title}`} />
+            </>
           ),
         };
       }
@@ -450,7 +451,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               id="worth-range"
               label="Time range"
               title="Net worth"
-              sub="Accounts and investments · YTD starts on 1 January."
+              sub="Accounts and investments. YTD starts on 1 January."
               span={8}
               options={(
                 [

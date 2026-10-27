@@ -19,7 +19,7 @@
 .rangeChange {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 16px;
   font: 13px/1.4 var(--sans);
   color: var(--text-2);
 }
@@ -50,7 +50,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 16px;
   font: 12px/1.4 var(--sans);
   color: var(--text-3);
 }

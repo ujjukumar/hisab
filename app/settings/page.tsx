@@ -143,7 +143,7 @@ export default async function SettingsPage() {
             {benchmarks.map((benchmark) => <SettingRow key={benchmark.id} title={benchmark.name}
               control={<RemoveBenchmark id={benchmark.id} />}>
               <p>{[SUGGESTED_BENCHMARKS.find((item) => item.isin === benchmark.isin)?.fund, benchmark.isin]
-                .filter(Boolean).join(' · ')}</p>
+                .filter(Boolean).join(', ')}</p>
             </SettingRow>)}
             {suggestions.length > 0 && <SettingRow title="Suggested index funds"
               control={<SuggestedBenchmarks items={suggestions} />}>

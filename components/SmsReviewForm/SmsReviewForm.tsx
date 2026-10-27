@@ -220,7 +220,7 @@ export function SmsReviewForm({
       ? `Future SMS from ${message.sender} with this wording become a transfer from ${fromName} to ${toName}.`
       : 'Choose both accounts to see where future SMS will go.'
     : nameOf(ownId) && categoryName
-      ? `Future SMS from ${message.sender} with this wording go to ${nameOf(ownId)} · ${categoryName}.`
+      ? `Future SMS from ${message.sender} with this wording go to ${nameOf(ownId)} under ${categoryName}.`
       : 'Choose an account and a category to see where future SMS will go.';
 
   return (

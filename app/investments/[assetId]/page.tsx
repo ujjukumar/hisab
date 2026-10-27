@@ -83,7 +83,7 @@ export default async function HoldingPage({
         title={asset.name}
         sub={[ASSET_TYPE_LABELS[asset.type], ref, asset.archived ? 'Archived' : '']
           .filter(Boolean)
-          .join(' · ')}
+          .join(', ')}
         actions={
           <>
             <RecordTransactionButton assetId={id} />
@@ -148,12 +148,12 @@ export default async function HoldingPage({
                     {
                       key: 's',
                       name: 'Start date',
-                      amount: asset.startDate ? formatDate(asset.startDate) : '—',
+                      amount: asset.startDate ? formatDate(asset.startDate) : 'Not set',
                     },
                     {
                       key: 'm',
                       name: 'Maturity date',
-                      amount: asset.maturityDate ? formatDate(asset.maturityDate) : '—',
+                      amount: asset.maturityDate ? formatDate(asset.maturityDate) : 'Not set',
                     },
                     {
                       key: 'v',
@@ -171,7 +171,7 @@ export default async function HoldingPage({
                                 date: asset.maturityDate,
                               }),
                             )
-                          : '—',
+                          : 'Not set',
                     },
                   ]}
                 />

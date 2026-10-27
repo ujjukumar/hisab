@@ -14,7 +14,6 @@ import { formatAmount, formatDate, formatUnits, MINUS } from '@/lib/domain/forma
 import { unitsAmount } from '@/lib/domain/holdings';
 import type { InvTxnRow } from '@/lib/queries/investments';
 
-const MUTED = <Amount tone="muted">—</Amount>;
 const PAID = new Set(['buy', 'deposit', 'fee']);
 
 /** Money out of the owner's pocket; an intraday trade only when it lost money. */
@@ -72,7 +71,7 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
       t.price ? (
         <Amount sub={t.sellPrice ? `Sold ${price(t.sellPrice)}` : undefined}>{price(t.price)}</Amount>
       ) : (
-        MUTED
+        null
       ),
   },
   {
@@ -92,7 +91,7 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
           {units(t.units)}
         </Amount>
       ) : (
-        MUTED
+        null
       ),
   },
   {
@@ -100,7 +99,7 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     header: 'Balance units',
     sortable: true,
     sortValue: (t) => t.balanceUnits ? Number(t.balanceUnits) : null,
-    cell: (t) => (t.balanceUnits === null ? MUTED : <Amount>{units(t.balanceUnits)}</Amount>),
+    cell: (t) => (t.balanceUnits === null ? null : <Amount>{units(t.balanceUnits)}</Amount>),
   },
   {
     key: 'amount',
@@ -119,7 +118,7 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     ],
     cell: (t) =>
       t.total === null ? (
-        MUTED
+        null
       ) : (
         <Amount
           sub={t.fees ? formatAmount(t.fees, 2) : undefined}
@@ -137,7 +136,7 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
     sortable: true,
     sortValue: (t) => t.accountName,
     cell: (t) =>
-      t.accountName ? <span className={tableStyles.catChip}>{t.accountName}</span> : MUTED,
+      t.accountName ? <span className={tableStyles.catChip}>{t.accountName}</span> : null,
   },
 ];
 

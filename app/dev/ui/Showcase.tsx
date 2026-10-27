@@ -183,8 +183,8 @@ export function Showcase() {
         <DataTable
           title="Empty state"
           columns={[
-            { key: 'date', header: 'Date', align: 'l', cell: () => <DateCell>—</DateCell> },
-            { key: 'desc', header: 'Description', align: 'l', cell: () => <DescCell desc="—" /> },
+            { key: 'date', header: 'Date', align: 'l', cell: () => <DateCell>{''}</DateCell> },
+            { key: 'desc', header: 'Description', align: 'l', cell: () => <DescCell desc="" /> },
           ]}
           rows={[]}
           rowKey={() => 'none'}

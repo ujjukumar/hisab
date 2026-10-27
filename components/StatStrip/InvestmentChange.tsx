@@ -21,7 +21,7 @@ export function InvestmentChange({
       <span className={`${styles.periodGroup} ${tone}`}>
         {formatINRSigned(selected.gain)}
         <span className={`${styles.aside} ${tone}`}>
-          {selected.absolute === null ? '—' : formatPercent(selected.absolute * 100)}
+          {selected.absolute === null ? null : formatPercent(selected.absolute * 100)}
         </span>
       </span>
       <select

@@ -58,7 +58,7 @@ export function ReturnsCard({ dates, lines, value, range, available, from, to, a
     </BenchmarkFill>
     {error ? <p role="alert" className={styles.error}>{error}</p> : <>
       <ReturnChart dates={dates} lines={lines} value={value} selectPath="/investments/performance" />
-      <p className={styles.note}>{formatDate(dates[0] ?? from ?? first)} to {formatDate(to)} · Comparisons use the same money added and taken out on the same dates.</p>
+      <p className={styles.note}>{formatDate(dates[0] ?? from ?? first)} to {formatDate(to)}. Comparisons use the same money added and taken out on the same dates.</p>
     </>}
   </Card>;
 }

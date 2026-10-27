@@ -430,9 +430,14 @@ export function SmsReviewWorkspace({
 
         <p className={styles.hint}>
           {shortcuts ? (
-            <span aria-hidden="true">J/K move · X select · A approve · R reject · </span>
+            <>
+              <span aria-hidden="true">J/K move</span>
+              <span aria-hidden="true">X select</span>
+              <span aria-hidden="true">A approve</span>
+              <span aria-hidden="true">R reject</span>
+            </>
           ) : (
-            <span>Keyboard shortcuts are off. </span>
+            <span>Keyboard shortcuts are off.</span>
           )}
           <button type="button" className="linkish" onClick={() => setHelpOpen(true)}>
             {shortcuts ? '? All shortcuts' : 'Keyboard shortcuts'}

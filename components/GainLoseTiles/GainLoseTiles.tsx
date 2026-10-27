@@ -23,7 +23,7 @@ function List({ title, movers, lose }: { title: string; movers: Mover[]; lose?: 
               {m.name}
             </Link>
             <span className={`${styles.val} ${lose ? 'neg' : 'pos'}`}>
-              {formatINRSigned(m.gain)} · {formatPercent(m.percent)}
+              {formatINRSigned(m.gain)} ({formatPercent(m.percent)})
             </span>
           </li>
         ))}

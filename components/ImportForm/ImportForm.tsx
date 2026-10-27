@@ -112,7 +112,7 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
               `${plan.duplicates} already in Hisaab`,
               count(newCount, 'new investment'),
               ...(plan.skipped.length ? [`${count(plan.skipped.length, 'row')} not imported`] : []),
-            ].join(' · ')}
+            ].join(', ')}
           </p>
 
           {plan.problems.length > 0 && (
@@ -152,7 +152,7 @@ export function ImportForm({ accounts }: { accounts: { id: number; name: string 
                   sortable: true,
                   sortValue: (i) => i.name,
                   cell: (i) => (
-                    <NameCell name={i.name} sub={`${ASSET_TYPE_LABELS[i.type]} · ${i.isin}`} />
+                    <NameCell name={i.name} sub={`${ASSET_TYPE_LABELS[i.type]}, ${i.isin}`} />
                   ),
                 },
                 { key: 'add', header: 'To add', sortable: true, sortValue: (i) => i.toAdd, cell: (i) => i.toAdd },

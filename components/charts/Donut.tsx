@@ -69,8 +69,7 @@ export function LegendList({ items }: { items: Slice[] }) {
           <span className={styles.legendText}>
             <span className={styles.nm}>{item.name}</span>
             <span className={styles.pc}>
-              {formatINR(item.value)} · {total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}
-              %
+              {formatINR(item.value)} ({total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}%)
             </span>
           </span>
         </li>

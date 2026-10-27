@@ -103,7 +103,7 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
       header: 'Last transaction',
       sortable: true,
       sortValue: (a) => a.lastDate,
-      cell: (a) => <DateCell>{a.lastDate ? formatDate(a.lastDate) : '—'}</DateCell>,
+      cell: (a) => <DateCell>{a.lastDate ? formatDate(a.lastDate) : null}</DateCell>,
     },
   ];
 

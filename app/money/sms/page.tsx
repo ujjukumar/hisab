@@ -141,7 +141,7 @@ export default async function SmsReviewPage({ searchParams }: { searchParams: Pr
       smsReasons(m.reason)
         .filter((r) => r.key !== 'amount' && r.key !== 'direction')
         .map((r) => r.short)
-        .join(' · ') || null,
+        .join(', ') || null,
     ...suggestionFor(m),
     // Any SMS a rule reads as a transfer needs opening, even if an account has since gone.
     toAccountId: m.proposedToAccountId,

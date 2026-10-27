@@ -188,20 +188,20 @@ export function ReturnChart({ dates, lines, value, selectPath }: {
       ...value.benchmarks.map((line) => ({
         color: line.color,
         label: line.label,
-        value: line.values[at] === null || line.values[at] === undefined ? '—' : formatShortINR(line.values[at]!),
+        value: line.values[at] === null || line.values[at] === undefined ? 'No data' : formatShortINR(line.values[at]!),
       })),
     ] : lines.map((line) => ({
       color: line.color,
       label: line.label,
       value: line.values[at] === null || line.values[at] === undefined
-        ? '—' : formatPercent(line.values[at]! * 100),
+        ? 'No data' : formatPercent(line.values[at]! * 100),
       tone: gainClass(line.values[at] ?? 0),
     })),
   };
 
   const legendValue = (line: ReturnLine) => {
     const end = line.values.at(-1);
-    if (end === null || end === undefined) return '—';
+    if (end === null || end === undefined) return 'No data';
     return showValue ? formatShortINR(end) : formatPercent(end * 100);
   };
 
@@ -222,16 +222,13 @@ export function ReturnChart({ dates, lines, value, selectPath }: {
           <span className={styles.rangeChange}>
             <span>{value.rangeLabel}</span>
             <span>Added <strong>{formatShortINRSigned(value.added[last]!)}</strong></span>
-            <span>·</span>
             <span>Gain <strong className={gainClass(value.gain[last]!)}>
               {formatShortINRSigned(value.gain[last]!)}{rangePercentText(last)}
             </strong></span>
           </span>
           {(value.booked[last] || value.income[last]) ? <span className={styles.rangeSplit}>
             <span>Booked <strong className={gainClass(value.booked[last]!)}>{formatShortINRSigned(value.booked[last]!)}</strong></span>
-            {value.income[last] ? <><span>·</span>
-              <span>Dividends <strong>{formatShortINRSigned(value.income[last]!)}</strong></span></> : null}
-            <span>·</span>
+            {value.income[last] ? <span>Dividends <strong>{formatShortINRSigned(value.income[last]!)}</strong></span> : null}
             <span>On paper <strong className={gainClass(paperAt(last))}>{formatShortINRSigned(paperAt(last))}</strong></span>
           </span> : null}
           {value.worth[0]! > 0 && last > 0 && <span className={styles.rangeFrom}>

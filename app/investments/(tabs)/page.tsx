@@ -100,9 +100,9 @@ function columns(
           sub={r.sold || r.asset.valuation !== 'units'
             ? maskRef(r.asset.accountRef) || ASSET_TYPE_LABELS[r.asset.type]
             : r.price
-              ? `${price(r.price.price)} · ${formatDate(r.price.date)}`
+              ? `${price(r.price.price)} on ${formatDate(r.price.date)}`
               : r.holding.lastBuyPrice
-                ? `${price(r.holding.lastBuyPrice)} · Price not updated`
+                ? `${price(r.holding.lastBuyPrice)}, price not updated`
                 : 'Price not updated'}
         />
       ),
