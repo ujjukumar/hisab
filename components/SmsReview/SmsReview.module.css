@@ -241,8 +241,6 @@
 .overrides legend {
   padding: 0 6px;
   font: 600 11px/1 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--text-3);
 }
 
@@ -281,8 +279,6 @@
   border-bottom: 1px solid var(--line-strong);
   font: 600 11px/1 var(--sans);
   text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--text-3);
 }
 
@@ -311,8 +307,6 @@
 .missing h4 {
   margin: 0 0 8px;
   font: 600 11px/1 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--text-3);
 }
 

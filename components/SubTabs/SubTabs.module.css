@@ -16,11 +16,9 @@
 .inner a {
   background: none;
   border: 0;
-  padding: 15px 20px;
-  font: 600 12px/1 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--heading);
+  padding: 16px 20px;
+  font: 400 13px/1 var(--sans);
+  color: var(--text-2);
   white-space: nowrap;
   position: relative;
   text-decoration: none;
@@ -30,16 +28,7 @@
   padding-left: 0;
 }
 
-.inner a + a::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 11px;
-  bottom: 11px;
-  width: 1px;
-  background: var(--line-strong);
-}
-
 .inner a[aria-current='true'] {
   color: var(--primary);
+  font-weight: 600;
 }

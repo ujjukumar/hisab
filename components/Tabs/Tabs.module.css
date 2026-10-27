@@ -43,7 +43,7 @@
   vertical-align: 1px;
 }
 
-/* ---------- view tabs: the uppercase row inside a section ---------- */
+/* ---------- view tabs: the smaller row inside a section ---------- */
 .view {
   gap: 0;
   border-bottom: 1px solid var(--line);
@@ -51,25 +51,13 @@
 
 .view a {
   position: relative;
-  padding: 13px 18px 12px;
-  font: 600 12px/1 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--heading);
+  padding: 12px 16px;
+  font: 400 13px/1 var(--sans);
+  color: var(--text-2);
 }
 
 .view a:first-child {
   padding-left: 0;
-}
-
-.view a + a::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 11px;
-  bottom: 11px;
-  width: 1px;
-  background: var(--line-strong);
 }
 
 .view a[aria-current='page'] {

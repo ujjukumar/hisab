@@ -35,7 +35,9 @@ in [styles/tokens.css](../styles/tokens.css), base styles in
 IBM Plex Sans, IBM Plex Mono for figures and Fraunces for titles. The theme follows
 the system unless the owner picks light or dark in the top bar. `/dev/ui` (development
 only) shows shared components. Copy, colour, accessibility and layout rules are in
-[CLAUDE.md](../CLAUDE.md#copy-and-design-rules).
+[CLAUDE.md](../CLAUDE.md#copy-and-design-rules). Labels, tabs, chips, tags and table
+heads are sentence case and untracked, a deliberate change from the mockup's small
+capitals (27 Oct 2026).
 
 ## 3. Architecture
 

@@ -12,8 +12,6 @@
   padding: 0 4px;
   background: var(--field-label-bg, var(--page));
   font: 600 11px/1.2 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--text-3);
   pointer-events: none;
   white-space: nowrap;

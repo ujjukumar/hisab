@@ -77,8 +77,6 @@
 
 .codeLabel {
   font: 600 11px/1 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--text-3);
 }
 

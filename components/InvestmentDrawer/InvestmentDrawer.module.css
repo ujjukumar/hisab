@@ -9,7 +9,5 @@
   margin: 4px 0 -8px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
   color: var(--text-2);
 }
