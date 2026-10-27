@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · .btn, .secondary and .hideLabel padding · it sets every button's 40px height and the secondary button's 1px border inset */
+
 .btn {
   display: inline-flex;
   align-items: center;

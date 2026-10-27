@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · brand gap, nav link padding, the Sample data pill padding and the nav's negative margin · nav links keep a 32px hit area aligned with the wordmark edge */
+
 .topbar {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
@@ -62,7 +65,7 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .pill {
@@ -101,7 +104,7 @@
   .inner {
     flex-wrap: wrap;
     height: auto;
-    gap: 10px 12px;
+    gap: 12px 12px;
     padding-top: 12px;
   }
   .brand {

@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · tag padding · an Archived or Sold tag stays a small inline badge inside a table row */
+
 .tag {
   display: inline-flex;
   align-items: center;

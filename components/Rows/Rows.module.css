@@ -1,6 +1,6 @@
 .rows {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   padding: 0;
 }
 
@@ -26,7 +26,7 @@
 .main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 

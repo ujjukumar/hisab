@@ -1,6 +1,9 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · tab link padding and the count badge padding and margins · the tab underline lands on the border and the count badge stays a tight pill */
+
 .tabs {
   display: flex;
-  gap: 30px;
+  gap: 32px;
   overflow-x: auto;
   scrollbar-width: none;
 }

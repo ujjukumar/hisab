@@ -1,13 +1,16 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · .link padding · the read-only pairing link box matches the Copy link button height */
+
 .pairing {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   justify-items: start;
   margin-top: 20px;
 }
 
 .steps {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -16,7 +19,7 @@
 .steps li {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   color: var(--text-2);
 }
 
@@ -41,9 +44,9 @@
 .connected {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   margin: 20px 0 0;
-  padding: 12px 14px;
+  padding: 12px 16px;
   background: var(--surface-2);
   border-left: 3px solid var(--primary);
 }
@@ -59,7 +62,7 @@
 .waiting {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   color: var(--text-2);
 }
@@ -112,7 +115,7 @@
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -120,7 +123,7 @@
   display: flex;
   flex: 1 1 240px;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
@@ -139,7 +142,7 @@
 
 .feedback {
   margin: 20px 0 0;
-  padding: 10px 12px;
+  padding: 12px 12px;
   background: var(--surface-2);
   border-left: 3px solid var(--primary);
   overflow-wrap: anywhere;

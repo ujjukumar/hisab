@@ -12,7 +12,7 @@
 }
 
 .noStrip .row {
-  padding-bottom: 30px;
+  padding-bottom: 32px;
 }
 
 .title {
@@ -49,7 +49,7 @@
 @media (max-width: 760px) {
   .row {
     flex-wrap: wrap;
-    padding-top: 22px;
+    padding-top: 24px;
   }
   .title {
     font-size: 28px;

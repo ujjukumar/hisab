@@ -1,5 +1,5 @@
 .budget {
-  padding: 11px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -10,9 +10,9 @@
 .top {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 13px;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 
 .name {

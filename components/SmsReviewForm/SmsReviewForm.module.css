@@ -7,7 +7,7 @@
 
 .fieldset {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -17,7 +17,7 @@
 .flow {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   font-weight: 600;
   color: var(--heading);
@@ -37,7 +37,7 @@
 .matches {
   display: grid;
   gap: 8px;
-  padding: 2px 0 2px 14px;
+  padding: 2px 0 2px 16px;
   border-left: 3px solid var(--accent);
 }
 
@@ -68,7 +68,7 @@
 .fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 14px;
+  gap: 16px 16px;
 }
 
 .fields > * {
@@ -89,19 +89,19 @@
 .learn {
   display: grid;
   gap: 4px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border: 1px solid var(--line);
   border-radius: 5px;
 }
 
 .learn .note {
-  padding-left: 26px;
+  padding-left: 24px;
 }
 
 .check {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-weight: 600;
   color: var(--heading);
 }
@@ -121,9 +121,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 12px;
+  gap: 12px 12px;
   margin-inline: -2px;
-  padding: 14px 2px;
+  padding: 16px 2px;
   background: var(--surface);
   border-top: 1px solid var(--line);
 }
@@ -136,9 +136,9 @@
 .form fieldset:disabled {
   opacity: 0.6;
   color: var(--text-3);
+  cursor: not-allowed;
 }
 
-.form fieldset:disabled,
 .form fieldset:disabled * {
   cursor: not-allowed;
 }
@@ -152,7 +152,7 @@
 
 @media (max-width: 760px) {
   .actions {
-    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
   .actions > :first-child {

@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · input and select padding, .search and .amount icon insets, .range input and .error offsets · they set the 40px field height and clear the search and rupee icons */
+
 .field {
   position: relative;
   border: 1px solid var(--field-edge);

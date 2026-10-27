@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · chip padding and the .count margin · each range chip keeps a 32px height and its count badge sits tight to the label */
+
 .chips {
   display: flex;
   flex-wrap: wrap;

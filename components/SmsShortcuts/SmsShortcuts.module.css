@@ -1,7 +1,10 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · kbd padding · each keyboard shortcut key, such as Shift or Esc, stays a small boxed letter beside its action */
+
 .toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-weight: 600;
   color: var(--heading);
 }
@@ -33,7 +36,7 @@
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 

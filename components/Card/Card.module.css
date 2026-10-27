@@ -2,7 +2,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 5px;
-  padding: 28px 30px;
+  padding: 28px 32px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -25,14 +25,14 @@
 }
 
 .sub {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   color: var(--text-2);
   font-size: 14px;
 }
 
 .foot {
   margin-top: auto;
-  padding-top: 22px;
+  padding-top: 24px;
 }
 
 .moreLink {
@@ -54,6 +54,6 @@
 
 @media (max-width: 760px) {
   .card {
-    padding: 22px 20px;
+    padding: 24px 20px;
   }
 }

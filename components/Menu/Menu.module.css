@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · waive 24b · menu inset, menu item padding and the kebab trigger's negative margin · the trigger's hit area grows without moving the row's dots */
+
 /* Built on the popover API so dismissal and top-layer stacking come from the browser. */
 
 .menu {
