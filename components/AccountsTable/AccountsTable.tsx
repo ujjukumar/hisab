@@ -69,7 +69,6 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
         {
           key: 'opening',
           header: 'Opening balance',
-          sub: 'As of',
           sortValue: (a) => a.openingBalance,
         },
         {
@@ -89,7 +88,6 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
         {
           key: 'balance',
           header: 'Current balance',
-          sub: 'Transactions',
           sortValue: (a) => a.balance,
         },
         {

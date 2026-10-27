@@ -145,7 +145,6 @@ function columns(
         {
           key: 'cost',
           header: 'Total cost',
-          sub: costSub,
           sortValue: (r) => r.sold ? null : r.holding.cost,
         },
         {
@@ -179,7 +178,6 @@ function columns(
         {
           key: 'value',
           header: 'Current value',
-          sub: g.key === 'mf' || g.key === 'stock' || g.key === 'gold' ? g.unitWord : undefined,
           sortValue: (r) => r.value,
         },
         {
@@ -207,7 +205,6 @@ function columns(
         {
           key: 'return',
           header: 'Total return',
-          sub: 'Return % p.a.',
           sortValue: (r) => r.totalReturn,
         },
         {

@@ -115,82 +115,84 @@ export default async function HoldingPage({
         ]}
       />
       <div className="wrap page-body">
-        <div className="grid">
-          <Card
-            span={asset.valuation === 'fd' ? 8 : 12}
-            title="Invested and worth"
-            sub={`${cadence === 'daily' ? 'Available dates' : cadence === 'weekly' ? 'Weekly' : 'Monthly'}${from ? ` from ${formatDate(from)}` : ', all time'}`}
-            action={
-              <LegendInline>
-                <LegendKey color="var(--c1)">Invested</LegendKey>
-                <LegendKey color="var(--c2)">Worth</LegendKey>
-              </LegendInline>
-            }
-          >
-            <LineChart points={history} />
-          </Card>
-          {asset.valuation === 'fd' && (
-            <Card span={4} title="Deposit details">
-              <Rows
-                rows={[
-                  { key: 'p', name: 'Principal', amount: formatINR(holding.cost) },
-                  {
-                    key: 'r',
-                    name: 'Interest rate',
-                    amount: `${asset.interestRate ?? '0'}% a year`,
-                  },
-                  {
-                    key: 'c',
-                    name: 'Interest added',
-                    amount: COMPOUNDING_LABELS[asset.compounding ?? 'quarterly'],
-                  },
-                  {
-                    key: 's',
-                    name: 'Start date',
-                    amount: asset.startDate ? formatDate(asset.startDate) : '—',
-                  },
-                  {
-                    key: 'm',
-                    name: 'Maturity date',
-                    amount: asset.maturityDate ? formatDate(asset.maturityDate) : '—',
-                  },
-                  {
-                    key: 'v',
-                    name: 'Maturity value',
-                    total: true,
-                    amount:
-                      asset.maturityDate && asset.startDate && holding.cost > 0
-                        ? formatINR(
-                            fdValue({
-                              principal: holding.cost,
-                              rate: asset.interestRate ?? '0',
-                              compounding: asset.compounding,
-                              start: asset.startDate,
-                              maturity: asset.maturityDate,
-                              date: asset.maturityDate,
-                            }),
-                          )
-                        : '—',
-                  },
-                ]}
-              />
+        <div className="stack">
+          <div className="grid">
+            <Card
+              span={asset.valuation === 'fd' ? 8 : 12}
+              title="Invested and worth"
+              sub={`${cadence === 'daily' ? 'Available dates' : cadence === 'weekly' ? 'Weekly' : 'Monthly'}${from ? ` from ${formatDate(from)}` : ', all time'}`}
+              action={
+                <LegendInline>
+                  <LegendKey color="var(--c1)">Invested</LegendKey>
+                  <LegendKey color="var(--c2)">Worth</LegendKey>
+                </LegendInline>
+              }
+            >
+              <LineChart points={history} />
             </Card>
-          )}
-        </div>
+            {asset.valuation === 'fd' && (
+              <Card span={4} title="Deposit details">
+                <Rows
+                  rows={[
+                    { key: 'p', name: 'Principal', amount: formatINR(holding.cost) },
+                    {
+                      key: 'r',
+                      name: 'Interest rate',
+                      amount: `${asset.interestRate ?? '0'}% a year`,
+                    },
+                    {
+                      key: 'c',
+                      name: 'Interest added',
+                      amount: COMPOUNDING_LABELS[asset.compounding ?? 'quarterly'],
+                    },
+                    {
+                      key: 's',
+                      name: 'Start date',
+                      amount: asset.startDate ? formatDate(asset.startDate) : '—',
+                    },
+                    {
+                      key: 'm',
+                      name: 'Maturity date',
+                      amount: asset.maturityDate ? formatDate(asset.maturityDate) : '—',
+                    },
+                    {
+                      key: 'v',
+                      name: 'Maturity value',
+                      total: true,
+                      amount:
+                        asset.maturityDate && asset.startDate && holding.cost > 0
+                          ? formatINR(
+                              fdValue({
+                                principal: holding.cost,
+                                rate: asset.interestRate ?? '0',
+                                compounding: asset.compounding,
+                                start: asset.startDate,
+                                maturity: asset.maturityDate,
+                                date: asset.maturityDate,
+                              }),
+                            )
+                          : '—',
+                    },
+                  ]}
+                />
+              </Card>
+            )}
+          </div>
 
-        <InvestmentTxnTable
-          title={`Transactions (${rows.length})`}
-          rows={rows}
-          showAsset={false}
-          sort={{ key: txnFilters.sort, dir: txnFilters.dir }}
-          sortHref={transactionSortHref}
-          empty={
-            <>
-              <p>No transactions for this investment yet. Record one to start tracking it.</p>
-              <RecordTransactionButton assetId={id} />
-            </>
-          }
-        />
+          <InvestmentTxnTable
+            title={`Transactions (${rows.length})`}
+            rows={rows}
+            showAsset={false}
+            sort={{ key: txnFilters.sort, dir: txnFilters.dir }}
+            sortHref={transactionSortHref}
+            empty={
+              <>
+                <p>No transactions for this investment yet. Record one to start tracking it.</p>
+                <RecordTransactionButton assetId={id} />
+              </>
+            }
+          />
+        </div>
         <p className="footnote">All amounts in ₹.{asset.note && <> Note: {asset.note}</>}</p>
       </div>
     </>

@@ -109,7 +109,6 @@ const columns = (showAsset: boolean): Column<InvTxnRow>[] => [
       {
         key: 'amount',
         header: 'Amount',
-        sub: 'Fees',
         sortValue: (t) => t.total === null ? null : t.total * (PAID.has(t.action) ? -1 : 1),
       },
       {
