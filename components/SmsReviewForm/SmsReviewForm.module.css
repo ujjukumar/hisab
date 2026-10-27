@@ -135,6 +135,12 @@
 
 .form fieldset:disabled {
   opacity: 0.6;
+  color: var(--text-3);
+}
+
+.form fieldset:disabled,
+.form fieldset:disabled * {
+  cursor: not-allowed;
 }
 
 /* The form sits in a pane whose width doesn't follow the viewport, so stack by its own width. */
