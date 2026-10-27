@@ -62,6 +62,8 @@ import {
   type PeriodRow,
 } from '@/lib/domain/performance';
 import { totals, type HoldingRow } from '@/lib/domain/portfolio';
+import { feedAssets } from '@/lib/domain/priceFeeds';
+import { benchmarkList } from '@/lib/queries/benchmarks';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/validation/money';
 import { monthBudgets } from '@/lib/queries/budgets';
 import { assetOptions, portfolio, portfolioData } from '@/lib/queries/investments';
@@ -352,7 +354,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         prices: {
           lastOn: lastPrices?.on ?? null,
           ok: lastPrices?.ok ?? false,
-          auto: await autoPrices(),
+          // Nothing to fetch without an ISIN or a benchmark, so there is nothing to nudge about.
+          auto:
+            (await autoPrices()) &&
+            (feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0 ||
+              benchmarkList().length > 0),
         },
         sms: { pending: pendingSmsCount() },
       })

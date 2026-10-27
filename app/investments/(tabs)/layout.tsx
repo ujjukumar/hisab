@@ -10,12 +10,19 @@ import { today } from '@/lib/domain/dates';
 import { formatReturn, formatShortINR, formatShortINRSigned, gainClass } from '@/lib/domain/format';
 import { PERIODS, investmentPeriodRows, periodTotals } from '@/lib/domain/performance';
 import { totals } from '@/lib/domain/portfolio';
+import { feedAssets } from '@/lib/domain/priceFeeds';
+import { benchmarkList } from '@/lib/queries/benchmarks';
 import { portfolio, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth, priceStatus, priceUpdate } from '@/lib/queries/settings';
 
 export default async function InvestmentTabsLayout({ children }: { children: ReactNode }) {
   const date = today();
-  const t = totals(portfolio(date), date);
+  const rows = portfolio(date);
+  const t = totals(rows, date);
+  // Without an ISIN (or a benchmark) nothing can be fetched, so say how to fix that instead.
+  const priced =
+    feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0 ||
+    benchmarkList().length > 0;
   const last = await priceUpdate();
   const yearStart = await financialYearStartMonth();
   const data = portfolioData();
@@ -29,10 +36,14 @@ export default async function InvestmentTabsLayout({ children }: { children: Rea
       <PageHead
         title="Investments"
         sub={
-          <>
-            {last ? priceStatus(last) : 'Prices not updated automatically yet.'}{' '}
-            <UpdatePricesButton link />
-          </>
+          priced ? (
+            <>
+              {last ? priceStatus(last) : 'Prices not updated automatically yet.'}{' '}
+              <UpdatePricesButton link />
+            </>
+          ) : rows.length > 0 ? (
+            'Add an ISIN under Symbol or code to fetch prices automatically.'
+          ) : undefined
         }
         actions={
           <>
