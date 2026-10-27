@@ -1,5 +1,14 @@
-import { daysBetween, type IsoDate, type IsoMonth } from './dates';
-import { formatDate } from './format';
+import {
+  addMonths,
+  daysBetween,
+  daysInMonth,
+  makeDate,
+  monthOf,
+  parts,
+  type IsoDate,
+  type IsoMonth,
+} from './dates';
+import { formatDate, formatDay, formatINR } from './format';
 import type { Paise } from './money';
 
 /**
@@ -11,7 +20,7 @@ import type { Paise } from './money';
  */
 
 export type AttentionItem = {
-  key: 'prices' | 'no-price' | 'budgets' | 'overdrawn' | 'sms';
+  key: 'prices' | 'no-price' | 'budgets' | 'overdrawn' | 'sms' | `card-${number}`;
   /** What is wrong, in one line. */
   text: string;
   /** What the link does about it. */
@@ -19,6 +28,8 @@ export type AttentionItem = {
   href: string;
   /** 'neg' only where the loss colour is allowed: spending over its budget. */
   tone: 'neg' | '';
+  /** A card bill: the card and the amount owed, so the page can offer to pay it. */
+  pay?: { accountId: number; amount: Paise };
 };
 
 export type AttentionInput = {
@@ -28,7 +39,14 @@ export type AttentionInput = {
   /** True when `month` is the current month, so links can leave it out. */
   isCurrentMonth: boolean;
   budgets: { rows: { name: string; over: boolean }[] };
-  accounts: { name: string; type: string; balance: Paise; archived: boolean }[];
+  accounts: {
+    id?: number;
+    name: string;
+    type: string;
+    balance: Paise;
+    archived: boolean;
+    dueDay?: number | null;
+  }[];
   holdings: { name: string; stale: boolean; sold: boolean }[];
   prices: { lastOn: IsoDate | null; ok: boolean; auto: boolean };
   /** SMS from paired phones waiting for the owner in Money → SMS. */
@@ -37,6 +55,19 @@ export type AttentionInput = {
 
 /** Prices older than this are worth a nudge. Four days covers a long weekend. */
 export const STALE_PRICE_DAYS = 4;
+
+/** A card bill is worth a nudge this many days before it is due. */
+export const CARD_DUE_DAYS = 7;
+
+/** The next date a bill due on `dueDay` falls on, today included. Short months use their last day. */
+export function nextDueDate(today: IsoDate, dueDay: number): IsoDate {
+  const on = (month: IsoMonth) => {
+    const { year, month: m } = parts(`${month}-01`);
+    return makeDate(year, m, Math.min(dueDay, daysInMonth(year, m)));
+  };
+  const thisMonth = on(monthOf(today));
+  return thisMonth >= today ? thisMonth : on(addMonths(monthOf(today), 1));
+}
 
 const plural = <T,>(list: T[], one: (item: T) => string, many: (count: number) => string) =>
   list.length === 1 ? one(list[0]!) : many(list.length);
@@ -48,6 +79,26 @@ const plural = <T,>(list: T[], one: (item: T) => string, many: (count: number) =
 export function attentionItems(input: AttentionInput): AttentionItem[] {
   const items: AttentionItem[] = [];
   const { prices, holdings, budgets, accounts } = input;
+
+  // Card bills due within a week, soonest first. Nothing owed means nothing to pay.
+  accounts
+    .filter((a) => !a.archived && a.type === 'card' && a.dueDay && a.balance < 0 && a.id)
+    .map((a) => ({ a, due: nextDueDate(input.today, a.dueDay!) }))
+    .filter(({ due }) => daysBetween(input.today, due) <= CARD_DUE_DAYS)
+    .sort((x, y) => x.due.localeCompare(y.due))
+    .forEach(({ a, due }) => {
+      const days = daysBetween(input.today, due);
+      items.push({
+        key: `card-${a.id!}`,
+        text: `${a.name} bill of ${formatINR(-a.balance)} is due ${
+          days === 0 ? 'today' : days === 1 ? 'tomorrow' : `on ${formatDay(due)}, in ${days} days`
+        }`,
+        action: 'Pay',
+        href: '/money/accounts',
+        tone: '',
+        pay: { accountId: a.id!, amount: -a.balance },
+      });
+    });
 
   // Prices. Nothing to say when the owner has switched downloads off.
   if (prices.auto) {

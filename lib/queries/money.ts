@@ -6,6 +6,7 @@ import { accounts, budgets, categories, transactions } from '@/lib/db/schema';
 import { accountBalance, summarise, type Flow } from '@/lib/domain/balances';
 import {
   currentMonth,
+  daysInMonth,
   endOfMonth,
   financialYearLabel,
   financialYearOf,
@@ -46,6 +47,8 @@ export type AccountRow = {
   openingBalance: Paise;
   openingDate: IsoDate;
   note: string | null;
+  /** Day of the month a card's bill is due; null for other accounts or when not set. */
+  dueDay: number | null;
   archived: boolean;
   balance: Paise;
   lastDate: IsoDate | null;
@@ -75,6 +78,7 @@ export function listAccounts(onDate: IsoDate = today()): AccountRow[] {
         openingBalance: a.openingBalance,
         openingDate: a.openingDate,
         note: a.note,
+        dueDay: a.dueDay,
         archived: a.archived === 1,
         balance: accountBalance(a, flows, onDate),
         lastDate,
@@ -389,6 +393,26 @@ export function monthlyTotals(from: IsoMonth, to: IsoMonth): MonthTotals[] {
     const m = monthOf(end);
     return { month: m, income: found.get(m)?.income ?? 0, spending: found.get(m)?.spending ?? 0 };
   });
+}
+
+/** Spending on each day of a month, index 0 for the 1st. Transfers are left out. */
+export function dailySpending(month: IsoMonth): Paise[] {
+  const day = sql<string>`substr(${transactions.date}, 9, 2)`;
+  const days = Array<Paise>(daysInMonth(Number(month.slice(0, 4)), Number(month.slice(5, 7)))).fill(0);
+  const rows = db
+    .select({ day, spending: sql<number>`coalesce(sum(${transactions.amount}), 0)` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.type, 'expense'),
+        gte(transactions.date, startOfMonth(month)),
+        lte(transactions.date, endOfMonth(month)),
+      ),
+    )
+    .groupBy(day)
+    .all();
+  for (const r of rows) days[Number(r.day) - 1] = r.spending;
+  return days;
 }
 
 export type SpendShare = { key: string; name: string; value: Paise; color: string | null };

@@ -45,10 +45,10 @@ const dec = (n: number, places = 4) => n.toFixed(places);
 /* ---------- invented sample data ---------- */
 
 const ACCOUNTS = [
-  { name: 'Salary account', type: 'bank', target: rupees(218450), note: null },
-  { name: 'Savings account', type: 'bank', target: rupees(342000), note: null },
-  { name: 'Credit card', type: 'card', target: rupees(-18640), note: 'Due 5th of each month' },
-  { name: 'Cash', type: 'cash', target: rupees(4200), note: null },
+  { name: 'Salary account', type: 'bank', target: rupees(218450), note: null, dueDay: null },
+  { name: 'Savings account', type: 'bank', target: rupees(342000), note: null, dueDay: null },
+  { name: 'Credit card', type: 'card', target: rupees(-18640), note: null, dueDay: 5 },
+  { name: 'Cash', type: 'cash', target: rupees(4200), note: null, dueDay: null },
 ] as const;
 
 /** Monthly income and spending totals the generated history must hit exactly. */
@@ -628,7 +628,7 @@ withTransaction(sqlite, () => {
 ensureDefaults(sqlite);
 
 const insertAccount = sqlite.prepare(
-  `INSERT INTO accounts (name, type, opening_balance, opening_date, note, sort_order) VALUES (?, ?, 0, ?, ?, ?)`,
+  `INSERT INTO accounts (name, type, opening_balance, opening_date, note, due_day, sort_order) VALUES (?, ?, 0, ?, ?, ?, ?)`,
 );
 const insertTxn = sqlite.prepare(
   `INSERT INTO transactions (date, type, amount, account_id, to_account_id, category_id, description, note, investment_txn_id)
@@ -688,7 +688,7 @@ withTransaction(sqlite, () => {
   /* accounts */
   const accountId = new Map<string, number>();
   ACCOUNTS.forEach((a, i) => {
-    const info = insertAccount.run(a.name, a.type, OPENING_DATE, a.note, i);
+    const info = insertAccount.run(a.name, a.type, OPENING_DATE, a.note, a.dueDay, i);
     accountId.set(a.name, Number(info.lastInsertRowid));
   });
   const acct = (name: string) => accountId.get(name)!;

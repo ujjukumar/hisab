@@ -21,7 +21,7 @@ function revalidate() {
 export async function saveAccount(id: number | null, formData: FormData): Promise<ActionResult> {
   const parsed = accountSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error);
-  const a = parsed.data;
+  const a = { ...parsed.data, dueDay: parsed.data.type === 'card' ? parsed.data.dueDay : null };
   const existingId = id === null ? null : idSchema.safeParse(id);
   if (existingId && !existingId.success) return failed('That account no longer exists.');
 

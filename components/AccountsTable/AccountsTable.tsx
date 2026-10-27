@@ -200,6 +200,7 @@ function AccountForm({ row, onDone }: { row?: AccountRow; onDone: () => void }) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
   const [pending, startTransition] = useTransition();
+  const [type, setType] = useState<string>(row?.type ?? 'bank');
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -246,6 +247,7 @@ function AccountForm({ row, onDone }: { row?: AccountRow; onDone: () => void }) 
         label="Type"
         name="type"
         defaultValue={row?.type ?? 'bank'}
+        onChange={(event) => setType(event.target.value)}
         {...describe('type')}
       >
         {ACCOUNT_TYPES.map((t) => (
@@ -278,6 +280,23 @@ function AccountForm({ row, onDone }: { row?: AccountRow; onDone: () => void }) 
       <p className="footnote">
         For a credit card, enter what you owe as a negative amount, for example −18,640.
       </p>
+      {type === 'card' && (
+        <>
+          <TextField
+            label="Bill due day (optional)"
+            name="dueDay"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="5"
+            defaultValue={row?.dueDay ?? ''}
+            {...describe('dueDay')}
+          />
+          {error('dueDay')}
+          <p className="footnote">
+            The day of the month the card bill is due. The Dashboard reminds you a week before.
+          </p>
+        </>
+      )}
       <TextField
         label="Note (optional)"
         name="note"

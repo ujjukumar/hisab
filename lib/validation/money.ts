@@ -109,6 +109,16 @@ export const accountSchema = z.object({
   openingBalance: amount(parsePaise, '', 0),
   openingDate: z.string().refine(isValidDate, 'Pick the date the opening balance is from.'),
   note: optionalText(200),
+  // Cards only; the action clears it for other types. Empty means no reminder.
+  dueDay: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (v) => !v || (/^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31),
+      'Enter a day from 1 to 31, or leave it empty.',
+    )
+    .transform((v) => (v ? Number(v) : null)),
 });
 
 export const CATEGORY_COLORS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8'] as const;

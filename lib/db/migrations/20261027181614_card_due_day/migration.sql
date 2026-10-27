@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD `due_day` integer;

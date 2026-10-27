@@ -26,6 +26,8 @@ export const accounts = sqliteTable('accounts', {
   openingBalance: integer('opening_balance').notNull().default(0),
   openingDate: text('opening_date').notNull(),
   note: text('note'),
+  /** Day of the month a card's bill is due (1–31); cards only. */
+  dueDay: integer('due_day'),
   archived: integer('archived').notNull().default(0),
   sortOrder: integer('sort_order').notNull().default(0),
   ...stamps,
