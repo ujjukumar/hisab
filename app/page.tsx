@@ -1,40 +1,30 @@
 import Link from 'next/link';
-import { spentAndSaved } from '@/app/money/stats';
-import { AttentionStrip } from '@/components/AttentionStrip/AttentionStrip';
+import { NeedsYou } from '@/components/AttentionStrip/AttentionStrip';
 import { BudgetBar } from '@/components/BudgetBar/BudgetBar';
-import { ButtonLink, IconLink } from '@/components/Button/Button';
+import { ButtonLink } from '@/components/Button/Button';
 import { Card, MoreLink } from '@/components/Card/Card';
-import { BarChart } from '@/components/charts/BarChart';
-import { DonutSplit, type Slice } from '@/components/charts/Donut';
+import { ChipLinks } from '@/components/Chips/Chips';
 import { LineChart } from '@/components/charts/LineChart';
-import { LegendInline, LegendKey } from '@/components/charts/Tip';
+import { PaceChart } from '@/components/charts/PaceChart';
 import {
   AddInvestmentButton,
-  AddInvestmentLink,
   InvestmentDrawerProvider,
 } from '@/components/InvestmentDrawer/InvestmentDrawer';
-import { MoversCard } from '@/components/MoversCard/MoversCard';
 import { PageHead } from '@/components/PageHead/PageHead';
 import { Rows, type Row } from '@/components/Rows/Rows';
-import { NetWorthPeriodSelect } from '@/components/StatStrip/NetWorthPeriodSelect';
-import stripStyles from '@/components/StatStrip/StatStrip.module.css';
-import { SwitchCard } from '@/components/SwitchCard/SwitchCard';
 import {
   AddTransactionButton,
   TransactionDrawerProvider,
 } from '@/components/TransactionDrawer/TransactionDrawer';
-import { ASSET_CLASS_LABELS, GROUPS } from '@/lib/domain/assets';
-import { attentionItems } from '@/lib/domain/attention';
+import { WealthBridge } from '@/components/WealthBridge/WealthBridge';
+import { attentionItems, nextDueDate } from '@/lib/domain/attention';
 import {
   addMonths,
   currentMonth,
-  endOfMonth,
-  isValidMonth,
+  daysInMonth,
   monthLabel,
-  SHORT_MONTHS,
-  startOfMonth,
+  parts,
   today,
-  type IsoMonth,
 } from '@/lib/domain/dates';
 import {
   formatDate,
@@ -42,9 +32,7 @@ import {
   formatINR,
   formatINRSigned,
   formatPercent,
-  formatReturn,
   formatShortINR,
-  formatShortINRSigned,
   gainClass,
   MINUS,
 } from '@/lib/domain/format';
@@ -52,33 +40,28 @@ import {
   investmentPeriodRows,
   linePoints,
   netWorthSeries,
-  seriesCadence,
   PERIOD_LABELS,
   periodRows,
-  PERIODS,
   periodStart,
   periodTotals,
+  seriesCadence,
   type Period,
-  type PeriodRow,
 } from '@/lib/domain/performance';
-import { totals, type HoldingRow } from '@/lib/domain/portfolio';
+import { totals } from '@/lib/domain/portfolio';
 import { feedAssets } from '@/lib/domain/priceFeeds';
 import { benchmarkList } from '@/lib/queries/benchmarks';
-import { ACCOUNT_TYPE_LABELS } from '@/lib/validation/money';
 import { monthBudgets } from '@/lib/queries/budgets';
 import { assetOptions, portfolio, portfolioData } from '@/lib/queries/investments';
 import {
   allFlows,
-  asOfDate,
+  dailySpending,
   listAccounts,
   listCategories,
   listTransactions,
-  monthlyTotals,
   moneyStrip,
-  parseTxnFilters,
-  spendingBreakdown,
-  type Params,
   paramReader,
+  parseTxnFilters,
+  type Params,
 } from '@/lib/queries/money';
 import { pendingSmsCount } from '@/lib/queries/sms';
 import {
@@ -87,45 +70,28 @@ import {
   financialYearStartMonth,
   priceUpdate,
 } from '@/lib/queries/settings';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/validation/money';
 import styles from './page.module.css';
 
-const color = (i: number) => `var(--c${(i % 8) + 1})`;
-
-const NET_WORTH_PERIODS = [
-  { value: '1d', label: '1 day' },
-  { value: '1w', label: '1 week' },
-  { value: '1m', label: '1 month' },
-  { value: '3m', label: '3 months' },
-  { value: '6m', label: '6 months' },
-  { value: '1y', label: '1 year' },
-] as const;
-
-const slices = (items: { name: string; value: number; color: string | null }[]): Slice[] =>
-  items.map((item, i) => ({
-    name: item.name,
-    value: item.value,
-    color: item.color ? `var(--${item.color})` : color(i),
-  }));
+/** The page's one period control. A week suits checking in a few times a week. */
+const PAGE_PERIODS = [
+  { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' },
+  { value: '1m', label: '1M' },
+  { value: '3m', label: '3M' },
+  { value: '1y', label: '1Y' },
+] as const satisfies readonly { value: Period; label: string }[];
+const DEFAULT_PERIOD = '1w';
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Params> }) {
-  const now = currentMonth();
   const params = paramReader(await searchParams);
-  const asked = params.one('month');
-  const netWorthPeriod = NET_WORTH_PERIODS.find((p) => p.value === params.one('worth')) ?? NET_WORTH_PERIODS[0];
-  // Future months have nothing to show yet, so they fall back to this month.
-  const month: IsoMonth = isValidMonth(asked) && asked <= now ? asked : now;
-  const isNow = month === now;
-  const asOf = asOfDate(month);
+  const period: Period =
+    PAGE_PERIODS.find((p) => p.value === params.one('period'))?.value ?? DEFAULT_PERIOD;
+  const asOf = today();
+  const month = currentMonth();
   const monthName = monthLabel(month).split(' ')[0]!;
-  const range = { from: startOfMonth(month), to: endOfMonth(month) };
-  const moneyHref = isNow ? '/money' : `/money?from=${range.from}&to=${range.to}`;
-  const budgetsHref = isNow ? '/money/budgets' : `/money/budgets?month=${month}`;
-  const monthHref = (m: IsoMonth) => {
-    const query = new URLSearchParams();
-    if (m !== now) query.set('month', m);
-    if (netWorthPeriod.value !== '1d') query.set('worth', netWorthPeriod.value);
-    return query.size ? `/?${query}` : '/';
-  };
+  const lastMonth = addMonths(month, -1);
+  const yearStart = await financialYearStartMonth();
 
   const s = moneyStrip(month);
   const allAccounts = listAccounts(asOf);
@@ -133,20 +99,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const rows = portfolio(asOf);
   const data = portfolioData();
   const t = totals(rows, asOf);
-  const worthFrom = periodStart(netWorthPeriod.value, asOf, 1)!;
-  const earlierCash = listAccounts(worthFrom)
-    .filter((account) => !account.archived && account.openingDate <= worthFrom)
-    .reduce((sum, account) => sum + account.balance, 0);
-  const earlierInvestments = portfolio(worthFrom).reduce((sum, row) => sum + row.value, 0);
-  const calendarInvestmentGain = netWorthPeriod.value === '1d'
-    ? periodTotals(periodRows(data, worthFrom, asOf), asOf).gain
-    : 0;
-  const latestPriceGain = netWorthPeriod.value === '1d'
-    ? periodTotals(investmentPeriodRows(data, '1d', asOf, 1), asOf).gain
-    : 0;
-  const worthChange = s.bankAndCash + t.value - earlierCash - earlierInvestments
-    + latestPriceGain - calendarInvestmentGain;
   const options = assetOptions();
+  const choices = allAccounts.map(({ id, name, archived }) => ({ id, name, archived }));
 
   /* ---------- get started, for a brand-new app ---------- */
   const steps = [
@@ -174,80 +128,105 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     },
   ];
 
-  /* ---------- income vs spending ---------- */
-  const months = monthlyTotals(addMonths(month, -11), month);
-  const firstActive = months.findIndex((m) => m.income || m.spending);
-  const bars = (firstActive < 0 ? [] : months.slice(firstActive)).map((m) => ({
-    month: SHORT_MONTHS[Number(m.month.slice(5)) - 1]!,
-    year: m.month.slice(0, 4),
-    income: m.income,
-    spending: m.spending,
+  /* ---------- wealth: how net worth moved over the period ---------- */
+  const worthFrom = periodStart(period, asOf, 1)!;
+  const earlierCash = listAccounts(worthFrom)
+    .filter((account) => !account.archived && account.openingDate <= worthFrom)
+    .reduce((sum, account) => sum + account.balance, 0);
+  const earlierInvestments = portfolio(worthFrom).reduce((sum, row) => sum + row.value, 0);
+  const periodRowsNow = investmentPeriodRows(data, period, asOf, yearStart);
+  const market = periodTotals(periodRowsNow, asOf).gain;
+  // For one day, investments move on each holding's last two prices, not on calendar dates.
+  const calendarInvestmentGain =
+    period === '1d' ? periodTotals(periodRows(data, worthFrom, asOf), asOf).gain : 0;
+  const netWorth = s.bankAndCash + t.value;
+  const worthChange =
+    netWorth - earlierCash - earlierInvestments + (period === '1d' ? market : 0) - calendarInvestmentGain;
+
+  // A one-day line has two points, so the chart shows at least a week.
+  const chartFrom = periodStart(period === '1d' ? '1w' : period, asOf, 1);
+  const worthPoints = netWorthSeries(data, allAccounts, allFlows(), asOf, chartFrom).map((point) => ({
+    date: point.date,
+    invested: point.accounts,
+    worth: point.worth,
   }));
-  const cashChart = (n: number) => (
-    <>
-      <LegendInline>
-        <LegendKey color="var(--c1)">Income</LegendKey>
-        <LegendKey color="var(--c3)">Spending</LegendKey>
-      </LegendInline>
-      <BarChart rows={bars.slice(-n)} />
-    </>
-  );
 
-  /* ---------- where the money went ---------- */
-  const spend = spendingBreakdown(month);
-  const spendSplit = (items: Slice[], max?: number) =>
-    items.length ? (
-      <DonutSplit items={items} label={`Spending in ${monthLabel(month)}`} max={max} />
-    ) : (
-      <p className={styles.empty}>
-        No spending in {monthName} yet. Add a transaction to see where your money goes.
-      </p>
-    );
+  const moved = periodRowsNow.filter((r) => !r.row.sold && r.gain !== 0);
+  const moverRow = (r: (typeof moved)[number]): Row => ({
+    key: String(r.row.asset.id),
+    name: <Link href={`/investments/${r.row.asset.id}`}>{r.row.asset.name}</Link>,
+    amount:
+      r.absolute === null
+        ? formatINRSigned(r.gain)
+        : `${formatINRSigned(r.gain)} (${formatPercent(r.absolute * 100)})`,
+    tone: gainClass(r.gain),
+  });
+  const up = moved.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 3);
+  const down = moved.filter((r) => r.gain < 0).sort((a, b) => a.gain - b.gain).slice(0, 3);
 
-  /* ---------- net worth history ---------- */
-  const flows = allFlows();
-  const worthChart = (period: Period) => {
-    const start = periodStart(period, asOf, 1);
-    const points = netWorthSeries(data, allAccounts, flows, asOf, start);
-    return (
-      <LineChart mode="netWorth" points={linePoints(points.map((point) => ({
-        date: point.date, invested: point.accounts, worth: point.worth,
-      })), seriesCadence(start, asOf))} />
-    );
-  };
-
-  /* ---------- allocation ---------- */
-  const held = rows.filter((r) => r.value > 0);
-  const sumBy = (key: (r: HoldingRow) => string, labels: { key: string; title: string }[]) =>
-    labels
-      .map((l, i) => ({
-        name: l.title,
-        value: held.filter((r) => key(r) === l.key).reduce((sum, r) => sum + r.value, 0),
-        color: color(i),
-      }))
-      .filter((item) => item.value > 0);
-  const byClass = sumBy(
-    (r) => r.asset.assetClass,
-    Object.entries(ASSET_CLASS_LABELS).map(([key, title]) => ({ key, title })),
-  );
-  const byGroup = sumBy((r) => r.group, GROUPS);
-  const allocSplit = (items: Slice[]) =>
-    items.length ? (
-      <DonutSplit items={items} label="Portfolio allocation" />
-    ) : (
-      <div className={styles.empty}>
-        <p>No investments yet. Add one to see how your money is spread.</p>
-        <AddInvestmentButton />
-      </div>
-    );
-
-  /* ---------- budgets ---------- */
+  /* ---------- needs you ---------- */
   const b = monthBudgets(month);
+  const lastPrices = await priceUpdate();
+  const attention = steps.some((step) => step.done)
+    ? attentionItems({
+        today: asOf,
+        month,
+        isCurrentMonth: true,
+        budgets: b,
+        accounts: allAccounts,
+        holdings: rows.map((r) => ({ name: r.asset.name, stale: r.stale, sold: r.sold })),
+        prices: {
+          lastOn: lastPrices?.on ?? null,
+          ok: lastPrices?.ok ?? false,
+          // Nothing to fetch without an ISIN or a benchmark, so there is nothing to nudge about.
+          auto:
+            (await autoPrices()) &&
+            (feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0 ||
+              benchmarkList().length > 0),
+        },
+        sms: { pending: pendingSmsCount() },
+      })
+    : [];
+  const payFrom = accounts.find((a) => a.type === 'bank')?.id ?? null;
 
-  /* ---------- recent transactions ---------- */
-  const recent = listTransactions({ ...parseTxnFilters({}), ...range, limit: 6 }).rows;
+  /* ---------- this month so far ---------- */
+  const { year, month: m, day } = parts(asOf);
+  const monthDays = daysInMonth(year, m);
+  const daysLeft = monthDays - day + 1;
+  const left = b.budget - s.spending;
+  const closest = b.rows
+    .filter((r) => r.budget > 0)
+    .sort((x, y) => y.spent / y.budget - x.spent / x.budget)
+    .slice(0, 5);
+
+  /* ---------- accounts and cards ---------- */
+  const hasCards = accounts.some((a) => a.type === 'card');
+  const accountRows: Row[] = [
+    ...accounts.map((a) => ({
+      key: String(a.id),
+      name: a.name,
+      sub:
+        a.type === 'card' && a.dueDay
+          ? `${ACCOUNT_TYPE_LABELS[a.type]}, bill due ${formatDay(nextDueDate(asOf, a.dueDay))}`
+          : ACCOUNT_TYPE_LABELS[a.type],
+      amount: formatINR(a.balance),
+    })),
+    {
+      key: 'total',
+      name: hasCards ? 'Total after card bills' : 'Total',
+      amount: formatINR(s.bankAndCash),
+      total: true,
+    },
+  ];
+
+  /* ---------- latest transactions ---------- */
   const categoryColor = new Map(listCategories().map((c) => [c.id, c.color]));
-  const recentRows: Row[] = recent.map((r) => ({
+  const latest: Row[] = listTransactions({
+    ...parseTxnFilters({}),
+    from: '1900-01-01',
+    to: asOf,
+    limit: 5,
+  }).rows.map((r) => ({
     key: String(r.id),
     name: r.description,
     sub: `${formatDay(r.date)}, ${r.type === 'transfer' ? `to ${r.toAccountName ?? ''}` : (r.accountName ?? '')}`,
@@ -264,168 +243,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     tone: r.type === 'income' ? 'pos' : r.type === 'transfer' ? 'muted' : '',
   }));
 
-  /* ---------- returns over each period, for the two cards below ---------- */
-  const yearStart = await financialYearStartMonth();
-  const byPeriod = PERIODS.map((period) => {
-    const from = period === '1d' ? null : periodStart(period, asOf, yearStart);
-    return {
-      period,
-      from,
-      rows: investmentPeriodRows(data, period, asOf, yearStart),
-    };
-  });
-
-  /* ---------- returns by investment type ---------- */
-  const returnRows = (mode: Period, periodRowsOf: PeriodRow[]): Row[] =>
-    GROUPS.map((g) => {
-      const own = rows.filter((r) => r.group === g.key);
-      if (own.length === 0) {
-        return {
-          key: g.key,
-          name: g.title,
-          amount: (
-            <>
-              <span className="muted">Not added.</span>{' '}
-              <AddInvestmentLink label={`Add ${g.title}`} />
-            </>
-          ),
-        };
-      }
-      const gt = totals(own, asOf);
-      if (mode !== 'all') {
-        const mine = periodRowsOf.filter((r) => r.row.group === g.key);
-        if (mine.length === 0) {
-          return { key: g.key, name: g.title, amount: 'Not held in this period', tone: 'muted' };
-        }
-        const pt = periodTotals(mine, asOf);
-        const pct = pt.absolute === null ? null : formatPercent(pt.absolute * 100);
-        return {
-          key: g.key,
-          name: g.title,
-          amount: pct
-            ? `${formatINRSigned(pt.gain)} (${pct})`
-            : formatINRSigned(pt.gain),
-          tone: gainClass(pt.gain),
-        };
-      }
-      return {
-        key: g.key,
-        name: g.title,
-        amount: `${formatINRSigned(gt.allTime)} (${formatReturn(gt.ret)})`,
-        tone: gainClass(gt.allTime),
-      };
-    });
-
-  /* ---------- gainers and losers ---------- */
-  const movers = Object.fromEntries(
-    byPeriod.map(({ period, rows: periodRowsOf }) => [
-      period,
-      periodRowsOf
-        .filter((r) => !r.row.sold && r.gain !== 0)
-        .map((r) => ({
-          id: r.row.asset.id,
-          name: r.row.asset.name,
-          group: r.row.group,
-          gain: r.gain,
-          percent: (r.absolute ?? 0) * 100,
-        })),
-    ]),
-  );
-  const moverPeriods = byPeriod.map(({ period, from }) => ({
-    value: period,
-    label: PERIOD_LABELS[period],
-    sub: period === '1d'
-      ? 'Latest daily prices per holding, after money added or taken out'
-      : from
-        ? `Gain from ${formatDate(from)} to ${formatDate(asOf)}, after money added or taken out`
-        : 'Gain since each holding was bought',
-  }));
-
-  /* ---------- needs attention ---------- */
-  const lastPrices = await priceUpdate();
-  const attention = steps.some((step) => step.done)
-    ? attentionItems({
-        today: today(),
-        month,
-        isCurrentMonth: isNow,
-        budgets: b,
-        accounts: allAccounts,
-        holdings: rows.map((r) => ({ name: r.asset.name, stale: r.stale, sold: r.sold })),
-        prices: {
-          lastOn: lastPrices?.on ?? null,
-          ok: lastPrices?.ok ?? false,
-          // Nothing to fetch without an ISIN or a benchmark, so there is nothing to nudge about.
-          auto:
-            (await autoPrices()) &&
-            (feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0 ||
-              benchmarkList().length > 0),
-        },
-        sms: { pending: pendingSmsCount() },
-      })
-    : [];
-
   return (
-    <TransactionDrawerProvider
-      accounts={allAccounts.map(({ id, name, archived }) => ({ id, name, archived }))}
-      categories={listCategories()}
-    >
+    <TransactionDrawerProvider accounts={choices} categories={listCategories()}>
       <InvestmentDrawerProvider
         options={options}
-        accounts={allAccounts.map(({ id, name, archived }) => ({ id, name, archived }))}
+        accounts={choices}
         compounding={await defaultCompounding()}
       >
         <PageHead
-          title={monthLabel(month)}
+          title="Dashboard"
+          sub={formatDate(asOf)}
           actions={
             <>
-              <nav className={styles.months} aria-label="Month">
-                <IconLink
-                  icon="chevLeft"
-                  label={`Previous month, ${monthLabel(addMonths(month, -1))}`}
-                  href={monthHref(addMonths(month, -1))}
-                />
-                {!isNow && (
-                  <>
-                    <IconLink
-                      icon="chevRight"
-                      label={`Next month, ${monthLabel(addMonths(month, 1))}`}
-                      href={monthHref(addMonths(month, 1))}
-                    />
-                    <Link className="linkish" href={monthHref(now)}>
-                      This month
-                    </Link>
-                  </>
-                )}
-              </nav>
+              <ChipLinks
+                label="Period"
+                items={PAGE_PERIODS.map((p) => ({
+                  href: p.value === DEFAULT_PERIOD ? '/' : `/?period=${p.value}`,
+                  label: p.label,
+                  current: p.value === period,
+                }))}
+              />
               <AddTransactionButton />
             </>
           }
-          stats={[
-            {
-              label: isNow ? 'Net worth' : `Net worth on ${formatDay(asOf)}`,
-              value: formatShortINR(s.bankAndCash + t.value),
-              aside: (
-                <span className={stripStyles.periodChange}>
-                  <span>{formatINRSigned(worthChange)}</span>
-                  <span className={stripStyles.periodGroup}>
-                    over <NetWorthPeriodSelect period={netWorthPeriod.value} options={NET_WORTH_PERIODS} />
-                  </span>
-                </span>
-              ),
-              asideTone: gainClass(worthChange),
-            },
-            {
-              label: 'Portfolio value',
-              value: formatShortINR(t.value),
-              aside: `${formatShortINRSigned(t.allTime)} (${formatReturn(t.ret)}) all time`,
-              asideTone: gainClass(t.allTime),
-            },
-            ...spentAndSaved(s),
-          ]}
         />
 
         <div className="wrap page-body">
-          <AttentionStrip items={attention} />
           <div className="grid">
             {steps.some((step) => !step.done) && (
               <Card
@@ -453,161 +296,138 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </p>
               </Card>
             )}
-            <SwitchCard
-              id="worth-range"
-              label="Time range"
-              title="Net worth"
-              sub="Accounts and investments. YTD starts on 1 January."
-              span={8}
-              options={(
-                [
-                  ['all', 'All time'],
-                  ['ytd', 'YTD'],
-                  ['1m', '1M'],
-                  ['3m', '3M'],
-                  ['6m', '6M'],
-                  ['1y', '1Y'],
-                  ['3y', '3Y'],
-                ] as const
-              ).map(([value, label]) => ({ value, label, content: worthChart(value) }))}
-              footer={<MoreLink href="/money/accounts">See accounts</MoreLink>}
-            />
 
-            <SwitchCard
-              id="alloc-by"
-              label="Group allocation by"
-              title="Allocation"
-              span={4}
-              options={[
-                { value: 'asset', label: 'By asset', content: allocSplit(byClass) },
-                { value: 'type', label: 'By investment type', content: allocSplit(byGroup) },
-              ]}
-              footer={<MoreLink href="/investments">See all holdings</MoreLink>}
-            />
-
-            <MoversCard
-              movers={movers}
-              periods={moverPeriods}
-              groups={GROUPS.filter((g) =>
-                Object.values(movers).some((list) => list.some((m) => m.group === g.key)),
-              )}
-            />
-
-            <SwitchCard
-              id="returns-duration"
-              variant="select"
-              label="Duration"
-              title="Returns by investment type"
-              span={5}
-              options={byPeriod.map(({ period, rows: periodRowsOf }) => ({
-                value: period,
-                label: PERIOD_LABELS[period],
-                content: <Rows rows={returnRows(period, periodRowsOf)} />,
-              }))}
-              footer={<MoreLink href="/investments">See all holdings</MoreLink>}
-            />
-
-            <SwitchCard
-              id="cash-range"
-              label="Time range"
-              title="Income vs spending"
-              sub="What came in and went out each month"
-              span={8}
-              options={[
-                { value: '6', label: '6M', content: cashChart(6) },
-                { value: '12', label: '1Y', content: cashChart(12) },
-              ]}
-              footer={<MoreLink href={moneyHref}>See all transactions</MoreLink>}
-            />
-
-            <SwitchCard
-              id="spend-by"
-              label="Group spending by"
-              title="Where your money went"
-              sub={`${formatINR(s.spending)} spent ${isNow ? 'so far this month' : `in ${monthName}`}`}
-              span={4}
-              options={[
-                {
-                  value: 'cat',
-                  label: 'By category',
-                  content: spendSplit(slices(spend.byCategory), 5),
-                },
-                {
-                  value: 'acct',
-                  label: 'By account',
-                  content: spendSplit(slices(spend.byAccount), 5),
-                },
-              ]}
-              footer={<MoreLink href={budgetsHref}>See budgets</MoreLink>}
-            />
-
-            <Card
-              title="Budgets"
-              sub={
-                !b.budget ? (
-                  `No budgets set for ${monthName}`
-                ) : b.over ? (
-                  <>
-                    <span className="neg">{formatINR(-b.left)} over</span> your{' '}
-                    {formatINR(b.budget)} budget
-                  </>
-                ) : (
-                  `${formatINR(b.left)} left of ${formatINR(b.budget)} ${isNow ? 'this month' : `in ${monthName}`}`
-                )
-              }
-              span={4}
-              className="half"
-              footer={<MoreLink href={budgetsHref}>Manage budgets</MoreLink>}
-            >
-              {b.rows.length ? (
-                <div className={styles.budgets}>
-                  {b.rows.map((r) => (
-                    <BudgetBar key={r.id} name={r.name} spent={r.spent} budget={r.budget} />
-                  ))}
+            <Card span={8} title="Net worth" footer={<MoreLink href="/investments">See investments</MoreLink>}>
+              <div className={styles.worth}>
+                <strong className={styles.worthValue}>{formatShortINR(netWorth)}</strong>
+                <span className={`${styles.worthChange} ${gainClass(worthChange)}`}>
+                  {formatINRSigned(worthChange)}
+                </span>
+                <span className={styles.worthOver}>over {PERIOD_LABELS[period]}</span>
+              </div>
+              <WealthBridge
+                start={netWorth - worthChange}
+                market={market}
+                end={netWorth}
+                startLabel={formatDay(worthFrom)}
+              />
+              <LineChart
+                mode="netWorth"
+                compact
+                points={linePoints(worthPoints, seriesCadence(chartFrom, asOf))}
+              />
+              {rows.length === 0 ? (
+                <div className={styles.empty}>
+                  <p>Add an investment to see what markets did to your money.</p>
+                  <AddInvestmentButton />
+                </div>
+              ) : up.length + down.length > 0 ? (
+                <div className={styles.moved}>
+                  <section aria-labelledby="moved-up">
+                    <h3 id="moved-up">Rose most</h3>
+                    {up.length ? <Rows rows={up.map(moverRow)} /> : <p className={styles.none}>Nothing rose.</p>}
+                  </section>
+                  <section aria-labelledby="moved-down">
+                    <h3 id="moved-down">Fell most</h3>
+                    {down.length ? <Rows rows={down.map(moverRow)} /> : <p className={styles.none}>Nothing fell.</p>}
+                  </section>
                 </div>
               ) : (
-                <p className={styles.empty}>Set a monthly budget to see how spending compares.</p>
+                <p className={styles.none}>No holding moved over {PERIOD_LABELS[period]}.</p>
               )}
             </Card>
 
+            <NeedsYou items={attention} payFrom={payFrom} />
+
             <Card
-              title="Recent transactions"
-              span={4}
-              className="half"
-              footer={<MoreLink href={moneyHref}>See all transactions</MoreLink>}
+              span={12}
+              title={`${monthName} so far`}
+              footer={<MoreLink href="/money/budgets">Manage budgets</MoreLink>}
             >
-              {recentRows.length ? (
-                <Rows rows={recentRows} />
+              <dl className={styles.figures}>
+                <div>
+                  <dt>Spent</dt>
+                  <dd>{formatINR(s.spending)}</dd>
+                  <dd className={styles.figureSub}>
+                    {b.budget ? `of ${formatINR(b.budget)} budget` : 'No budget set'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{left >= 0 ? 'Left to spend' : 'Over budget'}</dt>
+                  <dd className={left < 0 ? 'neg' : undefined}>
+                    {b.budget ? formatINR(Math.abs(left)) : 'No budget set'}
+                  </dd>
+                  <dd className={styles.figureSub}>
+                    {b.budget && left > 0
+                      ? `About ${formatINR(Math.floor(left / daysLeft))} a day for ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`
+                      : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left in ${monthName}`}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Earned</dt>
+                  <dd>{formatINR(s.income)}</dd>
+                </div>
+                <div>
+                  <dt>Saved</dt>
+                  <dd className={gainClass(s.saved)}>{formatINR(s.saved)}</dd>
+                  <dd className={styles.figureSub}>
+                    {s.savingsRate === null ? 'No income yet' : `${Math.round(s.savingsRate)}% of income`}
+                  </dd>
+                </div>
+              </dl>
+              <div className={styles.month}>
+                <section aria-labelledby="pace-title">
+                  <h3 id="pace-title">Spending pace</h3>
+                  <PaceChart
+                    thisMonth={dailySpending(month).slice(0, day)}
+                    lastMonth={dailySpending(lastMonth)}
+                    daysInMonth={monthDays}
+                    budget={b.budget}
+                    thisLabel={monthName}
+                    lastLabel={monthLabel(lastMonth).split(' ')[0]!}
+                  />
+                </section>
+                <section aria-labelledby="closest-title">
+                  <h3 id="closest-title">Closest to budget</h3>
+                  {closest.length ? (
+                    <div className={styles.budgets}>
+                      {closest.map((r) => (
+                        <BudgetBar key={r.id} name={r.name} spent={r.spent} budget={r.budget} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={styles.empty}>
+                      <p>Set a monthly budget to see how spending compares.</p>
+                      <ButtonLink href="/money/budgets" variant="secondary">
+                        Set budgets
+                      </ButtonLink>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </Card>
+
+            <Card
+              span={5}
+              title="Accounts and cards"
+              footer={<MoreLink href="/money/accounts">Manage accounts</MoreLink>}
+            >
+              <Rows rows={accountRows} />
+            </Card>
+
+            <Card
+              span={7}
+              title="Latest transactions"
+              footer={<MoreLink href="/money">See all transactions</MoreLink>}
+            >
+              {latest.length ? (
+                <Rows rows={latest} />
               ) : (
                 <div className={styles.empty}>
-                  <p>No transactions in {monthName} yet.</p>
+                  <p>No transactions yet.</p>
                   <AddTransactionButton />
                 </div>
               )}
-            </Card>
-
-            <Card
-              title="Accounts"
-              sub={isNow ? 'Bank, card and cash balances' : `Balances on ${formatDate(asOf)}`}
-              span={4}
-              footer={<MoreLink href="/money/accounts">Manage accounts</MoreLink>}
-            >
-              <Rows
-                rows={[
-                  ...accounts.map((a) => ({
-                    key: String(a.id),
-                    name: a.name,
-                    sub: [ACCOUNT_TYPE_LABELS[a.type], a.note].filter(Boolean).join(', '),
-                    amount: formatINR(a.balance),
-                  })),
-                  {
-                    key: 'total',
-                    name: 'In bank and cash',
-                    amount: formatINR(s.bankAndCash),
-                    total: true,
-                  },
-                ]}
-              />
             </Card>
           </div>
         </div>

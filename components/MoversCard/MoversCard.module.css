@@ -1,7 +1,0 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
-  margin: 20px 0 4px;
-}

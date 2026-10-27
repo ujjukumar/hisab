@@ -105,6 +105,45 @@ export function AddTransactionButton() {
   );
 }
 
+/**
+ * Opens the drawer with a card bill payment filled in: a transfer of what is owed from
+ * `fromId` (the first bank account) to the card. The owner checks it and saves.
+ */
+export function PayCardButton({
+  cardId,
+  cardName,
+  fromId,
+  amount,
+}: {
+  cardId: number;
+  cardName: string;
+  fromId: number | null;
+  amount: number;
+}) {
+  const open = useContext(DrawerContext);
+  const row: TxnRow = {
+    id: 0,
+    date: today(),
+    type: 'transfer',
+    amount,
+    description: `${cardName} bill`,
+    note: null,
+    categoryId: null,
+    categoryName: null,
+    categoryColor: null,
+    accountId: fromId,
+    accountName: null,
+    toAccountId: cardId,
+    toAccountName: cardName,
+    investmentTxnId: null,
+  };
+  return (
+    <Button variant="secondary" aria-label={`Pay ${cardName} bill`} onClick={() => open('duplicate', row)}>
+      Pay
+    </Button>
+  );
+}
+
 /** Pick active choices, plus the one already on the row even if it has since been archived. */
 function choices<T extends { id: number; archived: boolean }>(
   items: T[],

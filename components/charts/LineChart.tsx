@@ -22,10 +22,41 @@ export type LinePoint = {
 };
 
 const H = 270;
+
+/**
+ * Axis labels for rupee values. A narrow net worth range can round every label to the same
+ * '27.17L', so add decimals until neighbouring labels differ.
+ */
+function axisLabels(values: number[]): string[] {
+  const plain = values.map(axisLabel);
+  if (new Set(plain).size === plain.length) return plain;
+  for (const digits of [3, 4]) {
+    const finer = values.map((v) =>
+      Math.abs(v) >= 1e7
+        ? `${(v / 1e7).toFixed(digits)} Cr`
+        : Math.abs(v) >= 1e5
+          ? `${(v / 1e5).toFixed(digits)}L`
+          : axisLabel(v),
+    );
+    if (new Set(finer).size === finer.length) return finer;
+  }
+  return plain;
+}
 const M = { l: 50, r: 10, t: 12, b: 28 };
 
-/** Invested against current worth over time, with a crosshair on hover. */
-export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[]; mode?: 'portfolio' | 'netWorth' }) {
+/**
+ * Invested against current worth over time, with a crosshair on hover.
+ * `compact` drops the net worth range header and view switch, for pages that summarise the range themselves.
+ */
+export function LineChart({
+  points,
+  mode = 'portfolio',
+  compact = false,
+}: {
+  points: LinePoint[];
+  mode?: 'portfolio' | 'netWorth';
+  compact?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const width = useWidth(box);
@@ -55,6 +86,11 @@ export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[];
   const sc = mode === 'netWorth'
     ? niceValueRange(Math.min(...values) / 100, Math.max(...values) / 100, 5)
     : { bottom: 0, ...niceScale(peak, 5) };
+  const gridValues = Array.from(
+    { length: Math.round((sc.top - sc.bottom) / sc.step) + 1 },
+    (_, k) => sc.bottom + sc.step * k,
+  );
+  const gridLabels = axisLabels(gridValues);
   const start = points.every((point) => point.date) ? points[0]?.date : undefined;
   const span = start && points[n - 1]?.date ? daysBetween(start, points[n - 1]!.date!) : 0;
   const x = (i: number) => M.l + (n === 1 ? iw / 2 : span && start
@@ -111,7 +147,7 @@ export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[];
 
   return (
     <div className={styles.chart} ref={box}>
-      {mode === 'netWorth' && (
+      {mode === 'netWorth' && !compact && (
         <div className={styles.rangeTools}>
           <div className={styles.rangeChange}>
             <span>Change in range</span>
@@ -125,7 +161,7 @@ export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[];
           />
         </div>
       )}
-      {mode === 'netWorth' && (
+      {mode === 'netWorth' && !compact && (
         <LegendInline>
           {components ? (
             <>
@@ -146,14 +182,13 @@ export function LineChart({ points, mode = 'portfolio' }: { points: LinePoint[];
           : 'Line chart of amount invested and current worth over time'}
         onPointerLeave={() => setAt(null)}
       >
-        {Array.from({ length: Math.round((sc.top - sc.bottom) / sc.step) + 1 }, (_, k) => {
-          const v = sc.bottom + sc.step * k;
+        {gridValues.map((v, k) => {
           const yy = y(v * 100);
           return (
             <g key={`h${k}`}>
               <line x1={M.l} x2={width - M.r} y1={yy} y2={yy} stroke="var(--grid)" />
               <text x={M.l - 8} y={yy + 4} textAnchor="end">
-                {axisLabel(v)}
+                {gridLabels[k]}
               </text>
             </g>
           );

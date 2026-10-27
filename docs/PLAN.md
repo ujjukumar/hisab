@@ -185,6 +185,8 @@ Test vector: buy 100 @ 50 fee 20, buy 50 @ 62 fee 10, sell 60 @ 70 fee 15 →
   statements (yesterday when it has fewer than two); longer periods use calendar
   dates. The Dashboard 1-day net-worth change uses cash changes since yesterday plus
   the latest investment price gain, excluding purchases already funded from cash.
+  The Dashboard bridge splits any period's net-worth change into market moves (the
+  period's investment gain, as in Change in period) and money in and out (the rest).
 
 ### XIRR (`xirr.ts`)
 
@@ -204,8 +206,7 @@ Ranges up to 45 days plot each price, statement and transaction date; up to a
 year, weekly; longer, month-ends. Points include the range start and end and are
 spaced by calendar time. Invested = cost on that date; worth = value using the
 latest known price or valuation. A single holding's chart also plots its
-transaction dates. YTD follows the financial year, except the Dashboard net-worth
-chip, which uses the calendar year.
+transaction dates. YTD follows the financial year.
 
 The Investments Returns chart (`returns.ts`) plots gain ÷ (start value + money in)
 for the portfolio and each investment type, with a gap where that is undefined; its
@@ -228,7 +229,7 @@ show the top three each way for a period, group and value-or-percent sort.
 
 | Route | Purpose |
 |---|---|
-| `/` | Needs-attention strip (stale or missing prices, over-budget, overdrawn, SMS waiting), portfolio, net worth, cash flow, budgets, recent activity, accounts |
+| `/` | One page period (1D to 1Y, default 1W); net worth with the bridge (market moves against money in and out), its line and the holdings that rose or fell most; Needs you (card bills due within 7 days with Pay, SMS waiting, prices, over-budget, overdrawn); the month so far (spent, left per day, earned, saved, spending pace against last month and the budget, budgets closest to their limit); accounts and cards with bill due dates; latest transactions |
 | `/money` | Transactions with filters, totals and CSV |
 | `/money/budgets` | Monthly budgets, inline editing, carry-forward, copy last month |
 | `/money/accounts`, `/money/categories` | Create, edit and archive |
@@ -360,6 +361,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Investments | 12–13 Oct 2026 | Intraday trades, Returns chart with AMFI benchmarks and suggestions, net-worth chart, wider layout. |
 | Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, leaves today to the daily check, and no longer stops on one bad date. |
 | Move and UI polish | 27 Oct 2026 | Live install and development moved to the Pi. Hallmark audit polish: sentence-case labels and tabs, no dashes or middle-dot separators, field focus outline, import and card spacing, single table heads, 4px spacing, no-ISIN no longer a failed price update, blank future months and empty % p.a. Floor 35 to 1 (a checker false positive), Reflex 139 to 0. |
+| Dashboard redesign | 28 Oct 2026 | Rebuilt around three jobs: how wealth moved, what needs action, whether the month is on track. Card accounts gain a bill due day; Allocation, returns by type, income vs spending and the spending donut moved off the Dashboard to Investments and Reports; the month picker went. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.

@@ -29,7 +29,7 @@ export type AttentionItem = {
   /** 'neg' only where the loss colour is allowed: spending over its budget. */
   tone: 'neg' | '';
   /** A card bill: the card and the amount owed, so the page can offer to pay it. */
-  pay?: { accountId: number; amount: Paise };
+  pay?: { accountId: number; name: string; amount: Paise };
 };
 
 export type AttentionInput = {
@@ -96,7 +96,7 @@ export function attentionItems(input: AttentionInput): AttentionItem[] {
         action: 'Pay',
         href: '/money/accounts',
         tone: '',
-        pay: { accountId: a.id!, amount: -a.balance },
+        pay: { accountId: a.id!, name: a.name, amount: -a.balance },
       });
     });
 

@@ -1,15 +1,102 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-.months {
+/* Hallmark · checked: 2026-10-27 · genre: editorial (inferred) · scope: app · shape: app screen
+ * redesign: full · screen: Net worth band with the bridge, Needs you rail, the month so far with the pace chart, accounts and cards, latest transactions
+ * signature: the net worth bridge, start to markets to money in and out to today
+ * built: the project · redesign: full · v2.0.0 */
+/* Hallmark · dropped {budgetsHref}, {moneyHref}, {monthHref(now)}, /?month=2026-09, /investments/6, /investments/1, /investments/11, /investments/13, /investments/8, /investments/2 · the owner dropped the month picker, and the old movers card's links change with the page period now */
+/* Hallmark · dropped unnamed select 1, #movers-period, #movers-group, #movers-sort, #returns-duration, alloc-by, cash-range, returns-duration, spend-by, worth-range · one page period replaces each card's own period and view controls, as the owner agreed */
+/* Hallmark · dropped october 2026, allocation, top gainers & losers, gaining most, losing most, returns by investment type, income vs spending, where your money went, budgets, recent transactions, accounts · Allocation and returns live on Investments, income vs spending and categories on Reports; the rest became Rose most, Fell most, Closest to budget, Latest transactions and Accounts and cards */
+
+.worth {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 8px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 12px;
+}
+
+.worthValue {
+  font: 600 32px/1.1 var(--sans);
+  color: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.worthChange {
+  font: 600 18px/1.2 var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.worthOver {
+  color: var(--text-2);
+}
+
+.moved {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  margin-top: 16px;
+}
+
+.moved h3,
+.month h3 {
+  margin: 0;
+  font: 600 13px/1.3 var(--sans);
+  color: var(--heading);
+}
+
+.none {
+  margin: 8px 0 0;
+  color: var(--text-2);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 32px;
+  margin: 16px 0 0;
+}
+
+.figures div {
+  min-width: 0;
+}
+
+.figures dt {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.figures dd {
+  margin: 4px 0 0;
+  font: 600 22px/1.2 var(--sans);
+  color: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.figures dd:global(.pos) {
+  color: var(--gain);
+}
+
+.figures dd:global(.neg) {
+  color: var(--loss);
+}
+
+.figures .figureSub {
+  font: 400 13px/1.4 var(--sans);
+  color: var(--text-2);
+}
+
+.month {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 32px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
 }
 
 .budgets {
   display: grid;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .empty {
@@ -85,5 +172,22 @@
   .steps li > :last-child {
     grid-column: 2;
     justify-self: start;
+  }
+}
+
+@media (max-width: 1060px) {
+  .figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .month {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .moved {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
   }
 }
