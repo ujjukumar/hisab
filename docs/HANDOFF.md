@@ -1,35 +1,44 @@
 # Hisaab handoff
 
-Updated: 22 Oct 2026
+Updated: 27 Oct 2026
 
 ## Current state
 
-`master` holds all work, including the investment chart changes (smooth lines,
-rupee value, range gain split into booked/dividends/on paper, automatic benchmark
-history from mfapi.in, and dragging a range to open it on the Performance tab).
-From 22 Oct 2026 the owner works directly on the VM; the Windows checkout is no
-longer the main copy.
+`master` holds all work. From 27 Oct 2026 the owner develops on the Raspberry Pi and
+it is the live install; the owner's data was restored there from a backup through
+Settings → Restore from backup. The UI polish from the 27 Oct Hallmark audit is
+planned in [UI-POLISH-PLAN.md](UI-POLISH-PLAN.md).
 
-## VM deployment
+## Pi deployment
 
-- `ujju@myvm` (Ubuntu), reachable with the owner's SSH key. The app lives in
-  `/home/ujju/hisaab` as a clean Git checkout of `master`; `.env` and `data/` are
-  kept outside version control there. Never copy local `data/`, `*.db*` or `.env*`.
-- Runs as `hisaab.service` on `127.0.0.1:8787` with Node 24 from
-  `/home/ujju/.local/opt/node24`; system Node is untouched. Tailscale Serve proxies
-  the tailnet-only URL `https://myvm.tail276cc3.ts.net` to that port. Do not change
-  Tailscale Serve, `tailscaled` or `ac-daemon.service`.
+- `ujju@pi` (Debian 13, arm64). The app lives in `/home/ujju/repos/hisab`, a Git
+  checkout of `master`; `.env` and `data/` are kept outside version control there.
+  Never copy local `data/`, `*.db*` or `.env*`.
+- Runs as `hisaab.service` (`/etc/systemd/system/hisaab.service`) on `127.0.0.1:8080`
+  with Node 26 from nvm (`/home/ujju/.nvm/versions/node/v26.12.1`). Tailscale Serve
+  proxies the tailnet-only URL `https://pi.tail276cc3.ts.net` to that port. Do not
+  change Tailscale Serve or `tailscaled`.
+- `.env` sets `SMS_PAIRING_URL=https://pi.tail276cc3.ts.net`. `SMS_ENCRYPTION_KEY` is
+  empty, so SMS imports are off until the owner sets it (reuse the VM's key if pending
+  SMS from the backup must stay readable), then pair the phone again.
 - To deploy: `git pull` in the app folder, `npm ci`, `npm run build` with
-  `DATABASE_PATH=/home/ujju/hisaab/data/finance.db` (the build backs up and
-  migrates), then `sudo systemctl restart hisaab.service` and check the URL.
-- A fresh build on the VM failed to resolve the Google font files under Turbopack;
-  it succeeded once `.next/cache` from a previous build was present. Keep
-  `.next/cache` between builds (`git pull` does not touch it).
-- The pre-checkout folder and a copy of `data/` from 22 Oct are in
-  `~/hisaab-old-20261022T061013Z` and `~/hisaab-data-backup-20261022T061013Z`;
-  remove them once the owner is happy.
-- `HISAAB_PRICE_DEBUG=1` in the service environment logs price lookups to the journal.
+  `DATABASE_PATH=/home/ujju/repos/hisab/data/finance.db` (the build backs up and
+  migrates), then `sudo systemctl restart hisaab.service` and check the URL. The build
+  replaces the `.next` the service is serving, so restart straight after it.
+- Development: `npx next dev -H 127.0.0.1 -p 3123` with `DATABASE_PATH` on a temporary
+  copy of the seed. It writes to `.next/dev` and leaves the live build alone.
+- Keep `.next/cache` between builds; a fresh build on the VM once failed to resolve
+  the Google font files under Turbopack until a previous cache was present.
+- Chromium (`/usr/bin/chromium`) is installed for the Hallmark render checks.
 - Do not run `npm audit fix --force` without approval.
+
+## Earlier VM deployment
+
+Until 27 Oct 2026 the live install was `ujju@myvm` in `/home/ujju/hisaab`
+(`hisaab.service` on `127.0.0.1:8787`, `https://myvm.tail276cc3.ts.net`), with
+copies from 22 Oct in `~/hisaab-old-20261022T061013Z` and
+`~/hisaab-data-backup-20261022T061013Z`. Retire it once the owner is happy with the Pi,
+so two copies of the data don't drift apart.
 
 ## Privacy
 

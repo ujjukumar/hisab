@@ -15,7 +15,7 @@ backlog. Section numbers stay stable because code and tests refer to them.
 ## 1. Project summary
 
 A personal finance web app for one owner in India, storing everything in one SQLite
-file. It listens only on `127.0.0.1`; when it runs on the owner's VM, a tailnet-only
+file. It listens only on `127.0.0.1`; on the owner's Raspberry Pi, a tailnet-only
 proxy is the sole way in. Currency is ₹ only, with Indian grouping (1,08,289) and
 Lakh/Crore in headline figures.
 
@@ -322,7 +322,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Topic | Decision | Reason |
 |---|---|---|
 | Language | TypeScript (Next.js) | One language across the stack |
-| Hosting | `127.0.0.1` only, single user, no login; tailnet-only proxy on the VM | Personal data stays private |
+| Hosting | `127.0.0.1` only, single user, no login; tailnet-only proxy on the Pi | Personal data stays private |
 | SQLite driver | Node's `node:sqlite` with Drizzle's driver | No native build on Windows; upgrade carefully |
 | Styling | Mockup CSS, CSS Modules, no Tailwind | The design already exists as CSS |
 | Charts | Custom SVG | Matches the design exactly |
