@@ -359,6 +359,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | SMS imports | 7–11 Oct 2026 | Encrypted receiver, QR pairing, review workspace, learned rules, transfers, parser v3, History. |
 | Investments | 12–13 Oct 2026 | Intraday trades, Returns chart with AMFI benchmarks and suggestions, net-worth chart, wider layout. |
 | Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, leaves today to the daily check, and no longer stops on one bad date. |
+| Move and UI polish | 27 Oct 2026 | Live install and development moved to the Pi. Hallmark audit polish: sentence-case labels and tabs, no dashes or middle-dot separators, field focus outline, import and card spacing, single table heads, 4px spacing, no-ISIN no longer a failed price update, blank future months and empty % p.a. Floor 35 to 1 (a checker false positive), Reflex 139 to 0. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.

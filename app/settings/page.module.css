@@ -1,3 +1,4 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
 .about {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);

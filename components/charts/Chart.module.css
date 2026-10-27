@@ -1,6 +1,5 @@
 /* Hallmark · polish · built: the project · redesign: polish · scope: app */
 /* Hallmark · waive 24b · gaps and padding on .rangeTools, .tip, .tipRow, .legendList li, .legendText and .legendInline stay as measured · chart furniture pairs one step off the 4px scale, so every chart's gap rhythm stays even across the app */
-/* Hallmark · waive 38iii · strong inside .headline · the .headline > strong line is the whole heading itself, one word-figure in it at one size, not a lone accented word */
 
 .chart {
   position: relative;
@@ -33,18 +32,18 @@
 .rangeChange strong:global(.pos) { color: var(--gain); }
 .rangeChange strong:global(.neg) { color: var(--loss); }
 
-.headline {
+.summary {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.headline > strong {
+.summary > strong {
   font: 600 24px/1.2 var(--mono);
   color: var(--heading);
 }
 
-.headline .rangeChange { flex-wrap: wrap; }
+.summary .rangeChange { flex-wrap: wrap; }
 
 .rangeSplit {
   display: flex;

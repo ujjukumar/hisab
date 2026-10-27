@@ -217,7 +217,7 @@ export function ReturnChart({ dates, lines, value, selectPath }: {
   return (
     <>
       {value && <div className={styles.rangeTools}>
-        <div className={styles.headline}>
+        <div className={styles.summary}>
           <strong>{formatShortINR(value.worth[last]!)}</strong>
           <span className={styles.rangeChange}>
             <span>{value.rangeLabel}</span>

@@ -1,4 +1,10 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · checked: 2026-10-27 · genre: editorial (inferred) · scope: app
+ * floor: 1 FAIL left, 34, a checker false positive: it reads app/layout.tsx but not this file, which clips overflow-x on html and body; the render tier finds no horizontal scroll
+ * fixed: 19, 33, 39a, 63, 67, 24b, 38iii, F3, plus the import label overlap, card gaps and repeated table heads · reflex: 0
+ * built: the project · redesign: polish · v2.0.0 */
+/* Hallmark · dropped {phones.length > 0 ? <PairPhoneButton variant="secondary" /> : undefined}, /investments/performance?asof=2026-10-27&period=1d&sort=annual&dir=desc, needs attention · the SMS header button is now the one way to pair a phone, % p.a. only shows once a holding has a year of returns, and the sample data's missing ISINs no longer raise Needs attention */
+/* Hallmark · dropped 0 in Reports months still to come · a month that hasn't happened yet has nothing to show, so its cells stay blank */
+/* Hallmark · reworded "₹15,17,403 · 69.9%" to "₹15,17,403 (69.9%)" and the other dot-joined figures · 63 names the middle dot */
 /* Base and layout rules, ported from docs/mockup.html.
    Component-specific styles live in each component's CSS module. */
 

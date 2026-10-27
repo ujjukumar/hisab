@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · dismissed 70 · Amount received is the field label for a dividend or interest amount the owner types in, not a success message, and the form posts to a server action */
+
 /* A short line under a field, e.g. the last price in the Update prices drawer. */
 .hint {
   margin: -16px 0 0;

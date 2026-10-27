@@ -1,3 +1,6 @@
+/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · dismissed 3 · the 3px accent edge on .reason marks why this SMS needs review, a status callout inside the message pane rather than a card */
+
 .message {
   display: grid;
   gap: 20px;
