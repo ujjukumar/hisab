@@ -14,23 +14,25 @@ export function NetWorthPeriodSelect({
   const params = useSearchParams();
 
   return (
-    <select
-      className={styles.periodSelect}
-      aria-label="Net worth change period"
-      value={period}
-      onChange={(event) => {
-        const next = new URLSearchParams(params.toString());
-        if (event.target.value === '1d') next.delete('worth');
-        else next.set('worth', event.target.value);
-        const query = next.toString();
-        router.replace(query ? `/?${query}` : '/', { scroll: false });
-      }}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <span className={styles.periodWrap}>
+      <select
+        className={styles.periodSelect}
+        aria-label="Net worth change period"
+        value={period}
+        onChange={(event) => {
+          const next = new URLSearchParams(params.toString());
+          if (event.target.value === '1d') next.delete('worth');
+          else next.set('worth', event.target.value);
+          const query = next.toString();
+          router.replace(query ? `/?${query}` : '/', { scroll: false });
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }

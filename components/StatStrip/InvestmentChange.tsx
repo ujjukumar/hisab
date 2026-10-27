@@ -24,24 +24,26 @@ export function InvestmentChange({
           {selected.absolute === null ? null : formatPercent(selected.absolute * 100)}
         </span>
       </span>
-      <select
-        className={styles.periodSelect}
-        aria-label="Investment change period"
-        value={selected.period}
-        onChange={(event) => {
-          const next = new URLSearchParams(params.toString());
-          if (event.target.value === '1d') next.delete('period');
-          else next.set('period', event.target.value);
-          const query = next.toString();
-          router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-        }}
-      >
-        {PERIODS.map((period) => (
-          <option key={period} value={period}>
-            {PERIOD_LABELS[period]}
-          </option>
-        ))}
-      </select>
+      <span className={styles.periodWrap}>
+        <select
+          className={styles.periodSelect}
+          aria-label="Investment change period"
+          value={selected.period}
+          onChange={(event) => {
+            const next = new URLSearchParams(params.toString());
+            if (event.target.value === '1d') next.delete('period');
+            else next.set('period', event.target.value);
+            const query = next.toString();
+            router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+          }}
+        >
+          {PERIODS.map((period) => (
+            <option key={period} value={period}>
+              {PERIOD_LABELS[period]}
+            </option>
+          ))}
+        </select>
+      </span>
     </span>
   );
 }
