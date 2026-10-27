@@ -114,6 +114,7 @@
   display: grid;
   gap: 12px;
   justify-items: start;
+  margin-top: 16px;
 }
 
 .empty p {

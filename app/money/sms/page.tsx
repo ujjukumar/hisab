@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Card } from '@/components/Card/Card';
 import { SmsMessage, SmsMessageEmpty } from '@/components/SmsMessage/SmsMessage';
-import { PairPhoneButton } from '@/components/SmsPairing/SmsPairing';
 import { SmsReviewWorkspace, type SmsQueueItem } from '@/components/SmsReview/SmsReview';
 import { SmsReviewForm } from '@/components/SmsReviewForm/SmsReviewForm';
 import { smsHighlights } from '@/lib/domain/sms';
@@ -70,10 +69,7 @@ export default async function SmsReviewPage({ searchParams }: { searchParams: Pr
               automatically; see them in <Link href="/money/sms/history">History</Link>.
             </p>
           ) : (
-            <>
-              <p>Pair your Android phone to send bank SMS to Hisaab for review.</p>
-              <PairPhoneButton />
-            </>
+            <p>Pair your Android phone above to send bank SMS to Hisaab for review.</p>
           )}
         </div>
       </Card>

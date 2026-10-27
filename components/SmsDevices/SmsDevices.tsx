@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/Button/Button';
 import { Card } from '@/components/Card/Card';
-import { PairPhoneButton } from '@/components/SmsPairing/SmsPairing';
 import { useToast } from '@/components/Toast/Toast';
 import { manageSmsDeviceFormAction } from '@/lib/actions/sms';
 import type { SmsDeviceState } from '@/lib/domain/smsReview';
@@ -73,14 +72,13 @@ export function SmsDevices({
       <Card
         title={`Phones (${phones.length})`}
         sub="Revoke a phone if it is lost or its token may be exposed. It stops sending SMS at once."
-        action={phones.length > 0 ? <PairPhoneButton variant="secondary" /> : undefined}
       >
         {phones.length === 0 ? (
           <div className={styles.empty}>
             <p>
-              No phone is paired. Pair your Android phone to send bank SMS to Hisaab for review.
+              No phone is paired. Pair your Android phone above to send bank SMS to Hisaab for
+              review.
             </p>
-            <PairPhoneButton />
           </div>
         ) : (
           <ul className={styles.list}>
