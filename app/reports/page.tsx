@@ -19,7 +19,7 @@ import {
 } from '@/components/TransactionDrawer/TransactionDrawer';
 import { FilterForm } from '@/components/TransactionFilters/TransactionFilters';
 import { formatDate, formatAmount, formatINR, formatINRSigned } from '@/lib/domain/format';
-import { SHORT_MONTHS } from '@/lib/domain/dates';
+import { SHORT_MONTHS, today } from '@/lib/domain/dates';
 import { listAccounts, listCategories } from '@/lib/queries/money';
 import { monthTotals, yearReport, type CategoryYear } from '@/lib/queries/reports';
 
@@ -41,6 +41,9 @@ function CategoryTable({
   sortHref: (key: string, dir: 'asc' | 'desc') => string;
 }) {
   const t = monthTotals(rows, months.length);
+  // Months still to come stay blank rather than showing 0.
+  const thisMonth = today().slice(0, 7);
+  const future = (i: number) => months[i]! > thisMonth;
   const columns: Column<CategoryYear>[] = [
     {
       key: 'name',
@@ -56,9 +59,10 @@ function CategoryTable({
       sub: m.slice(0, 4),
       sortable: true,
       sortValue: (r: CategoryYear) => r.months[i]!,
-      cell: (r: CategoryYear) => (
-        <Amount tone={r.months[i] ? '' : 'muted'}>{formatAmount(r.months[i]!)}</Amount>
-      ),
+      cell: (r: CategoryYear) =>
+        future(i) ? null : (
+          <Amount tone={r.months[i] ? '' : 'muted'}>{formatAmount(r.months[i]!)}</Amount>
+        ),
     })),
     { key: 'total', header: 'Total', sortable: true, sortValue: (r) => r.total, cell: (r) => <Amount>{formatAmount(r.total)}</Amount> },
   ];
@@ -82,7 +86,7 @@ function CategoryTable({
             <td className="l">Total</td>
             {t.months.map((v, i) => (
               <td key={months[i]} className="r">
-                <Amount>{formatAmount(v)}</Amount>
+                {future(i) ? null : <Amount>{formatAmount(v)}</Amount>}
               </td>
             ))}
             <td className="r">

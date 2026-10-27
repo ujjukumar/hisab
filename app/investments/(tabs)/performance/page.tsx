@@ -55,7 +55,7 @@ function figures(r: PeriodResult) {
   ];
 }
 
-const columns = (period: PerformancePeriod): Column<PeriodRow>[] => [
+const columns = (period: PerformancePeriod, annual: boolean): Column<PeriodRow>[] => [
   {
     key: 'name',
     header: 'Name',
@@ -94,7 +94,7 @@ const columns = (period: PerformancePeriod): Column<PeriodRow>[] => [
     sortable: true,
     sortValue: value,
     cell: (r: PeriodRow) => figures(r)[i],
-  })),
+  })).filter((column) => annual || column.key !== 'annual'),
 ];
 
 export default async function PerformancePage({
@@ -106,6 +106,8 @@ export default async function PerformancePage({
   const yearStart = await financialYearStartMonth();
   const { asOf, period, from, rows } = periodPerformance(params, yearStart);
   const total = periodTotals(rows, asOf);
+  // % p.a. needs a year or more; hide the column when no holding has one.
+  const annual = total.annual !== null || rows.some((r) => r.annual !== null);
   const sort = tableSortFromParams(
     new URLSearchParams({ sort: typeof params.sort === 'string' ? params.sort : '', dir: typeof params.dir === 'string' ? params.dir : '' }),
     SORT_KEYS,
@@ -204,7 +206,7 @@ export default async function PerformancePage({
         {rows.length === 0 ? (
           <DataTable
             title="Holdings"
-            columns={columns(period)}
+            columns={columns(period, annual)}
             rows={[]}
             rowKey={(r) => r.row.asset.id}
             sort={sort}
@@ -225,7 +227,7 @@ export default async function PerformancePage({
               <DataTable
                 key={g.key}
                 title={`${g.title} (${own.length})`}
-                columns={columns(period)}
+                columns={columns(period, annual)}
                 rows={own}
                 rowKey={(r) => r.row.asset.id}
                 sort={sort}
@@ -239,7 +241,7 @@ export default async function PerformancePage({
                     <td className="r">
                       <Amount>{formatAmount(t.invested)}</Amount>
                     </td>
-                    {figures(t).map((cell) => (
+                    {figures(t).slice(0, annual ? 3 : 2).map((cell) => (
                       <td key={cell.key} className="r">
                         {cell}
                       </td>
