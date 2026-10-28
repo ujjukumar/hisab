@@ -23,9 +23,11 @@ Lakh/Crore in headline figures.
   budgets and SMS imports from the owner's paired phone.
 - **Investments:** mutual funds, stocks, ETFs, gold, FDs, PPF, EPF, NPS and bonds,
   with cost, value, gains, XIRR and allocation.
+- **Tax:** a new-regime income tax estimate for each financial year, with capital
+  gains matched first in, first out. An estimate to check a return against, not advice.
 
 Out of scope: logins or multiple users, cloud sync, bank or broker connections, tax
-reports, multiple currencies (see section 14).
+filing, the old regime, multiple currencies (see section 14).
 
 ## 2. Design
 
@@ -225,6 +227,43 @@ Up to eight benchmarks, selected in the URL.
 Allocation sums value by asset class or by display group. Top gainers and losers
 show the top three each way for a period, group and value-or-percent sort.
 
+### Tax (`taxRules.ts`, `capitalGains.ts`, `tax.ts`)
+
+New regime only, April–March, from FY 2024-25 (`FIRST_TAX_YEAR`). `TAX_RULES` holds
+each year's slabs, standard deduction (₹75,000), rebate limit and maximum, 4% cess,
+₹1,25,000 long-term equity exemption and the surcharge threshold (₹50 lakh). Add a
+year only after checking its figures against the Finance Act; a year without rules
+shows its income but no tax.
+
+- **Lots:** each sale is matched to the oldest units first. A lot's cost is units ×
+  price plus the buy's fees; proceeds are the sale amount less fees, shared by units.
+  Splits scale units and keep cost and date. Holdings elsewhere keep average cost.
+- **Treatment** by holding period and the sale date (rates changed on 23 Jul 2024):
+  - Stocks and equity funds: short-term up to 12 months at 15% then 20%; long-term at
+    10% then 12.5%. Bought before 1 Feb 2018: left out (no grandfathering).
+  - Non-equity funds bought from 1 Apr 2023 (from FY 2025-26 only debt funds): slab
+    rates whatever the holding period.
+  - Everything else: long-term after 24 months (ETFs 12) at 12.5%; sold before 23 Jul
+    2024, long-term after 36 months is left out (may use indexation); short-term at
+    slab rates.
+- **Set-off:** losses net within their treatment, then a short-term loss goes against
+  short-term equity, slab-rate, other long-term and long-term equity gains; a
+  long-term loss against other long-term, then long-term equity. Higher rates first.
+  What's left is shown as unused, not carried forward.
+- **Income:** salary less the standard deduction, interest, dividends, other income,
+  intraday profit (a loss is ignored) and slab-rate gains go through the slabs.
+  Interest is investment interest (not PPF or EPF), what FD withdrawals took beyond
+  the amount invested, and Money income in Interest not linked to an investment;
+  dividends likewise. FD interest counts when received. Salary, TDS, tax paid, other
+  income and replacements for the worked interest and dividends are entered per year
+  (`tax_years`).
+- **Tax:** slab tax by band; special-rate gains after the equity exemption, with any
+  unused basic exemption set against them; the rebate when total income is within the
+  limit, else marginal relief up to the slab tax; 4% cess; less TDS and tax paid.
+- **Left out:** surcharge (flagged above the threshold), deductions other than the
+  standard one, advance-tax interest, losses carried in from earlier years, and
+  sales that are left out above. An oversold investment is listed to fix.
+
 ## 7. Screens
 
 | Route | Purpose |
@@ -240,6 +279,8 @@ show the top three each way for a period, group and value-or-percent sort.
 | `/investments/[assetId]` | Holding summary, chart, transactions, FD details |
 | `/investments/import` | Check and import Value Research history |
 | `/reports` | Financial/calendar-year cash flow and category totals, CSV |
+| `/tax` | One financial year's tax worked line by line, checks before filing, salary, TDS and other figures |
+| `/tax/gains` | That year's sales by lot: bought, sold, cost, sale value, gain and how each is taxed |
 | `/settings` | Backup, restore, export, reset, prices, benchmarks, preferences |
 
 Filters, tabs and table sorting live in the URL. Data tables sort by every data
@@ -333,7 +374,8 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Daily change | Each holding's last two prices for 1 day; calendar dates otherwise | Quotes can predate today; flows aren't gains |
 | Automatic prices | AMFI, NSE and BSE whole-market files, daily on open, optional backfill | Nothing about holdings is sent |
 | Unpublished prices | Missing after three days counts as not published; owner can recheck | Stops repeated downloads of holidays and unlisted dates |
-| Cost method | Average cost | Simple; not a tax calculation |
+| Cost method | Average cost for holdings, first in, first out for tax | Simple on screen; FIFO matches how sales are taxed |
+| Tax year | Fixed April–March, new regime only | The owner files under the new regime |
 | Short holdings | Under 365 days show "abs." | Annualising short periods misleads |
 | Investment payments | Optional linked Money transaction | Avoids entering SIPs twice |
 | FD interest | Quarterly by default, editable | Common in India |
@@ -346,7 +388,6 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 - Bank and card statement CSV import with column mapping and duplicate detection.
 - Recurring transactions with reminders.
 - Inflation-adjusted returns and official index levels.
-- Capital gains by financial year (FIFO); not tax advice.
 - Rule-based insights ("Dining is 30% above your 3-month average").
 - Split transactions, receipts, multiple currencies.
 
@@ -362,6 +403,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, leaves today to the daily check, and no longer stops on one bad date. |
 | Move and UI polish | 27 Oct 2026 | Live install and development moved to the Pi. Hallmark audit polish: sentence-case labels and tabs, no dashes or middle-dot separators, field focus outline, import and card spacing, single table heads, 4px spacing, no-ISIN no longer a failed price update, blank future months and empty % p.a. Floor 35 to 1 (a checker false positive), Reflex 139 to 0. |
 | Dashboard redesign | 28 Oct 2026 | Rebuilt around three jobs: how wealth moved, what needs action, whether the month is on track. Card accounts gain a bill due day; Allocation, returns by type, income vs spending and the spending donut moved off the Dashboard to Investments and Reports; the month picker went. |
+| Tax tab | 28 Oct 2026 | New-regime estimate from FY 2024-25: FIFO capital gains with set-off, interest and dividends from Money and Investments, hand-entered salary and TDS, rebate, marginal relief and cess, and a sales table. FY 2026-27 rules wait for verified figures. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.
