@@ -619,6 +619,7 @@ const WIPE = [
   'categories',
   'accounts',
   'settings',
+  'tax_years',
 ];
 
 withTransaction(sqlite, () => {
@@ -932,6 +933,121 @@ withTransaction(sqlite, () => {
       investmentTxnId: Number(dividend.lastInsertRowid),
     }),
   );
+
+  /* sold investments and other income, so the Tax tab has a year to work out */
+  const soldOut: {
+    name: string;
+    type: string;
+    assetClass: string;
+    trades: [IsoDate, 'buy' | 'sell', number, number][];
+  }[] = [
+    {
+      name: 'Godavari Cement Ltd',
+      type: 'stock',
+      assetClass: 'equity',
+      trades: [
+        ['2024-02-12', 'buy', 60, 1180],
+        ['2025-03-05', 'buy', 40, 1320],
+        ['2025-11-18', 'sell', 80, 1495],
+        ['2026-07-14', 'sell', 20, 1410],
+      ],
+    },
+    {
+      name: 'Tapti Liquid Fund Direct-G',
+      type: 'mutual_fund',
+      assetClass: 'debt',
+      trades: [
+        ['2022-06-15', 'buy', 4000, 25.1],
+        ['2025-06-20', 'sell', 4000, 30.25],
+      ],
+    },
+    {
+      name: 'Malabar Mid Cap Direct-G',
+      type: 'mutual_fund',
+      assetClass: 'equity',
+      trades: [
+        ['2025-05-12', 'buy', 1500, 48.2],
+        ['2026-02-20', 'sell', 1500, 44.9],
+      ],
+    },
+    {
+      name: 'Narmada Chemicals Ltd',
+      type: 'stock',
+      assetClass: 'equity',
+      trades: [
+        ['2017-09-11', 'buy', 50, 410],
+        ['2025-12-08', 'sell', 50, 1260],
+      ],
+    },
+  ];
+  const soldId = new Map<string, number>();
+  for (const s of soldOut) {
+    const id = Number(
+      insertAsset.run({
+        name: s.name,
+        type: s.type,
+        assetClass: s.assetClass,
+        valuation: 'units',
+        accountRef: s.type === 'stock' ? 'Demat ••4402' : 'Folio ••6120',
+        interestRate: null,
+        compounding: null,
+        startDate: null,
+        maturityDate: null,
+        note: null,
+      }).lastInsertRowid,
+    );
+    soldId.set(s.name, id);
+    for (const [date, action, units, price] of s.trades) {
+      insertInvTxn.run({
+        assetId: id,
+        date,
+        action,
+        units: String(units),
+        price: dec(price),
+        amount: rupees(Number((units * price).toFixed(2))),
+        fees: action === 'sell' && s.type === 'stock' ? rupees(20) : 0,
+        note: null,
+      });
+    }
+  }
+  sqlite
+    .prepare(
+      `INSERT INTO investment_transactions (asset_id, date, action, units, price, sell_price, amount, fees, note)
+       VALUES (?, '2025-08-21', 'intraday', '50', '1310.0000', '1324.5000', ?, ?, NULL)`,
+    )
+    .run(soldId.get('Godavari Cement Ltd')!, rupees(725), rupees(45));
+  insertInvTxn.run({
+    assetId: soldId.get('Godavari Cement Ltd')!,
+    date: '2025-07-04',
+    action: 'dividend',
+    units: null,
+    price: null,
+    amount: rupees(1200),
+    fees: 0,
+    note: null,
+  });
+  for (const [date, amount] of [
+    ['2025-12-31', 1840],
+    ['2026-03-31', 1910],
+    ['2026-06-30', 1960],
+  ] as const) {
+    insertTxn.run(
+      txn({
+        date,
+        type: 'income',
+        amount: rupees(amount),
+        accountId: acct('Savings account'),
+        categoryId: cat('income', 'Interest'),
+        description: 'Savings interest',
+      }),
+    );
+  }
+  sqlite
+    .prepare(
+      `INSERT INTO tax_years (year, gross_salary, salary_tds, other_tds, tax_paid, other_income)
+       VALUES (2025, ?, ?, 0, 0, 0)`,
+    )
+    .run(rupees(1860000), rupees(152400));
 
   /* ---------- money history, Oct 2025 to Aug 2026 ---------- */
   const cardSpendByMonth = new Map<string, number>();

@@ -80,7 +80,7 @@ beforeAll(() => {
         .all(),
     },
     DATE,
-  );
+  ).filter((r) => !r.sold); // sold-out investments are there for the Tax tab
 }, 60_000);
 
 afterAll(() => {
