@@ -22,8 +22,8 @@ const amount = <T extends number | null>(empty: T) =>
 
 export const taxYearSchema = z.object({
   year: z.coerce.number({ error: 'Choose a financial year.' }).int().min(2000).max(2100),
-  grossSalary: amount(0),
-  salaryTds: amount(0),
+  grossSalary: amount(null),
+  salaryTds: amount(null),
   otherTds: amount(0),
   taxPaid: amount(0),
   otherIncome: amount(0),

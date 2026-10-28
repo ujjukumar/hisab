@@ -13,16 +13,21 @@ import styles from './TaxDetailsForm.module.css';
 export function TaxDetailsForm({
   year,
   figures: fig,
+  workedGross,
+  workedTds,
   workedInterest,
   workedDividends,
 }: {
   year: number;
   figures: TaxFigures | null;
+  workedGross: number;
+  workedTds: number;
   workedInterest: number;
   workedDividends: number;
 }) {
   const f = useActionForm(saveTaxYear, 'Tax details saved', { reset: false });
   const value = (p: number | null | undefined) => (p ? paiseToInput(p) : '');
+  const typed = (p: number | null | undefined) => (p != null ? paiseToInput(p) : '');
   const amount = (name: string, label: string, defaultValue: string, placeholder?: string) => (
     <div>
       <TextField
@@ -40,16 +45,12 @@ export function TaxDetailsForm({
 
   return (
     <form className={styles.form} onSubmit={f.submit} noValidate aria-busy={f.pending}>
-      {!fig && (
-        <p className={styles.empty}>
-          Add salary and TDS from your Form 16 to complete the estimate.
-        </p>
-      )}
       <input type="hidden" name="year" value={year} />
       <fieldset className={styles.group}>
         <legend>Salary</legend>
-        {amount('grossSalary', 'Gross salary', value(fig?.grossSalary))}
-        {amount('salaryTds', 'TDS on salary', value(fig?.salaryTds))}
+        <p className={styles.hint}>Leave blank to work them out from take-home pay in Money.</p>
+        {amount('grossSalary', 'Gross salary', typed(fig?.grossSalary), formatAmount(workedGross))}
+        {amount('salaryTds', 'TDS on salary', typed(fig?.salaryTds), formatAmount(workedTds))}
       </fieldset>
       <fieldset className={styles.group}>
         <legend>Other income and tax paid</legend>
@@ -63,13 +64,13 @@ export function TaxDetailsForm({
         {amount(
           'interestOverride',
           'Interest',
-          fig?.interestOverride != null ? paiseToInput(fig.interestOverride) : '',
+          typed(fig?.interestOverride),
           formatAmount(workedInterest),
         )}
         {amount(
           'dividendOverride',
           'Dividends',
-          fig?.dividendOverride != null ? paiseToInput(fig.dividendOverride) : '',
+          typed(fig?.dividendOverride),
           formatAmount(workedDividends),
         )}
       </fieldset>

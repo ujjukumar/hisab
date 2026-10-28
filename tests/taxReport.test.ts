@@ -71,6 +71,9 @@ function seed() {
       .values({ date, type: 'income', amount: r(amount), accountId, categoryId: category('Interest'), description: 'Savings interest' })
       .run();
   }
+  db.insert(transactions)
+    .values({ date: '2024-06-30', type: 'income', amount: r(960_000), accountId, categoryId: category('Salary'), description: 'Salary' })
+    .run();
 
   const oversold = asset('Invented Oversold Ltd', 'stock', 'units');
   txn(oversold, '2024-10-01', 'sell', 100, '5');
@@ -99,6 +102,11 @@ describe('tax report and saved figures', () => {
     expect(empty.problems).toEqual([
       expect.stringContaining('Invented Oversold Ltd: the sale on 1 Oct 2024 sells more units'),
     ]);
+    // 0.896 × gross + 59,800 = 9,60,000 take-home, in the 10% band.
+    expect(empty.salary).toMatchObject({ takeHome: r(960_000), grossTyped: false, tdsTyped: false });
+    expect(empty.salary.gross - empty.salary.tds).toBe(r(960_000));
+    expect(Math.abs(empty.salary.gross - 100_468_750)).toBeLessThanOrEqual(2);
+    expect(empty.computation?.salaryTds).toBe(empty.salary.tds);
 
     expect((await saveTaxYear(form({ year: '2024', grossSalary: '-1' }))).ok).toBe(false);
     expect(await saveTaxYear(form({ year: '2024', grossSalary: '10,00,000', salaryTds: '50000' })))
@@ -119,6 +127,13 @@ describe('tax report and saved figures', () => {
       totalTax: r(44_330),
       balance: r(-5_670),
     });
+
+    // A typed gross alone: TDS is the tax on that salary.
+    await saveTaxYear(form({ year: '2024', grossSalary: '10,00,000' }));
+    expect(taxReport({ year: '2024' }).salary).toMatchObject({ gross: r(1_000_000), tds: r(44_200), grossTyped: true, tdsTyped: false });
+    // A typed TDS alone: gross is take-home plus that TDS.
+    await saveTaxYear(form({ year: '2024', salaryTds: '30000' }));
+    expect(taxReport({ year: '2024' }).salary).toMatchObject({ gross: r(990_000), tds: r(30_000), grossTyped: false, tdsTyped: true });
   });
 
   it('leaves the tax out for a year without rules', async () => {

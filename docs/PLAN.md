@@ -254,9 +254,13 @@ shows its income but no tax.
   intraday profit (a loss is ignored) and slab-rate gains go through the slabs.
   Interest is investment interest (not PPF or EPF), what FD withdrawals took beyond
   the amount invested, and Money income in Interest not linked to an investment;
-  dividends likewise. FD interest counts when received. Salary, TDS, tax paid, other
-  income and replacements for the worked interest and dividends are entered per year
-  (`tax_years`).
+  dividends likewise. FD interest counts when received. Salary is the year's Money
+  income in Salary (take-home), worked back to the gross whose new-regime tax on
+  salary alone, taken as TDS, leaves that take-home; PF and other deductions are
+  unknown. A typed Form 16 gross or TDS replaces the worked one (gross alone: TDS is
+  its tax; TDS alone: gross is take-home plus TDS). Other TDS, tax paid, other income
+  and replacements for the worked interest and dividends are typed per year
+  (`tax_years`). The Other income category is not counted.
 - **Tax:** slab tax by band; special-rate gains after the equity exemption, with any
   unused basic exemption set against them; the rebate when total income is within the
   limit, else marginal relief up to the slab tax; 4% cess; less TDS and tax paid.
@@ -403,7 +407,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Unpublished prices | 22 Oct 2026 | Backfill waits for recent files, caches exchange holidays despite AMFI holiday lists, records settled missing prices with a recheck, leaves today to the daily check, and no longer stops on one bad date. |
 | Move and UI polish | 27 Oct 2026 | Live install and development moved to the Pi. Hallmark audit polish: sentence-case labels and tabs, no dashes or middle-dot separators, field focus outline, import and card spacing, single table heads, 4px spacing, no-ISIN no longer a failed price update, blank future months and empty % p.a. Floor 35 to 1 (a checker false positive), Reflex 139 to 0. |
 | Dashboard redesign | 28 Oct 2026 | Rebuilt around three jobs: how wealth moved, what needs action, whether the month is on track. Card accounts gain a bill due day; Allocation, returns by type, income vs spending and the spending donut moved off the Dashboard to Investments and Reports; the month picker went. |
-| Tax tab | 28 Oct 2026 | New-regime estimate from FY 2024-25: FIFO capital gains with set-off, interest and dividends from Money and Investments, hand-entered salary and TDS, rebate, marginal relief and cess, and a sales table. FY 2026-27 rules wait for verified figures. |
+| Tax tab | 28 Oct 2026 | New-regime estimate from FY 2024-25: FIFO capital gains with set-off, interest and dividends from Money and Investments, hand-entered salary and TDS, rebate, marginal relief and cess, and a sales table. FY 2026-27 rules wait for verified figures. Salary and TDS are then worked back from take-home pay in Money, with Form 16 figures as optional replacements. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.

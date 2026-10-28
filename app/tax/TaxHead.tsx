@@ -10,7 +10,7 @@ import type { TaxReport } from '@/lib/queries/tax';
 export function TaxHead({ report: r }: { report: TaxReport }) {
   const c = r.computation;
   const f = r.figures;
-  const paid = c?.paid ?? (f ? f.salaryTds + f.otherTds + f.taxPaid : 0);
+  const paid = c?.paid ?? r.salary.tds + (f?.otherTds ?? 0) + (f?.taxPaid ?? 0);
   const query = `year=${r.year}`;
   return (
     <PageHead

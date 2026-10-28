@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeTax, fdWithdrawalInterest, type TaxInputs } from '@/lib/domain/tax';
+import {
+  computeTax,
+  fdWithdrawalInterest,
+  grossUpSalary,
+  salaryTax,
+  type TaxInputs,
+} from '@/lib/domain/tax';
 import type { HoldingTxn } from '@/lib/domain/holdings';
 import { FIRST_TAX_YEAR, taxRulesFor } from '@/lib/domain/taxRules';
 
@@ -134,5 +140,33 @@ describe('computeTax', () => {
   it('flags income above the surcharge threshold', () => {
     expect(computeTax(fy25, inputs({ salary: r(6_000_000) })).surcharge).toBe(true);
     expect(computeTax(fy25, inputs({ salary: r(5_000_000) })).surcharge).toBe(false);
+  });
+});
+
+describe('grossUpSalary', () => {
+  const near = (actual: number, expected: number) =>
+    expect(Math.abs(actual - expected)).toBeLessThanOrEqual(2);
+
+  it('keeps take-home as gross when the salary carries no tax', () => {
+    expect(grossUpSalary(fy25, 0)).toEqual({ gross: 0, tds: 0 });
+    expect(grossUpSalary(fy25, r(1_275_000))).toEqual({ gross: r(1_275_000), tds: 0 });
+    expect(grossUpSalary(fy24, r(775_000))).toEqual({ gross: r(775_000), tds: 0 });
+  });
+
+  it('adds back the tax on the salary', () => {
+    // 0.792 × gross + 2,23,600 = 18,00,000 within the 20% band.
+    const g = grossUpSalary(fy25, r(1_800_000));
+    expect(g.gross - g.tds).toBe(r(1_800_000));
+    near(g.gross, 199_040_404);
+    near(salaryTax(fy25, g.gross), g.tds);
+    // FY 2024–25: 0.896 × gross + 59,800 = 10,00,000 within the 10% band.
+    near(grossUpSalary(fy24, r(1_000_000)).gross, 104_933_036);
+  });
+
+  it('finds the gross past the dip marginal relief makes in take-home', () => {
+    // Take-home falls to 12,72,176 just above 12,75,000 gross, then rises again.
+    const g = grossUpSalary(fy25, r(1_280_000));
+    near(g.gross, 135_485_782);
+    expect(g.gross - g.tds).toBe(r(1_280_000));
   });
 });

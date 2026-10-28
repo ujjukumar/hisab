@@ -24,7 +24,13 @@ import {
 import { formatDate } from '@/lib/domain/format';
 import { OversellError, type HoldingTxn } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
-import { computeTax, fdWithdrawalInterest, type TaxComputation } from '@/lib/domain/tax';
+import {
+  computeTax,
+  fdWithdrawalInterest,
+  grossUpSalary,
+  salaryTax,
+  type TaxComputation,
+} from '@/lib/domain/tax';
 import { FIRST_TAX_YEAR, TAX_RULES, taxRulesFor, type TaxRules } from '@/lib/domain/taxRules';
 import { paramReader, type Params } from './money';
 
@@ -32,8 +38,8 @@ import { paramReader, type Params } from './money';
 const START_MONTH = 4;
 
 export type TaxFigures = {
-  grossSalary: Paise;
-  salaryTds: Paise;
+  grossSalary: Paise | null;
+  salaryTds: Paise | null;
   otherTds: Paise;
   taxPaid: Paise;
   otherIncome: Paise;
@@ -45,6 +51,16 @@ export type GainRow = SaleLot & { key: string; assetName: string };
 
 /** An income figure worked out from records, and the one the estimate uses. */
 export type Worked = { worked: Paise; used: Paise; categoryId: number | null };
+
+/** Salary in Money and the gross and TDS the estimate uses, typed or worked back from it. */
+export type Salary = {
+  takeHome: Paise;
+  gross: Paise;
+  tds: Paise;
+  grossTyped: boolean;
+  tdsTyped: boolean;
+  categoryId: number | null;
+};
 
 export type TaxReport = {
   year: number;
@@ -58,6 +74,7 @@ export type TaxReport = {
   latestRulesYear: number;
   /** Null until the owner saves figures for the year. */
   figures: TaxFigures | null;
+  salary: Salary;
   interest: Worked;
   dividends: Worked;
   intraday: Paise;
@@ -207,15 +224,40 @@ export function taxReport(params: Params): TaxReport {
 
   const summary = summariseGains(gains);
   const rules = taxRulesFor(year);
+
+  const salaryCategory = incomeCategory('Salary');
+  const takeHome = unlinkedIncome(salaryCategory, from, to);
+  const typedGross = figures?.grossSalary ?? null;
+  const typedTds = figures?.salaryTds ?? null;
+  let gross: Paise;
+  let tds: Paise;
+  if (typedGross !== null) {
+    gross = typedGross;
+    tds = typedTds ?? (rules ? salaryTax(rules, typedGross) : 0);
+  } else if (typedTds !== null || !rules) {
+    tds = typedTds ?? 0;
+    gross = takeHome + tds;
+  } else {
+    ({ gross, tds } = grossUpSalary(rules, takeHome));
+  }
+  const salary: Salary = {
+    takeHome,
+    gross,
+    tds,
+    grossTyped: typedGross !== null,
+    tdsTyped: typedTds !== null,
+    categoryId: salaryCategory,
+  };
+
   const computation = rules
     ? computeTax(rules, {
-        salary: figures?.grossSalary ?? 0,
+        salary: gross,
         interest: interest.used,
         dividends: dividends.used,
         otherIncome: figures?.otherIncome ?? 0,
         intraday,
         gains: summary,
-        salaryTds: figures?.salaryTds ?? 0,
+        salaryTds: tds,
         otherTds: figures?.otherTds ?? 0,
         taxPaid: figures?.taxPaid ?? 0,
       })
@@ -230,6 +272,7 @@ export function taxReport(params: Params): TaxReport {
     rules,
     latestRulesYear: Math.max(...Object.keys(TAX_RULES).map(Number)),
     figures,
+    salary,
     interest,
     dividends,
     intraday,

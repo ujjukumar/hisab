@@ -157,3 +157,36 @@ export function computeTax(rules: TaxRules, inputs: TaxInputs): TaxComputation {
     surcharge: totalIncome > rules.surchargeFrom,
   };
 }
+
+/** The tax on a salary with no other income: what an employer deducts as TDS. */
+export function salaryTax(rules: TaxRules, gross: Paise): Paise {
+  return computeTax(rules, {
+    salary: gross,
+    interest: 0,
+    dividends: 0,
+    otherIncome: 0,
+    intraday: 0,
+    gains: { slab: 0, special: [] },
+    salaryTds: 0,
+    otherTds: 0,
+    taxPaid: 0,
+  }).totalTax;
+}
+
+/**
+ * Work back from the salary paid into the bank to the gross and its TDS, assuming the
+ * employer deducted exactly the tax on the salary. Other deductions such as PF are not known.
+ */
+export function grossUpSalary(rules: TaxRules, takeHome: Paise): { gross: Paise; tds: Paise } {
+  if (takeHome <= 0 || salaryTax(rules, takeHome) === 0) return { gross: Math.max(takeHome, 0), tds: 0 };
+  // Above the rebate each take-home has one gross, though not a monotonic one, so bisect.
+  let lo = takeHome;
+  let hi = takeHome * 2;
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (mid - salaryTax(rules, mid) >= takeHome) hi = mid;
+    else lo = mid;
+  }
+  const tds = salaryTax(rules, hi);
+  return { gross: takeHome + tds, tds };
+}

@@ -18,6 +18,10 @@ export default async function TaxPage({
   const lossLeft = r.summary.shortLossLeft + r.summary.longLossLeft;
   const checks = [
     ...r.problems,
+    r.rules &&
+      !r.salary.grossTyped &&
+      r.salary.takeHome > 0 &&
+      `Salary is worked back from ${formatINR(r.salary.takeHome)} of take-home pay, assuming TDS covered the tax on it. PF and other deductions aren't known, so enter your Form 16 figures for an exact estimate.`,
     left > 0 &&
       `${left === 1 ? "One sale isn't" : `${left} sales aren't`} in the estimate: shares bought before Feb 2018 need their 31 Jan 2018 value, and long-term sales before 23 Jul 2024 may use indexation. Check them under Capital gains.`,
     lossLeft > 0 &&
@@ -58,6 +62,8 @@ export default async function TaxPage({
                   key={r.year}
                   year={r.year}
                   figures={r.figures}
+                  workedGross={r.salary.gross}
+                  workedTds={r.salary.tds}
                   workedInterest={r.interest.worked}
                   workedDividends={r.dividends.worked}
                 />

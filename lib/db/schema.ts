@@ -230,8 +230,9 @@ export const settings = sqliteTable('settings', {
 /** The owner's own figures for one financial year, named by the year it starts in. */
 export const taxYears = sqliteTable('tax_years', {
   year: integer('year').primaryKey(),
-  grossSalary: integer('gross_salary').notNull().default(0),
-  salaryTds: integer('salary_tds').notNull().default(0),
+  /** From Form 16; when null the gross and TDS are worked out from salary in Money. */
+  grossSalary: integer('gross_salary'),
+  salaryTds: integer('salary_tds'),
   otherTds: integer('other_tds').notNull().default(0),
   /** Advance and self-assessment tax paid. */
   taxPaid: integer('tax_paid').notNull().default(0),

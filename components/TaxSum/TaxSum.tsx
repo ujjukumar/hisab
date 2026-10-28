@@ -53,7 +53,7 @@ function bandLabel(from: number, upTo: number | null): string {
 }
 
 function IncomeLines({ r, c }: { r: TaxReport; c: TaxComputation | null }) {
-  const salary = r.figures?.grossSalary ?? 0;
+  const s = r.salary;
   const moneyHref = (categoryId: number | null) =>
     categoryId
       ? `/money?${new URLSearchParams({ from: r.from, to: r.to, cat: String(categoryId) })}`
@@ -63,11 +63,18 @@ function IncomeLines({ r, c }: { r: TaxReport; c: TaxComputation | null }) {
     if (w.used !== w.worked) return `Your figure. Records show ${formatAmount(w.worked)}.`;
     return href ? <Link href={href}>{`See ${what} in Money`}</Link> : 'From your records';
   };
+  const salaryHref = moneyHref(s.categoryId);
+  const takeHome = s.tds > 0 ? `${formatAmount(s.takeHome)} take-home plus TDS` : 'Take-home pay';
+  const salaryNote = s.grossTyped
+    ? 'Gross, from your figures'
+    : salaryHref
+      ? <Link href={salaryHref}>{takeHome}</Link>
+      : takeHome;
   const slabGains = Math.max(r.summary.slab, 0);
   const intraday = Math.max(r.intraday, 0);
   return (
     <>
-      <Line label="Salary" note="Gross, from your figures" amount={salary} />
+      <Line label="Salary" note={salaryNote} amount={s.gross} />
       {c && c.standardDeduction > 0 && (
         <Line label="Standard deduction" amount={-c.standardDeduction} />
       )}
@@ -198,7 +205,17 @@ export function TaxSum({ report: r }: { report: TaxReport }) {
       </Section>
 
       <Section title="Paid">
-        <Line label="TDS on salary" note="From Form 16" amount={c.salaryTds} />
+        <Line
+          label="TDS on salary"
+          note={
+            r.salary.tdsTyped
+              ? 'From your figures'
+              : r.salary.grossTyped
+                ? 'The tax on your gross salary'
+                : 'Worked from take-home pay'
+          }
+          amount={c.salaryTds}
+        />
         <Line label="TDS on other income" note="From Form 26AS" amount={c.otherTds} />
         <Line label="Advance and self-assessment tax" amount={c.taxPaid} />
         <Line label="Paid so far" amount={c.paid} total />

@@ -196,7 +196,7 @@ describe('investmentTxnSchema', () => {
 });
 
 describe('taxYearSchema', () => {
-  it('reads amounts, with empty as zero and empty overrides as null', () => {
+  it('reads amounts, with empty as zero and empty salary figures and overrides as null', () => {
     const r = taxYearSchema.parse({
       year: '2025',
       grossSalary: '12,40,000',
@@ -210,7 +210,7 @@ describe('taxYearSchema', () => {
     expect(r).toEqual({
       year: 2025,
       grossSalary: 124_000_000,
-      salaryTds: 0,
+      salaryTds: null,
       otherTds: 150_050,
       taxPaid: 0,
       otherIncome: 0,
