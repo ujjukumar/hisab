@@ -115,6 +115,13 @@ export function addDays(date: IsoDate, delta: number): IsoDate {
   return makeDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
 
+/** Add months to a date, clamping to the month's last day: 2024-02-29 + 12 → 2025-02-28. */
+export function addMonthsToDate(date: IsoDate, delta: number): IsoDate {
+  const month = addMonths(monthOf(date), delta);
+  const { year, month: m } = parts(`${month}-01`);
+  return makeDate(year, m, Math.min(parts(date).day, daysInMonth(year, m)));
+}
+
 /** Sunday = 0, Saturday = 6, independent of the machine's timezone. */
 export function dayOfWeek(date: IsoDate): number {
   const { year, month, day } = parts(date);

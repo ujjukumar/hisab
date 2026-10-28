@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   addMonths,
+  addMonthsToDate,
   currentMonth,
   dayOfWeek,
   daysBetween,
@@ -47,6 +48,15 @@ describe('month boundaries', () => {
     expect(addMonths('2026-12', 1)).toBe('2027-01');
     expect(addMonths('2026-01', -1)).toBe('2025-12');
     expect(addMonths('2026-09', -12)).toBe('2025-09');
+  });
+
+  it('adds months to a date, clamping to the month end', () => {
+    expect(addMonthsToDate('2024-01-15', 12)).toBe('2025-01-15');
+    expect(addMonthsToDate('2024-02-29', 12)).toBe('2025-02-28');
+    expect(addMonthsToDate('2023-02-28', 12)).toBe('2024-02-28');
+    expect(addMonthsToDate('2024-08-31', 6)).toBe('2025-02-28');
+    expect(addMonthsToDate('2024-03-31', -1)).toBe('2024-02-29');
+    expect(addMonthsToDate('2024-12-31', 24)).toBe('2026-12-31');
   });
 
   it('lists month ends in a range', () => {
