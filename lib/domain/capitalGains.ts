@@ -39,6 +39,16 @@ export type SaleLot = {
 
 export type IntradayResult = { assetId: number; date: IsoDate; amount: Paise };
 
+/** How each treatment reads in the Tax tab. */
+export const GAIN_KIND_LABELS: Record<GainKind, string> = {
+  equity_short: 'Short-term, shares and equity funds',
+  equity_long: 'Long-term, shares and equity funds',
+  other_long: 'Long-term, other investments',
+  slab: 'Taxed with income',
+  indexation: 'Left out: may use indexation',
+  grandfathered: 'Left out: bought before Feb 2018',
+};
+
 /** Rates and holding periods changed for transfers on or after this date. */
 export const RATE_CHANGE: IsoDate = '2024-07-23';
 /** Non-equity funds bought on or after this date are taxed at slab rates. */

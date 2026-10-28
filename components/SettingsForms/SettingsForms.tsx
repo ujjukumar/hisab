@@ -34,7 +34,7 @@ export function SettingRow({
 }
 
 /** Submit a form to an action; show field errors in place, or toast `done` (and clear the form). */
-function useActionForm(
+export function useActionForm(
   action: (data: FormData) => Promise<ActionResult>,
   done: string,
   { reset = true } = {},

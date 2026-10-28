@@ -1,0 +1,170 @@
+/* Hallmark · built: 2026-10-28 · scope: app · shape: app screen · theme: custom (existing tokens and fonts) · tone: austere
+ * screen: the Tax estimate, one worked column from income to what's left to pay
+ * idea: the year's tax worked as one column you can audit
+ * signature: the slab lines in the worked sum, each band's fill shown beside its working */
+
+.sum {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.section {
+  min-width: 0;
+}
+
+.heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(8em, auto);
+  margin: 0;
+}
+
+.line {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  column-gap: 24px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.label {
+  min-width: 0;
+  color: var(--text);
+}
+
+.note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.note a {
+  color: var(--primary);
+}
+
+.working {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.amount {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.total {
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  margin-top: -1px;
+}
+
+.total .label,
+.total .amount {
+  font-weight: 600;
+  color: var(--heading);
+}
+
+/* The signature: each slab line shows how much of its band the income fills. */
+.meter {
+  inline-size: 56px;
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+  flex: none;
+}
+
+.meter i {
+  display: block;
+  block-size: 100%;
+  background: var(--c1);
+}
+
+.band .label {
+  font-variant-numeric: tabular-nums;
+}
+
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 2px solid var(--heading);
+}
+
+.resultLabel {
+  font: 400 21px/1.2 var(--serif);
+  color: var(--heading);
+}
+
+.resultValue {
+  font: 600 32px/1.1 var(--sans);
+  color: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.missing {
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line-strong);
+  color: var(--text-2);
+  max-width: 60ch;
+}
+
+@media (max-width: 560px) {
+  .lines {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label amount'
+      'working working';
+    row-gap: 2px;
+  }
+
+  .label {
+    grid-area: label;
+  }
+
+  .amount {
+    grid-area: amount;
+  }
+
+  .working {
+    grid-area: working;
+  }
+
+  .working:empty {
+    display: none;
+  }
+
+  .resultValue {
+    font-size: 26px;
+  }
+}

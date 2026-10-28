@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, gte, inArray, isNull, lte, min, sum } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte, sum } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import {
   assets,
@@ -25,7 +25,7 @@ import { formatDate } from '@/lib/domain/format';
 import { OversellError, type HoldingTxn } from '@/lib/domain/holdings';
 import type { Paise } from '@/lib/domain/money';
 import { computeTax, fdWithdrawalInterest, type TaxComputation } from '@/lib/domain/tax';
-import { taxRulesFor, type TaxRules } from '@/lib/domain/taxRules';
+import { FIRST_TAX_YEAR, TAX_RULES, taxRulesFor, type TaxRules } from '@/lib/domain/taxRules';
 import { paramReader, type Params } from './money';
 
 /** The tax year always runs April to March, whatever the Reports setting says. */
@@ -51,9 +51,11 @@ export type TaxReport = {
   label: string;
   from: IsoDate;
   to: IsoDate;
-  /** Every year with data, newest first. Always includes this year. */
+  /** Every year the tab covers, newest first. Always includes this year. */
   years: { value: number; label: string }[];
   rules: TaxRules | null;
+  /** The newest year the rules cover, offered when this one isn't. */
+  latestRulesYear: number;
   /** Null until the owner saves figures for the year. */
   figures: TaxFigures | null;
   interest: Worked;
@@ -100,19 +102,8 @@ function unlinkedIncome(categoryId: number | null, from: IsoDate, to: IsoDate): 
 /** The year's tax estimate from `?year`, with its matched sales. */
 export function taxReport(params: Params): TaxReport {
   const { one } = paramReader(params);
-  const latest = financialYearOf(today(), START_MONTH);
-  const firstDates = [
-    db.select({ d: min(transactions.date) }).from(transactions).get()?.d,
-    db.select({ d: min(investmentTransactions.date) }).from(investmentTransactions).get()?.d,
-    db.select({ d: min(taxYears.year) }).from(taxYears).get()?.d,
-  ];
-  const earliest = Math.min(
-    latest,
-    ...firstDates
-      .filter((d): d is string | number => d != null)
-      .map((d) => (typeof d === 'number' ? d : financialYearOf(d, START_MONTH))),
-  );
-  const years = Array.from({ length: latest - earliest + 1 }, (_, i) => latest - i);
+  const latest = Math.max(financialYearOf(today(), START_MONTH), FIRST_TAX_YEAR);
+  const years = Array.from({ length: latest - FIRST_TAX_YEAR + 1 }, (_, i) => latest - i);
   const asked = Number(one('year'));
   const year = years.includes(asked) ? asked : latest;
   const { from, to } = financialYearRange(year, START_MONTH);
@@ -237,6 +228,7 @@ export function taxReport(params: Params): TaxReport {
     to,
     years: years.map((y) => ({ value: y, label: yearLabel(y) })),
     rules,
+    latestRulesYear: Math.max(...Object.keys(TAX_RULES).map(Number)),
     figures,
     interest,
     dividends,

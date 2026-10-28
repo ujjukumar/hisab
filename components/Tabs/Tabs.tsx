@@ -13,6 +13,8 @@ export type Tab = {
   countLabel?: string;
   /** Also select the tab on pages below `href`, such as /money/sms/rules for /money/sms. */
   match?: 'prefix';
+  /** Kept on the link, such as the year both Tax tabs show. */
+  query?: string;
 };
 
 /**
@@ -41,7 +43,7 @@ export function Tabs({
         return (
           <Link
             key={tab.href}
-            href={tab.href}
+            href={tab.query ? `${tab.href}?${tab.query}` : tab.href}
             role="tab"
             aria-selected={selected}
             aria-current={selected ? 'page' : undefined}

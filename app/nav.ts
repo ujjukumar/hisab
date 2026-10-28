@@ -23,3 +23,8 @@ export const INVESTMENT_TABS: Tab[] = [
   { href: '/investments/performance', label: 'Performance' },
   { href: '/investments/transactions', label: 'Transactions' },
 ];
+
+export const TAX_TABS: Tab[] = [
+  { href: '/tax', label: 'Estimate' },
+  { href: '/tax/gains', label: 'Capital gains' },
+];
