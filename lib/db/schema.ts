@@ -227,6 +227,21 @@ export const settings = sqliteTable('settings', {
   ...stamps,
 });
 
+/** The owner's own figures for one financial year, named by the year it starts in. */
+export const taxYears = sqliteTable('tax_years', {
+  year: integer('year').primaryKey(),
+  grossSalary: integer('gross_salary').notNull().default(0),
+  salaryTds: integer('salary_tds').notNull().default(0),
+  otherTds: integer('other_tds').notNull().default(0),
+  /** Advance and self-assessment tax paid. */
+  taxPaid: integer('tax_paid').notNull().default(0),
+  otherIncome: integer('other_income').notNull().default(0),
+  /** Replaces the interest worked out from Money and Investments when set. */
+  interestOverride: integer('interest_override'),
+  dividendOverride: integer('dividend_override'),
+  ...stamps,
+});
+
 export const smsDevices = sqliteTable(
   'sms_devices',
   {
@@ -343,6 +358,7 @@ export type SmsDevice = typeof smsDevices.$inferSelect;
 export type SmsPairingInvite = typeof smsPairingInvites.$inferSelect;
 export type SmsRule = typeof smsRules.$inferSelect;
 export type SmsMessage = typeof smsMessages.$inferSelect;
+export type TaxYear = typeof taxYears.$inferSelect;
 
 export type AccountType = Account['type'];
 export type AssetType = Asset['type'];

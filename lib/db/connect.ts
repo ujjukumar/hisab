@@ -109,11 +109,12 @@ export const TABLES = [
   'categories',
   'accounts',
   'settings',
+  'tax_years',
 ] as const;
 const REQUIRED_BACKUP_TABLES = TABLES.filter(
   (table) =>
     !(
-      ['sms_messages', 'sms_pairing_invites', 'sms_rules', 'sms_devices', 'benchmark_prices', 'benchmarks'] as readonly string[]
+      ['sms_messages', 'sms_pairing_invites', 'sms_rules', 'sms_devices', 'benchmark_prices', 'benchmarks', 'tax_years'] as readonly string[]
     ).includes(table),
 );
 

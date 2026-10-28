@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assetSchema, investmentTxnSchema } from '@/lib/validation/investments';
 import { accountSchema, budgetSchema, transactionSchema } from '@/lib/validation/money';
+import { taxYearSchema } from '@/lib/validation/tax';
 
 const base = {
   type: 'expense',
@@ -191,5 +192,37 @@ describe('investmentTxnSchema', () => {
     const r = investmentTxnSchema.parse({ ...day, action: 'buy' });
     expect(r.sellPrice).toBeNull();
     expect(r.amount).toBe(482000);
+  });
+});
+
+describe('taxYearSchema', () => {
+  it('reads amounts, with empty as zero and empty overrides as null', () => {
+    const r = taxYearSchema.parse({
+      year: '2025',
+      grossSalary: '12,40,000',
+      salaryTds: '',
+      otherTds: '1500.50',
+      taxPaid: '0',
+      otherIncome: '',
+      interestOverride: '',
+      dividendOverride: '0',
+    });
+    expect(r).toEqual({
+      year: 2025,
+      grossSalary: 124_000_000,
+      salaryTds: 0,
+      otherTds: 150_050,
+      taxPaid: 0,
+      otherIncome: 0,
+      interestOverride: null,
+      dividendOverride: 0,
+    });
+  });
+
+  it('rejects negative and malformed amounts', () => {
+    const r = taxYearSchema.safeParse({ year: '2025', grossSalary: '-5', salaryTds: 'abc' });
+    expect(r.success).toBe(false);
+    const paths = r.success ? [] : r.error.issues.map((i) => i.path[0]);
+    expect(paths).toEqual(expect.arrayContaining(['grossSalary', 'salaryTds']));
   });
 });
