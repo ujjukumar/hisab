@@ -13,11 +13,16 @@ import {
   type Column,
 } from '@/components/DataTable/DataTable';
 import { Drawer } from '@/components/Drawer/Drawer';
-import { FieldError, TextField } from '@/components/Field/Field';
+import { FieldError, SelectField, TextField } from '@/components/Field/Field';
 import { Menu } from '@/components/Menu/Menu';
 import { Segmented } from '@/components/Segmented/Segmented';
 import { useToast } from '@/components/Toast/Toast';
-import { deleteCategory, saveCategory, setCategoryArchived } from '@/lib/actions/categories';
+import {
+  deleteCategory,
+  mergeCategory,
+  saveCategory,
+  setCategoryArchived,
+} from '@/lib/actions/categories';
 import { formatAmount } from '@/lib/domain/format';
 import type { CategoryRow } from '@/lib/queries/money';
 import { CATEGORY_COLORS } from '@/lib/validation/money';
@@ -48,6 +53,7 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
   const [editing, setEditing] = useState<{ row?: CategoryRow; kind: Kind; key: number } | null>(
     null,
   );
+  const [merging, setMerging] = useState<{ row: CategoryRow; key: number } | null>(null);
 
   async function run(action: Promise<{ ok: boolean; message?: string }>, done: string) {
     const result = await action;
@@ -139,6 +145,14 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
                     label: 'Archive',
                     onSelect: () => run(setCategoryArchived(c.id, true), 'Category archived'),
                   },
+              ...(rows.some((o) => o.kind === c.kind && o.id !== c.id)
+                ? [
+                    {
+                      label: 'Merge into…',
+                      onSelect: () => setMerging({ row: c, key: Date.now() }),
+                    },
+                  ]
+                : []),
               ...(c.used
                 ? []
                 : [
@@ -183,7 +197,94 @@ export function CategoriesTables({ rows, yearLabel }: { rows: CategoryRow[]; yea
           />
         )}
       </Drawer>
+      <Drawer
+        open={merging !== null}
+        onClose={() => setMerging(null)}
+        title={merging ? `Merge ${merging.row.name}` : 'Merge category'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMerging(null)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="merge-form">
+              Merge
+            </Button>
+          </>
+        }
+      >
+        {merging && (
+          <MergeForm
+            key={merging.key}
+            row={merging.row}
+            options={rows.filter((o) => o.kind === merging.row.kind && o.id !== merging.row.id)}
+            onDone={() => setMerging(null)}
+          />
+        )}
+      </Drawer>
     </>
+  );
+}
+
+function MergeForm({
+  row,
+  options,
+  onDone,
+}: {
+  row: CategoryRow;
+  options: CategoryRow[];
+  onDone: () => void;
+}) {
+  const toast = useToast();
+  const [error, setError] = useState('');
+  const [pending, startTransition] = useTransition();
+  const active = options.filter((o) => !o.archived);
+  const archived = options.filter((o) => o.archived);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const into = Number(new FormData(event.currentTarget).get('into'));
+    const target = options.find((o) => o.id === into);
+    startTransition(async () => {
+      const result = await mergeCategory(row.id, into);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      onDone();
+      toast(`${row.name} merged into ${target?.name ?? 'the other category'}`);
+    });
+  }
+
+  const option = (o: CategoryRow) => (
+    <option key={o.id} value={o.id}>
+      {o.name}
+    </option>
+  );
+
+  return (
+    <form
+      id="merge-form"
+      onSubmit={submit}
+      noValidate
+      aria-busy={pending}
+      style={{ display: 'contents' }}
+    >
+      <p className={styles.mergeNote}>
+        Everything in {row.name} moves to the category you pick: its transactions, budgets and SMS
+        rules. Then {row.name} is deleted. This can’t be undone.
+      </p>
+      <SelectField
+        label="Merge into"
+        name="into"
+        autoFocus
+        invalid={Boolean(error)}
+        aria-describedby={error ? 'e-into' : undefined}
+      >
+        {active.map(option)}
+        {archived.length > 0 && <optgroup label="Archived">{archived.map(option)}</optgroup>}
+      </SelectField>
+      {error && <FieldError id="e-into">{error}</FieldError>}
+    </form>
   );
 }
 

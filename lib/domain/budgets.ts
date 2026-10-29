@@ -19,6 +19,32 @@ export function budgetsForMonth(rows: BudgetRow[], month: IsoMonth): Map<number,
   return out;
 }
 
+/**
+ * One budget history for two categories being merged: from each start month either of
+ * them changed, the new budget is the sum of what both carried then. Months that would
+ * only repeat the amount already carried are left out.
+ */
+export function mergeBudgetRows(
+  a: Omit<BudgetRow, 'categoryId'>[],
+  b: Omit<BudgetRow, 'categoryId'>[],
+): { startMonth: IsoMonth; amount: Paise }[] {
+  const carried = (rows: Omit<BudgetRow, 'categoryId'>[], month: IsoMonth) =>
+    budgetsForMonth(
+      rows.map((r) => ({ ...r, categoryId: 0 })),
+      month,
+    ).get(0) ?? 0;
+  const months = [...new Set([...a, ...b].map((r) => r.startMonth))].sort();
+  const out: { startMonth: IsoMonth; amount: Paise }[] = [];
+  let previous = 0;
+  for (const month of months) {
+    const amount = carried(a, month) + carried(b, month);
+    if (amount === previous) continue;
+    out.push({ startMonth: month, amount });
+    previous = amount;
+  }
+  return out;
+}
+
 export type BudgetLine = {
   categoryId: number;
   budget: Paise;

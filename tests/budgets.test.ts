@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetsForMonth, budgetTotals } from '@/lib/domain/budgets';
+import { budgetsForMonth, budgetTotals, mergeBudgetRows } from '@/lib/domain/budgets';
 
 const rows = [
   { categoryId: 1, startMonth: '2026-01', amount: 1000 },
@@ -86,5 +86,36 @@ describe('budgetTotals', () => {
       over: false,
       unbudgetedSpent: 500,
     });
+  });
+});
+
+describe('mergeBudgetRows', () => {
+  it('adds up what both categories carry from every month either changed', () => {
+    const dining = [{ startMonth: '2026-01', amount: 1000 }];
+    const food = [
+      { startMonth: '2026-03', amount: 500 },
+      { startMonth: '2026-06', amount: 700 },
+    ];
+    expect(mergeBudgetRows(dining, food)).toEqual([
+      { startMonth: '2026-01', amount: 1000 },
+      { startMonth: '2026-03', amount: 1500 },
+      { startMonth: '2026-06', amount: 1700 },
+    ]);
+  });
+
+  it('keeps a stop to 0 and leaves out months that change nothing', () => {
+    const a = [
+      { startMonth: '2026-01', amount: 800 },
+      { startMonth: '2026-04', amount: 0 },
+    ];
+    const b = [{ startMonth: '2026-01', amount: 0 }];
+    expect(mergeBudgetRows(a, b)).toEqual([
+      { startMonth: '2026-01', amount: 800 },
+      { startMonth: '2026-04', amount: 0 },
+    ]);
+  });
+
+  it('is empty when neither had a budget', () => {
+    expect(mergeBudgetRows([], [])).toEqual([]);
   });
 });
