@@ -23,6 +23,16 @@ function key(): Buffer {
   return decoded;
 }
 
+/** Whether SMS_ENCRYPTION_KEY is set to a usable key, so SMS can be stored. */
+export function smsEncryptionConfigured(): boolean {
+  try {
+    key();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function createSmsToken(): string {
   return randomBytes(32).toString('base64url');
 }

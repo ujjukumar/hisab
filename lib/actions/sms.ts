@@ -18,12 +18,12 @@ import { smsContentHash, type SmsDirection, type SmsEnvelope } from '@/lib/domai
 import { parsePositivePaise } from '@/lib/domain/money';
 import { isValidDate } from '@/lib/domain/dates';
 import { smsPairingInviteState } from '@/lib/queries/sms';
-import { readSms, type Tx } from '@/lib/actions/smsRead';
+import { type Tx } from '@/lib/actions/smsRead';
+import { storeSms } from '@/lib/actions/smsInbound';
 import {
   ENCRYPTION_KEY_REQUIRED,
   createSmsToken,
   decryptSmsText,
-  encryptSmsBody,
   encryptSmsText,
   hashSmsToken,
 } from '@/lib/sms/security';
@@ -500,52 +500,7 @@ export async function receiveSms(token: string, input: unknown): Promise<SmsRece
       .get();
     if (duplicate) return { ok: true, status: 'duplicate', id: duplicate.id };
 
-    const { importable, fields } = readSms(tx, envelope);
-    const received = {
-      deviceId: device.id,
-      providerMessageId: envelope.messageId ?? null,
-      sender: envelope.sender,
-      receivedAt: envelope.receivedAt,
-      contentHash,
-      ...fields,
-    };
-    if (importable) {
-      const transaction = tx
-        .insert(transactions)
-        .values({
-          date: importable.transactionDate,
-          type: importable.type,
-          amount: importable.amount,
-          accountId: importable.accountId,
-          toAccountId: importable.toAccountId,
-          categoryId: importable.categoryId,
-          description: importable.description,
-        })
-        .returning({ id: transactions.id })
-        .get();
-      const message = tx
-        .insert(smsMessages)
-        .values({
-          ...received,
-          rawCiphertext: null,
-          status: 'imported',
-          transactionId: transaction.id,
-          reason: null,
-          ruleId: importable.ruleId,
-          decidedBy: 'rule',
-          decidedAt: new Date().toISOString(),
-        })
-        .returning({ id: smsMessages.id })
-        .get();
-      return { ok: true, status: 'imported', id: message.id };
-    }
-
-    const message = tx
-      .insert(smsMessages)
-      .values({ ...received, rawCiphertext: encryptSmsBody(envelope.body), status: 'pending' })
-      .returning({ id: smsMessages.id })
-      .get();
-    return { ok: true, status: 'queued', id: message.id };
+    return { ok: true, ...storeSms(tx, device.id, envelope, contentHash) };
   });
 }
 

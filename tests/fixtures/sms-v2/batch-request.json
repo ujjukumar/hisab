@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "installationId": "invented-installation-fixture",
+  "messages": [
+    {
+      "messageId": "18342",
+      "sender": "VM-INVBNK-S",
+      "receivedAt": "2026-10-30T10:42:05.120+05:30",
+      "body": "INR 450.00 debited from a/c XX1234 on 30-10-26 to VPA invented@upi. Ref 630412345678.",
+      "source": "live"
+    },
+    {
+      "messageId": "18343",
+      "sender": "AD-INVCRD-T",
+      "receivedAt": "2026-10-30T10:44:51+05:30",
+      "body": "Your invented card statement is ready. Total amount due Rs 2,310.00 by 15-11-26.",
+      "source": "history"
+    },
+    {
+      "messageId": "18344",
+      "sender": "VM-INVBNK-S",
+      "receivedAt": "not a time",
+      "body": "This one is malformed on purpose.",
+      "source": "live"
+    }
+  ]
+}

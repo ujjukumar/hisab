@@ -15,7 +15,7 @@ backlog. Section numbers stay stable because code and tests refer to them.
 ## 1. Project summary
 
 A personal finance web app for one owner in India, storing everything in one SQLite
-file. It listens only on `127.0.0.1`; on the owner's Raspberry Pi, a tailnet-only
+file. It listens only on `127.0.0.1`; on the owner's VM, a tailnet-only
 proxy is the sole way in. Currency is ₹ only, with Indian grouping (1,08,289) and
 Lakh/Crore in headline figures.
 
@@ -117,7 +117,9 @@ transaction. Deleting either row removes both, with Undo.
 
 A paired phone posts SMS to the tailnet-only receiver; messages are stored
 encrypted until decided. Pairing uses a one-time QR code (10 minutes, hashes only);
-request-and-approve remains for older app versions. Approving a message can teach a
+request-and-approve remains for older app versions. Current apps send batches of up
+to 50 to `/api/sms/v2/batch` and check the connection with `/api/sms/v2/status`;
+duplicates are matched across every pairing of the same installation. Approving a message can teach a
 rule from its sender and structure; later messages that match exactly import
 automatically, everything else waits for review. Transfers between own accounts
 are supported; a matching transfer already in Money within three days is offered
@@ -372,7 +374,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Topic | Decision | Reason |
 |---|---|---|
 | Language | TypeScript (Next.js) | One language across the stack |
-| Hosting | `127.0.0.1` only, single user, no login; tailnet-only proxy on the Pi | Personal data stays private |
+| Hosting | `127.0.0.1` only, single user, no login; tailnet-only proxy on the VM | Personal data stays private |
 | SQLite driver | Node's `node:sqlite` with Drizzle's driver | No native build on Windows; upgrade carefully |
 | Styling | Mockup CSS, CSS Modules, no Tailwind | The design already exists as CSS |
 | Charts | Custom SVG | Matches the design exactly |
@@ -411,6 +413,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Dashboard redesign | 28 Oct 2026 | Rebuilt around three jobs: how wealth moved, what needs action, whether the month is on track. Card accounts gain a bill due day; Allocation, returns by type, income vs spending and the spending donut moved off the Dashboard to Investments and Reports; the month picker went. |
 | Tax tab | 28 Oct 2026 | New-regime estimate from FY 2024-25: FIFO capital gains with set-off, interest and dividends from Money and Investments, hand-entered salary and TDS, rebate, marginal relief and cess, and a sales table. FY 2026-27 rules wait for verified figures. Salary and TDS are then worked back from take-home pay in Money, with Form 16 figures as optional replacements. |
 | Refract redesign | 29 Oct 2026 | Hallmark full redesign in the Refract theme, locked in `DESIGN.md`: warm white paper, pool-blue ink and one blue for actions, Funnel Display over Funnel Sans with tabular numerals, white cards with tinted shadows, pill controls, light and dark modes. Every link, field and handler kept; Floor 3 to 1 (the same checker false positive), Reflex 4 to 0. |
+| SMS protocol v2 | 30 Oct 2026 | Batch receiver at `/api/sms/v2/batch` (up to 50 SMS, one result each) and a connection check at `/api/sms/v2/status`. Errors carry a code; a wrong or revoked token now returns 401 so the app knows to pair again; a missing encryption key returns 503 instead of a crash. Duplicates are matched across re-pairings of the same phone. Version 1 still works. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.

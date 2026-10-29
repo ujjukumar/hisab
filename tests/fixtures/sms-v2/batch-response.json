@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "results": [
+    { "messageId": "18342", "status": "accepted", "id": 1, "imported": false },
+    { "messageId": "18343", "status": "accepted", "id": 2, "imported": false },
+    {
+      "messageId": "18344",
+      "status": "rejected",
+      "code": "invalid",
+      "message": "The received time must be an ISO date and time with an offset."
+    }
+  ]
+}

@@ -100,22 +100,57 @@ code and the token. Revoke a phone under Money → SMS → Devices if it is lost
 Older app versions still use request-and-approve through `/api/sms/pair`; their
 requests wait under Devices → Waiting to connect.
 
-Store the returned bearer token only in the paired
-Android app. Send SMS envelopes to `POST /api/sms/inbound` with
-`Authorization: Bearer <token>`:
+Store the returned bearer token only in the paired Android app, and send it as
+`Authorization: Bearer <token>`.
+
+Current app versions send up to 50 SMS at a time to `POST /api/sms/v2/batch`:
 
 ```json
 {
-  "schemaVersion": 1,
-  "messageId": "android-provider-message-id",
-  "sender": "BANK-INFO",
-  "receivedAt": "2026-10-07T08:00:00+05:30",
-  "body": "INR 1,250.50 credited on 07/10/2026. Ref UPI ABC12345"
+  "schemaVersion": 2,
+  "installationId": "app-installation-id",
+  "messages": [
+    {
+      "messageId": "android-provider-message-id",
+      "sender": "BANK-INFO",
+      "receivedAt": "2026-10-07T08:00:00+05:30",
+      "body": "INR 1,250.50 credited on 07/10/2026. Ref UPI ABC12345",
+      "source": "live"
+    }
+  ]
 }
 ```
 
+The reply has one result per message, in order. Each is `accepted` (with
+`imported` true when a learned rule already made a transaction), `duplicate`, or
+`rejected` with a `code` of `invalid` or `too_large`. Duplicates are found by
+message ID or by the same sender, text and time, across every pairing of the
+same installation, so sending again after re-pairing is safe.
+
+`GET /api/sms/v2/status` checks the connection. It returns the device name,
+the server time, when the last SMS arrived, how many have arrived in total, and
+`configured: false` when `SMS_ENCRYPTION_KEY` is missing.
+
+Errors return `{"ok":false,"code":"…","message":"…"}`:
+
+| Status | Code                    | What the app should do                      |
+| ------ | ----------------------- | ------------------------------------------- |
+| 400    | `invalid_json`          | Fix the app; do not retry the same body     |
+| 400    | `invalid_batch`         | Fix the app; do not retry the same body     |
+| 401    | `token_missing`         | Fix the app                                 |
+| 401    | `token_unknown`         | Pair again                                  |
+| 401    | `device_revoked`        | Pair again                                  |
+| 401    | `installation_mismatch` | Pair again                                  |
+| 413    | `too_large`             | Send fewer messages at a time               |
+| 503    | `server_not_configured` | Keep the SMS and retry later                |
+
+Older app versions send one SMS at a time to `POST /api/sms/inbound` with
+`schemaVersion: 1` and the message fields at the top level. That endpoint still
+works, and returns 503 `server_not_configured` instead of failing when the key
+is missing.
+
 The Android app should retry transport and 5xx failures, treat `duplicate` as
-success, and never assume `queued` means that a ledger transaction exists.
+success, and never assume `accepted` means that a ledger transaction exists.
 Pending raw SMS is encrypted and deleted after approval or rejection. Do not
 put real SMS text in tests, seed data, screenshots or logs.
 

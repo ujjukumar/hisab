@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "configured": true,
+  "device": { "id": 1, "label": "Invented phone" },
+  "serverTime": "2026-10-30T05:15:00.000Z",
+  "lastReceivedAt": "2026-10-30T05:15:00.000Z",
+  "acceptedTotal": 2
+}

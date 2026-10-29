@@ -1,0 +1,58 @@
+[
+  {
+    "http": 401,
+    "body": {
+      "ok": false,
+      "code": "token_missing",
+      "message": "Pair this phone with Hisaab first."
+    }
+  },
+  {
+    "http": 401,
+    "body": {
+      "ok": false,
+      "code": "token_unknown",
+      "message": "Hisaab doesn’t know this phone. Pair it again."
+    }
+  },
+  {
+    "http": 401,
+    "body": {
+      "ok": false,
+      "code": "device_revoked",
+      "message": "This phone was unpaired in Hisaab. Pair it again."
+    }
+  },
+  {
+    "http": 401,
+    "body": {
+      "ok": false,
+      "code": "installation_mismatch",
+      "message": "This token belongs to another installation. Pair this phone again."
+    }
+  },
+  {
+    "http": 400,
+    "body": { "ok": false, "code": "invalid_json", "message": "Send the batch as JSON." }
+  },
+  {
+    "http": 400,
+    "body": {
+      "ok": false,
+      "code": "invalid_batch",
+      "message": "Send schemaVersion 2 and 1 to 50 messages, each with a messageId."
+    }
+  },
+  {
+    "http": 413,
+    "body": { "ok": false, "code": "too_large", "message": "Send at most 256 KB per batch." }
+  },
+  {
+    "http": 503,
+    "body": {
+      "ok": false,
+      "code": "server_not_configured",
+      "message": "Hisaab can’t store SMS yet. Set SMS_ENCRYPTION_KEY on the server and restart it."
+    }
+  }
+]
