@@ -1,13 +1,14 @@
 # Hisaab handoff
 
-Updated: 27 Oct 2026
+Updated: 29 Oct 2026
 
 ## Current state
 
 `master` holds all work. From 27 Oct 2026 the owner develops on the Raspberry Pi and
 it is the live install; the owner's data was restored there from a backup through
-Settings → Restore from backup. The UI polish from the 27 Oct Hallmark audit is done
-(PLAN section 15); the stamp at the top of `styles/globals.css` records what it kept.
+Settings → Restore from backup. The 29 Oct Refract redesign replaced the look
+throughout; `DESIGN.md` holds the system and the stamps at the top of
+`styles/tokens.css` and `styles/globals.css` record what it kept and waived.
 
 ## Pi deployment
 

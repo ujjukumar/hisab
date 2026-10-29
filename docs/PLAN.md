@@ -31,10 +31,12 @@ filing, the old regime, multiple currencies (see section 14).
 
 ## 2. Design
 
-[docs/mockup.html](mockup.html) is the visual reference (invented data). Tokens live
-in [styles/tokens.css](../styles/tokens.css), base styles in
+[DESIGN.md](../DESIGN.md) is the design system (the Refract redesign, 29 Oct 2026);
+[docs/mockup.html](mockup.html) is the older reference and is kept for its invented
+data. Tokens live in [styles/tokens.css](../styles/tokens.css), base styles in
 [styles/globals.css](../styles/globals.css) and fonts in [app/fonts.ts](../app/fonts.ts):
-IBM Plex Sans, IBM Plex Mono for figures and Fraunces for titles. The theme follows
+Funnel Display for titles and big figures, Funnel Sans for everything else, with
+tabular numerals for figures. The theme follows
 the system unless the owner picks light or dark in the top bar. `/dev/ui` (development
 only) shows shared components. Copy, colour, accessibility and layout rules are in
 [CLAUDE.md](../CLAUDE.md#copy-and-design-rules). Labels, tabs, chips, tags and table
@@ -408,6 +410,7 @@ and 360/768/1440px widths with invented data. Charts need zero, one and many poi
 | Move and UI polish | 27 Oct 2026 | Live install and development moved to the Pi. Hallmark audit polish: sentence-case labels and tabs, no dashes or middle-dot separators, field focus outline, import and card spacing, single table heads, 4px spacing, no-ISIN no longer a failed price update, blank future months and empty % p.a. Floor 35 to 1 (a checker false positive), Reflex 139 to 0. |
 | Dashboard redesign | 28 Oct 2026 | Rebuilt around three jobs: how wealth moved, what needs action, whether the month is on track. Card accounts gain a bill due day; Allocation, returns by type, income vs spending and the spending donut moved off the Dashboard to Investments and Reports; the month picker went. |
 | Tax tab | 28 Oct 2026 | New-regime estimate from FY 2024-25: FIFO capital gains with set-off, interest and dividends from Money and Investments, hand-entered salary and TDS, rebate, marginal relief and cess, and a sales table. FY 2026-27 rules wait for verified figures. Salary and TDS are then worked back from take-home pay in Money, with Form 16 figures as optional replacements. |
+| Refract redesign | 29 Oct 2026 | Hallmark full redesign in the Refract theme, locked in `DESIGN.md`: warm white paper, pool-blue ink and one blue for actions, Funnel Display over Funnel Sans with tabular numerals, white cards with tinted shadows, pill controls, light and dark modes. Every link, field and handler kept; Floor 3 to 1 (the same checker false positive), Reflex 4 to 0. |
 
 Owner checks still open: an end-to-end import with a real download and real-account
 balance verification. The SQLite path was tested on Node 26.7, not Node 24.
