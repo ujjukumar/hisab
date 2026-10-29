@@ -1,57 +1,111 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Design tokens, ported from docs/mockup.html. That file is the source of truth for the look. */
+/* Hallmark · shape: app screen · genre: atmospheric · theme: Refract (deal 1/3, seed clean-modern-comforting-personal-c1e3·9a19bc04·2026-10-28·r0) · redesign: full
+ * nav: kept, the project's own top bar on paper · signature: the portfolio value set large over its performance chart · states: empty, error, full, refreshing · refract: water/pool
+ * axes: light/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H3 E4 S4 R4 V4 · weakest: H, an app has no hero, so the investments summary carries the one cast shadow and the light display figure */
+/* Hallmark · waive 22 · --qr-light and --qr-dark · the pairing QR code must stay pure black on pure white so a phone camera can read it */
+/* Design tokens. DESIGN.md at the repo root describes the system; token names are kept so every module reads them. */
 
 :root {
-  --page: #fef1e8;
-  --surface: #ffffff;
-  --surface-2: #f0f0f0;
-  --line: rgba(0, 0, 0, 0.1);
-  --line-strong: rgba(0, 0, 0, 0.24);
-  /* Input boxes read as one shape, so their edge clears 3:1 against whatever fill they sit on. */
-  --field-edge: rgba(0, 0, 0, 0.46);
-  --zebra: #f5f5f5;
-  --heading: #000000;
-  --text: #212529;
-  --text-2: rgba(0, 0, 0, 0.8);
-  --text-3: rgba(0, 0, 0, 0.6);
-  --text-4: rgba(0, 0, 0, 0.4);
-  --primary: #1c509d;
-  --primary-btn: #1c4da0;
-  --on-primary: #ffffff;
-  --primary-glow: rgba(28, 80, 157, 0.32);
-  --gain: #12783c;
-  --loss: #b91014;
-  --gain-tint: rgba(28, 160, 81, 0.1);
-  --gain-tint-strong: rgba(28, 160, 81, 0.2);
-  --loss-tint: rgba(185, 16, 20, 0.08);
-  --loss-tint-strong: rgba(185, 16, 20, 0.17);
-  --accent: #ffa500;
-  --avatar: #fdc9a8;
-  --avatar-fg: #7a3e17;
-  --grid: #e6e6e6;
-  --track: #eee8e3;
-  --c1: #3e6298;
-  --c2: #669c72;
-  --c3: #976550;
-  --c4: #a7749c;
-  --c5: #bec37a;
-  --c6: #66729f;
-  --c7: #c9885a;
-  --c8: #8fa9c9;
-  --c-muted: #a9a9a9;
-  --bar-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.15);
-  --pop-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --drawer-shadow: -4px 0 8px rgba(0, 0, 0, 0.25);
-  --backdrop: rgba(0, 0, 0, 0.35);
-  --toast-bg: #212529;
-  --toast-fg: #ffffff;
-  /* The pairing QR code stays black on white in every theme, so phone cameras can read it. */
-  --qr-light: #ffffff;
-  --qr-dark: #000000;
+  /* ---------- scale (shared by both modes) ---------- */
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
 
-  --sans: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-  --mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --serif: var(--font-serif), Georgia, 'Times New Roman', serif;
+  /* Fixed 1.125 scale on a 15px body; no fluid heads in an app. */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-cell: 14px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 40px;
+
+  --radius-card: 22px;
+  --radius-inner: 12px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+
+  --sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --display: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Kept for older modules: the title face is now the display face, not a serif. */
+  --serif: var(--display);
+  /* Raw SMS text and pairing codes only; figures use the sans with tabular numerals. */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --tracking-display: -0.032em;
+
+  /* ---------- light: Refract, pool colourway ---------- */
+  --page: oklch(97.4% 0.007 95);
+  --surface: oklch(99.7% 0.003 95);
+  --surface-2: oklch(95.6% 0.011 225);
+  --line: oklch(90% 0.009 230);
+  --line-strong: oklch(81% 0.014 235);
+  /* Input boxes read as one shape, so their edge clears 3:1 against whatever fill they sit on. */
+  --field-edge: oklch(62% 0.02 240);
+  --zebra: oklch(97.8% 0.005 225);
+  --heading: oklch(23% 0.035 245);
+  --text: oklch(29% 0.035 245);
+  --text-2: oklch(36% 0.032 245);
+  --text-3: oklch(47% 0.026 240);
+  --text-4: oklch(63% 0.02 240);
+  --primary: oklch(48% 0.12 236);
+  --primary-btn: oklch(49% 0.12 234);
+  --primary-btn-hi: oklch(44% 0.12 236);
+  --on-primary: oklch(99% 0.003 95);
+  --primary-glow: oklch(50% 0.12 234 / 0.26);
+  --primary-soft: oklch(94% 0.026 222);
+  --focus: oklch(56% 0.14 234);
+  --gain: oklch(47% 0.12 152);
+  --loss: oklch(50% 0.18 27);
+  --gain-tint: oklch(62% 0.13 152 / 0.12);
+  --gain-tint-strong: oklch(62% 0.13 152 / 0.22);
+  --loss-tint: oklch(58% 0.18 27 / 0.09);
+  --loss-tint-strong: oklch(58% 0.18 27 / 0.17);
+  --accent: oklch(74% 0.07 220);
+  --avatar: oklch(88% 0.045 212);
+  --avatar-fg: oklch(32% 0.06 232);
+  --grid: oklch(91.5% 0.008 230);
+  --track: oklch(93.5% 0.012 225);
+  --c1: oklch(52% 0.12 236);
+  --c2: oklch(66% 0.09 190);
+  --c3: oklch(66% 0.1 50);
+  --c4: oklch(58% 0.09 295);
+  --c5: oklch(76% 0.1 95);
+  --c6: oklch(68% 0.06 255);
+  --c7: oklch(70% 0.07 355);
+  --c8: oklch(80% 0.07 215);
+  --c-muted: oklch(78% 0.012 240);
+  --edge-light: inset 0 1px 0 oklch(100% 0 0 / 0.9), inset 0 0 0 1px oklch(100% 0 0 / 0.55);
+  --btn-edge: inset 0 1px 0 oklch(100% 0 0 / 0.24);
+  --shadow-card: 14px 22px 44px -28px oklch(52% 0.09 220 / 0.34), 1px 2px 5px -2px oklch(40% 0.05 230 / 0.12);
+  --shadow-lift: 18px 30px 52px -26px oklch(52% 0.09 220 / 0.42), 2px 3px 7px -2px oklch(40% 0.05 230 / 0.14);
+  --shadow-cast: 28px 40px 70px -30px oklch(60% 0.11 212 / 0.45), 1px 2px 5px -2px oklch(40% 0.05 230 / 0.12);
+  --bar-shadow: 0 1px 0 oklch(90% 0.009 230);
+  --pop-shadow: 12px 20px 40px -18px oklch(45% 0.08 225 / 0.36), 0 2px 6px -1px oklch(40% 0.05 230 / 0.14);
+  --drawer-shadow: -24px 0 60px -20px oklch(45% 0.08 225 / 0.36);
+  --backdrop: oklch(26% 0.04 240 / 0.3);
+  --toast-bg: oklch(23% 0.035 245);
+  --toast-fg: oklch(98% 0.006 95);
+  /* The pairing QR code stays black on white in every theme, so phone cameras can read it. */
+  --qr-light: oklch(100% 0 0);
+  --qr-dark: oklch(0% 0 0);
 
   color-scheme: light;
   box-sizing: border-box;
@@ -59,139 +113,169 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* ---------- dark: the same pool at night ---------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --page: #17120f;
-    --surface: #221c18;
-    --surface-2: #2e2722;
-    --line: rgba(255, 255, 255, 0.1);
-    --line-strong: rgba(255, 255, 255, 0.24);
-    --field-edge: rgba(255, 255, 255, 0.42);
-    --zebra: rgba(255, 255, 255, 0.035);
-    --heading: #ffffff;
-    --text: #ece6e1;
-    --text-2: rgba(255, 255, 255, 0.8);
-    --text-3: rgba(255, 255, 255, 0.6);
-    --text-4: rgba(255, 255, 255, 0.38);
-    --primary: #8cb0ec;
-    --primary-btn: #2f63b8;
-    --primary-glow: rgba(120, 160, 230, 0.28);
-    --gain: #5ccb8a;
-    --loss: #ff7b73;
-    --gain-tint: rgba(92, 203, 138, 0.1);
-    --gain-tint-strong: rgba(92, 203, 138, 0.19);
-    --loss-tint: rgba(255, 123, 115, 0.09);
-    --loss-tint-strong: rgba(255, 123, 115, 0.17);
-    --avatar: #6b4028;
-    --avatar-fg: #ffd9c2;
-    --grid: rgba(255, 255, 255, 0.09);
-    --track: rgba(255, 255, 255, 0.1);
-    --c1: #7d9dd2;
-    --c2: #86bc91;
-    --c3: #c39079;
-    --c4: #c99cbf;
-    --c5: #cdd28e;
-    --c6: #97a1ce;
-    --c7: #dda77a;
-    --c8: #a9c1de;
-    --c-muted: #7e7e7e;
-    --bar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-    --pop-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-    --drawer-shadow: -6px 0 18px rgba(0, 0, 0, 0.5);
-    --backdrop: rgba(0, 0, 0, 0.55);
-    --toast-bg: #ece6e1;
-    --toast-fg: #17120f;
+    --page: oklch(18.5% 0.022 245);
+    --surface: oklch(22.5% 0.026 243);
+    --surface-2: oklch(26.5% 0.028 240);
+    --line: oklch(100% 0 0 / 0.09);
+    --line-strong: oklch(100% 0 0 / 0.2);
+    --field-edge: oklch(100% 0 0 / 0.42);
+    --zebra: oklch(100% 0 0 / 0.03);
+    --heading: oklch(97% 0.008 225);
+    --text: oklch(91% 0.012 230);
+    --text-2: oklch(85% 0.014 230);
+    --text-3: oklch(73% 0.018 232);
+    --text-4: oklch(59% 0.02 235);
+    --primary: oklch(79% 0.1 228);
+    --primary-btn: oklch(53% 0.12 234);
+    --primary-btn-hi: oklch(58% 0.12 234);
+    --on-primary: oklch(99% 0.003 95);
+    --primary-glow: oklch(60% 0.12 230 / 0.3);
+    --primary-soft: oklch(32% 0.05 234);
+    --focus: oklch(74% 0.12 230);
+    --gain: oklch(79% 0.13 155);
+    --loss: oklch(75% 0.14 25);
+    --gain-tint: oklch(79% 0.13 155 / 0.11);
+    --gain-tint-strong: oklch(79% 0.13 155 / 0.2);
+    --loss-tint: oklch(75% 0.14 25 / 0.1);
+    --loss-tint-strong: oklch(75% 0.14 25 / 0.18);
+    --accent: oklch(62% 0.08 222);
+    --avatar: oklch(38% 0.05 225);
+    --avatar-fg: oklch(92% 0.035 212);
+    --grid: oklch(100% 0 0 / 0.08);
+    --track: oklch(100% 0 0 / 0.1);
+    --c1: oklch(72% 0.11 236);
+    --c2: oklch(76% 0.09 190);
+    --c3: oklch(76% 0.09 50);
+    --c4: oklch(72% 0.08 295);
+    --c5: oklch(82% 0.09 95);
+    --c6: oklch(74% 0.06 255);
+    --c7: oklch(78% 0.07 355);
+    --c8: oklch(86% 0.06 215);
+    --c-muted: oklch(55% 0.015 240);
+    --edge-light: inset 0 1px 0 oklch(100% 0 0 / 0.06), inset 0 0 0 1px oklch(100% 0 0 / 0.05);
+  --btn-edge: inset 0 1px 0 oklch(100% 0 0 / 0.16);
+    --shadow-card: 14px 22px 44px -26px oklch(8% 0.03 245 / 0.7), 1px 2px 5px -2px oklch(8% 0.03 245 / 0.5);
+    --shadow-lift: 18px 30px 52px -24px oklch(8% 0.03 245 / 0.78), 2px 3px 7px -2px oklch(8% 0.03 245 / 0.55);
+    --shadow-cast: 28px 40px 70px -28px oklch(6% 0.03 245 / 0.85), 1px 2px 5px -2px oklch(8% 0.03 245 / 0.5);
+    --bar-shadow: 0 1px 0 oklch(100% 0 0 / 0.07);
+    --pop-shadow: 12px 20px 40px -16px oklch(6% 0.03 245 / 0.8), 0 2px 6px -1px oklch(6% 0.03 245 / 0.5);
+    --drawer-shadow: -24px 0 60px -16px oklch(6% 0.03 245 / 0.8);
+    --backdrop: oklch(8% 0.03 245 / 0.55);
+    --toast-bg: oklch(91% 0.012 230);
+    --toast-fg: oklch(18.5% 0.022 245);
     color-scheme: dark;
   }
 }
 
-/* Explicit override, used by the /dev/ui dark panel and any future theme switch. */
+/* Explicit override, used by the theme toggle and the /dev/ui dark panel. */
 :root[data-theme='dark'],
 [data-theme='dark'] {
-  --page: #17120f;
-  --surface: #221c18;
-  --surface-2: #2e2722;
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --field-edge: rgba(255, 255, 255, 0.42);
-  --zebra: rgba(255, 255, 255, 0.035);
-  --heading: #ffffff;
-  --text: #ece6e1;
-  --text-2: rgba(255, 255, 255, 0.8);
-  --text-3: rgba(255, 255, 255, 0.6);
-  --text-4: rgba(255, 255, 255, 0.38);
-  --primary: #8cb0ec;
-  --primary-btn: #2f63b8;
-  --primary-glow: rgba(120, 160, 230, 0.28);
-  --gain: #5ccb8a;
-  --loss: #ff7b73;
-  --gain-tint: rgba(92, 203, 138, 0.1);
-  --gain-tint-strong: rgba(92, 203, 138, 0.19);
-  --loss-tint: rgba(255, 123, 115, 0.09);
-  --loss-tint-strong: rgba(255, 123, 115, 0.17);
-  --avatar: #6b4028;
-  --avatar-fg: #ffd9c2;
-  --grid: rgba(255, 255, 255, 0.09);
-  --track: rgba(255, 255, 255, 0.1);
-  --c1: #7d9dd2;
-  --c2: #86bc91;
-  --c3: #c39079;
-  --c4: #c99cbf;
-  --c5: #cdd28e;
-  --c6: #97a1ce;
-  --c7: #dda77a;
-  --c8: #a9c1de;
-  --c-muted: #7e7e7e;
-  --bar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-  --pop-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-  --drawer-shadow: -6px 0 18px rgba(0, 0, 0, 0.5);
-  --backdrop: rgba(0, 0, 0, 0.55);
-  --toast-bg: #ece6e1;
-  --toast-fg: #17120f;
+  --page: oklch(18.5% 0.022 245);
+  --surface: oklch(22.5% 0.026 243);
+  --surface-2: oklch(26.5% 0.028 240);
+  --line: oklch(100% 0 0 / 0.09);
+  --line-strong: oklch(100% 0 0 / 0.2);
+  --field-edge: oklch(100% 0 0 / 0.42);
+  --zebra: oklch(100% 0 0 / 0.03);
+  --heading: oklch(97% 0.008 225);
+  --text: oklch(91% 0.012 230);
+  --text-2: oklch(85% 0.014 230);
+  --text-3: oklch(73% 0.018 232);
+  --text-4: oklch(59% 0.02 235);
+  --primary: oklch(79% 0.1 228);
+  --primary-btn: oklch(53% 0.12 234);
+  --primary-btn-hi: oklch(58% 0.12 234);
+  --on-primary: oklch(99% 0.003 95);
+  --primary-glow: oklch(60% 0.12 230 / 0.3);
+  --primary-soft: oklch(32% 0.05 234);
+  --focus: oklch(74% 0.12 230);
+  --gain: oklch(79% 0.13 155);
+  --loss: oklch(75% 0.14 25);
+  --gain-tint: oklch(79% 0.13 155 / 0.11);
+  --gain-tint-strong: oklch(79% 0.13 155 / 0.2);
+  --loss-tint: oklch(75% 0.14 25 / 0.1);
+  --loss-tint-strong: oklch(75% 0.14 25 / 0.18);
+  --accent: oklch(62% 0.08 222);
+  --avatar: oklch(38% 0.05 225);
+  --avatar-fg: oklch(92% 0.035 212);
+  --grid: oklch(100% 0 0 / 0.08);
+  --track: oklch(100% 0 0 / 0.1);
+  --c1: oklch(72% 0.11 236);
+  --c2: oklch(76% 0.09 190);
+  --c3: oklch(76% 0.09 50);
+  --c4: oklch(72% 0.08 295);
+  --c5: oklch(82% 0.09 95);
+  --c6: oklch(74% 0.06 255);
+  --c7: oklch(78% 0.07 355);
+  --c8: oklch(86% 0.06 215);
+  --c-muted: oklch(55% 0.015 240);
+  --edge-light: inset 0 1px 0 oklch(100% 0 0 / 0.06), inset 0 0 0 1px oklch(100% 0 0 / 0.05);
+  --btn-edge: inset 0 1px 0 oklch(100% 0 0 / 0.16);
+  --shadow-card: 14px 22px 44px -26px oklch(8% 0.03 245 / 0.7), 1px 2px 5px -2px oklch(8% 0.03 245 / 0.5);
+  --shadow-lift: 18px 30px 52px -24px oklch(8% 0.03 245 / 0.78), 2px 3px 7px -2px oklch(8% 0.03 245 / 0.55);
+  --shadow-cast: 28px 40px 70px -28px oklch(6% 0.03 245 / 0.85), 1px 2px 5px -2px oklch(8% 0.03 245 / 0.5);
+  --bar-shadow: 0 1px 0 oklch(100% 0 0 / 0.07);
+  --pop-shadow: 12px 20px 40px -16px oklch(6% 0.03 245 / 0.8), 0 2px 6px -1px oklch(6% 0.03 245 / 0.5);
+  --drawer-shadow: -24px 0 60px -16px oklch(6% 0.03 245 / 0.8);
+  --backdrop: oklch(8% 0.03 245 / 0.55);
+  --toast-bg: oklch(91% 0.012 230);
+  --toast-fg: oklch(18.5% 0.022 245);
   color-scheme: dark;
 }
 
 [data-theme='light'] {
-  --page: #fef1e8;
-  --surface: #ffffff;
-  --surface-2: #f0f0f0;
-  --line: rgba(0, 0, 0, 0.1);
-  --line-strong: rgba(0, 0, 0, 0.24);
-  /* Input boxes read as one shape, so their edge clears 3:1 against whatever fill they sit on. */
-  --field-edge: rgba(0, 0, 0, 0.46);
-  --zebra: #f5f5f5;
-  --heading: #000000;
-  --text: #212529;
-  --text-2: rgba(0, 0, 0, 0.8);
-  --text-3: rgba(0, 0, 0, 0.6);
-  --text-4: rgba(0, 0, 0, 0.4);
-  --primary: #1c509d;
-  --primary-btn: #1c4da0;
-  --primary-glow: rgba(28, 80, 157, 0.32);
-  --gain: #12783c;
-  --loss: #b91014;
-  --gain-tint: rgba(28, 160, 81, 0.1);
-  --gain-tint-strong: rgba(28, 160, 81, 0.2);
-  --loss-tint: rgba(185, 16, 20, 0.08);
-  --loss-tint-strong: rgba(185, 16, 20, 0.17);
-  --avatar: #fdc9a8;
-  --avatar-fg: #7a3e17;
-  --grid: #e6e6e6;
-  --track: #eee8e3;
-  --c1: #3e6298;
-  --c2: #669c72;
-  --c3: #976550;
-  --c4: #a7749c;
-  --c5: #bec37a;
-  --c6: #66729f;
-  --c7: #c9885a;
-  --c8: #8fa9c9;
-  --c-muted: #a9a9a9;
-  --bar-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.15);
-  --pop-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --drawer-shadow: -4px 0 8px rgba(0, 0, 0, 0.25);
-  --backdrop: rgba(0, 0, 0, 0.35);
-  --toast-bg: #212529;
-  --toast-fg: #ffffff;
+  --page: oklch(97.4% 0.007 95);
+  --surface: oklch(99.7% 0.003 95);
+  --surface-2: oklch(95.6% 0.011 225);
+  --line: oklch(90% 0.009 230);
+  --line-strong: oklch(81% 0.014 235);
+  --field-edge: oklch(62% 0.02 240);
+  --zebra: oklch(97.8% 0.005 225);
+  --heading: oklch(23% 0.035 245);
+  --text: oklch(29% 0.035 245);
+  --text-2: oklch(36% 0.032 245);
+  --text-3: oklch(47% 0.026 240);
+  --text-4: oklch(63% 0.02 240);
+  --primary: oklch(48% 0.12 236);
+  --primary-btn: oklch(49% 0.12 234);
+  --primary-btn-hi: oklch(44% 0.12 236);
+  --on-primary: oklch(99% 0.003 95);
+  --primary-glow: oklch(50% 0.12 234 / 0.26);
+  --primary-soft: oklch(94% 0.026 222);
+  --focus: oklch(56% 0.14 234);
+  --gain: oklch(47% 0.12 152);
+  --loss: oklch(50% 0.18 27);
+  --gain-tint: oklch(62% 0.13 152 / 0.12);
+  --gain-tint-strong: oklch(62% 0.13 152 / 0.22);
+  --loss-tint: oklch(58% 0.18 27 / 0.09);
+  --loss-tint-strong: oklch(58% 0.18 27 / 0.17);
+  --accent: oklch(74% 0.07 220);
+  --avatar: oklch(88% 0.045 212);
+  --avatar-fg: oklch(32% 0.06 232);
+  --grid: oklch(91.5% 0.008 230);
+  --track: oklch(93.5% 0.012 225);
+  --c1: oklch(52% 0.12 236);
+  --c2: oklch(66% 0.09 190);
+  --c3: oklch(66% 0.1 50);
+  --c4: oklch(58% 0.09 295);
+  --c5: oklch(76% 0.1 95);
+  --c6: oklch(68% 0.06 255);
+  --c7: oklch(70% 0.07 355);
+  --c8: oklch(80% 0.07 215);
+  --c-muted: oklch(78% 0.012 240);
+  --edge-light: inset 0 1px 0 oklch(100% 0 0 / 0.9), inset 0 0 0 1px oklch(100% 0 0 / 0.55);
+  --btn-edge: inset 0 1px 0 oklch(100% 0 0 / 0.24);
+  --shadow-card: 14px 22px 44px -28px oklch(52% 0.09 220 / 0.34), 1px 2px 5px -2px oklch(40% 0.05 230 / 0.12);
+  --shadow-lift: 18px 30px 52px -26px oklch(52% 0.09 220 / 0.42), 2px 3px 7px -2px oklch(40% 0.05 230 / 0.14);
+  --shadow-cast: 28px 40px 70px -30px oklch(60% 0.11 212 / 0.45), 1px 2px 5px -2px oklch(40% 0.05 230 / 0.12);
+  --bar-shadow: 0 1px 0 oklch(90% 0.009 230);
+  --pop-shadow: 12px 20px 40px -18px oklch(45% 0.08 225 / 0.36), 0 2px 6px -1px oklch(40% 0.05 230 / 0.14);
+  --drawer-shadow: -24px 0 60px -20px oklch(45% 0.08 225 / 0.36);
+  --backdrop: oklch(26% 0.04 240 / 0.3);
+  --toast-bg: oklch(23% 0.035 245);
+  --toast-fg: oklch(98% 0.006 95);
   color-scheme: light;
 }
