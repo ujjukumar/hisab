@@ -7,21 +7,21 @@ log current with a short outcome, not a transcript of implementation steps.
 
 ## Where the app runs
 
-Development happens directly on the Raspberry Pi `ujju@pi`, in `/home/ujju/repos/hisab`,
-which is also the live install. [docs/HANDOFF.md](docs/HANDOFF.md) has the details.
+The live install is the VM `ujju@myvm`, in `/home/ujju/hisaab`. Connect with
+`ssh ujju@myvm -i "C:\Users\ujju\.ssh\myvm_ssh_key.pem"`. The Raspberry Pi is not used
+for Hisaab. [docs/HANDOFF.md](docs/HANDOFF.md) has the details.
 
-- Node 26 comes from nvm (`/home/ujju/.nvm/versions/node/v26.12.1/bin`), which meets
-  the Node 24+ requirement.
-- The live app is `hisaab.service` on `127.0.0.1:8080`, served on the tailnet at
-  `https://pi.tail276cc3.ts.net`. Its database is `data/finance.db` and holds the
+- Node 24 on the VM comes from `/home/ujju/.local/opt/node24/bin`.
+- The live app is `hisaab.service` on `127.0.0.1:8787`, served on the tailnet at
+  `https://myvm.tail276cc3.ts.net`. Its database is `data/finance.db` and holds the
   owner's real data: never open, query, quote or copy it. For UI checks, run
   `npx next dev -H 127.0.0.1 -p 3123` with `DATABASE_PATH` pointing at a temporary copy
   of the invented seed (the Sample data pill shows). `next dev` writes to `.next/dev`,
   so it leaves the live build alone.
-- To ship: run the checks, commit, `git push origin master`, then
-  `DATABASE_PATH=/home/ujju/repos/hisab/data/finance.db npm run build` (it backs up and
-  migrates), `sudo systemctl restart hisaab.service` and check the URL. Keep
-  `.next/cache` between builds.
+- To ship: run the checks, commit, `git push origin master`, then run
+  `scripts/pull-and-deploy-on-linux.bash` on the VM (pull, `npm ci`, build with the live
+  `DATABASE_PATH`, which backs up and migrates, then restart `hisaab`) and check the
+  URL. Keep `.next/cache` between builds.
 - Commit in small steps with plain messages; GitHub (`origin`, branch `master`) is
   the backup.
 
