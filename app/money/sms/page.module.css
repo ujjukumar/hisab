@@ -1,14 +1,15 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS empty state */
 .empty {
   display: grid;
-  gap: 12px;
+  gap: var(--space-sm);
   justify-items: start;
-  padding: 12px 0;
+  padding: var(--space-sm) 0;
 }
 
 .empty h3 {
   margin: 0;
-  font: 400 21px/1.2 var(--serif);
+  font: 400 var(--text-xl) / 1.2 var(--display);
+  letter-spacing: -0.016em;
   color: var(--heading);
 }
 

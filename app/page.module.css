@@ -1,7 +1,6 @@
-/* Hallmark · checked: 2026-10-27 · genre: editorial (inferred) · scope: app · shape: app screen
- * redesign: full · screen: Net worth band with the bridge, Needs you rail, the month so far with the pace chart, accounts and cards, latest transactions
- * signature: the net worth bridge, start to markets to money in and out to today
- * built: the project · redesign: full · v2.0.0 */
+/* Hallmark · redesign: full · theme: Refract · scope: app · dashboard module
+ * screen: Net worth panel with the bridge, Needs you rail, the month so far with the pace chart, accounts and cards, latest transactions
+ * signature: the net worth figure set light and large over its bridge · v2.0.0 */
 /* Hallmark · dropped {budgetsHref}, {moneyHref}, {monthHref(now)}, /?month=2026-09, /investments/6, /investments/1, /investments/11, /investments/13, /investments/8, /investments/2 · the owner dropped the month picker, and the old movers card's links change with the page period now */
 /* Hallmark · dropped unnamed select 1, #movers-period, #movers-group, #movers-sort, #returns-duration, alloc-by, cash-range, returns-duration, spend-by, worth-range · one page period replaces each card's own period and view controls, as the owner agreed */
 /* Hallmark · dropped october 2026, allocation, top gainers & losers, gaining most, losing most, returns by investment type, income vs spending, where your money went, budgets, recent transactions, accounts · Allocation and returns live on Investments, income vs spending and categories on Reports; the rest became Rose most, Fell most, Closest to budget, Latest transactions and Accounts and cards */
@@ -10,49 +9,56 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
-  margin-top: 12px;
+  gap: var(--space-2xs) var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .worthValue {
-  font: 600 32px/1.1 var(--sans);
+  font: 300 var(--text-4xl)/1.05 var(--display);
+  letter-spacing: -0.024em;
   color: var(--heading);
   font-variant-numeric: tabular-nums;
 }
 
 .worthChange {
-  font: 600 18px/1.2 var(--sans);
+  font: 600 var(--text-lg)/1.2 var(--sans);
   font-variant-numeric: tabular-nums;
 }
 
 .worthOver {
-  color: var(--text-2);
+  color: var(--text-3);
 }
 
 .moved {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 32px;
-  margin-top: 16px;
+  gap: 0 var(--space-xl);
+  margin-top: var(--space-lg);
 }
 
 .moved h3,
 .month h3 {
   margin: 0;
-  font: 600 13px/1.3 var(--sans);
-  color: var(--heading);
+  font: 500 var(--text-sm)/1.3 var(--sans);
+  letter-spacing: 0;
+  color: var(--text-3);
 }
 
 .none {
-  margin: 8px 0 0;
+  margin: var(--space-xs) 0 0;
   color: var(--text-2);
+}
+
+/* Lines up with the first row of the list beside it (list margin plus row padding). */
+.moved .none {
+  margin-top: calc(var(--space-md) + var(--space-sm));
 }
 
 .figures {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px 32px;
-  margin: 16px 0 0;
+  gap: var(--space-md) var(--space-xl);
+  margin: var(--space-md) 0 0;
 }
 
 .figures div {
@@ -60,13 +66,14 @@
 }
 
 .figures dt {
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-3);
 }
 
 .figures dd {
-  margin: 4px 0 0;
-  font: 600 22px/1.2 var(--sans);
+  margin: var(--space-2xs) 0 0;
+  font: 600 var(--text-2xl)/1.2 var(--sans);
   color: var(--heading);
   font-variant-numeric: tabular-nums;
 }
@@ -80,30 +87,30 @@
 }
 
 .figures .figureSub {
-  font: 400 13px/1.4 var(--sans);
-  color: var(--text-2);
+  font: 400 var(--text-sm)/1.4 var(--sans);
+  color: var(--text-3);
 }
 
 .month {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  gap: 32px;
-  margin-top: 24px;
-  padding-top: 24px;
+  gap: var(--space-xl);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
   border-top: 1px solid var(--line);
 }
 
 .budgets {
   display: grid;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
 }
 
 .empty {
-  margin: 16px 0 0;
+  margin: var(--space-md) 0 0;
   color: var(--text-2);
   display: grid;
-  gap: 12px;
+  gap: var(--space-sm);
   justify-items: start;
 }
 
@@ -113,7 +120,7 @@
 
 .steps {
   list-style: none;
-  margin: 16px 0 0;
+  margin: var(--space-md) 0 0;
   padding: 0;
   counter-reset: step;
 }
@@ -123,8 +130,8 @@
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px 16px;
-  padding: 16px 0;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-md) 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -135,14 +142,15 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid var(--line-strong);
+  background: var(--primary-soft);
   font-weight: 600;
-  color: var(--heading);
+  color: var(--primary);
 }
 
 .steps h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0 0 var(--space-2xs);
+  font: 600 var(--text-md)/1.3 var(--sans);
+  letter-spacing: 0;
   color: var(--heading);
 }
 
@@ -188,6 +196,6 @@
 @media (max-width: 560px) {
   .moved {
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    gap: var(--space-md);
   }
 }

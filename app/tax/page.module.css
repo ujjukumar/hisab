@@ -1,29 +1,28 @@
-/* Hallmark · built: 2026-10-28 · scope: app · shape: app screen · theme: custom (existing tokens and fonts) · tone: austere
+/* Hallmark · redesign: full · theme: Refract · scope: app · shape: app screen
  * screen: Tax, the worked sum beside the owner's own figures and what to check before filing
- * idea: the year's tax worked as one column you can audit
  * signature: the slab lines in the worked sum */
 
 .body {
-  margin-top: 24px;
+  margin-top: var(--space-lg);
 }
 
 .side {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-lg);
   min-width: 0;
 }
 
 .checks {
-  margin: 16px 0 0;
-  padding-left: 18px;
+  margin: var(--space-md) 0 0;
+  padding-left: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-xs);
   color: var(--text-2);
 }
 
 .more {
-  margin: 12px 0 0;
-  font-weight: 600;
+  margin: var(--space-sm) 0 0;
+  font-weight: 500;
 }

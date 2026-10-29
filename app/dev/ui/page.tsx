@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Building blocks · Hisaab' };
 
 /**
  * A development-only page showing every shared component side by side in both
- * themes, so changes can be checked against docs/mockup.html.
+ * themes, so changes can be checked against DESIGN.md.
  */
 export default function DevUiPage() {
   if (process.env.NODE_ENV === 'production') notFound();

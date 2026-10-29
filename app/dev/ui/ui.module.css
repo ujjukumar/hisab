@@ -1,4 +1,4 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · dev UI showcase */
 /* Hallmark · waive 24b · .panel's padding-bottom 60px is the scroll spacer under the pinned .panelHead · it is not an off-scale spacing step, the panel head needs that clearance */
 /* Hallmark · waive 71 · h2 spacing follows the pinned .panelHead · the h2 heads sit 25px over, 41px under because the pinned banner that precedes them separates the sections */
 
@@ -31,18 +31,18 @@
   z-index: 5;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  padding: 12px 24px;
-  font: 600 12px/1.4 var(--sans);
+  padding: var(--space-sm) var(--space-lg);
+  font: 600 var(--text-xs)/1.4 var(--sans);
   color: var(--text-3);
 }
 
 .section {
-  padding: 24px 24px 0;
+  padding: var(--space-lg) var(--space-lg) 0;
 }
 
 .section h2 {
-  margin: 0 0 12px;
-  font: 600 12px/1.3 var(--sans);
+  margin: 0 0 var(--space-sm);
+  font: 600 var(--text-xs)/1.3 var(--sans);
   text-wrap: balance;
   color: var(--text-3);
 }
@@ -50,32 +50,32 @@
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-sm);
   align-items: center;
 }
 
 .fields {
   display: grid;
-  gap: 24px;
+  gap: var(--space-lg);
   max-width: 380px;
 }
 
 .swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .swatch {
   width: 46px;
   height: 46px;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   border: 1px solid var(--line);
 }
 
 /* Sample rows carry keyboard focus like the rest of the app. */
 .panel :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 

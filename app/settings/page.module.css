@@ -1,13 +1,13 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · settings about list */
 .about {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 12px 24px;
-  margin: 16px 0 0;
+  gap: var(--space-sm) var(--space-lg);
+  margin: var(--space-md) 0 0;
 }
 
 .about dt {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--heading);
 }
 
@@ -16,27 +16,28 @@
   display: flex;
   flex-direction: column;
   align-items: start;
-  gap: 4px;
+  gap: var(--space-2xs);
   color: var(--text-2);
 }
 
 .aboutMeta {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-3);
 }
 
+/* a file path, shown as code */
 .about code {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 560px) {
   .about {
     grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
+    gap: var(--space-2xs);
   }
   .about dd + dt {
-    margin-top: 12px;
+    margin-top: var(--space-sm);
   }
 }
