@@ -1,13 +1,15 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · group links as quiet pills under the head */
 .subtabs {
-  border-bottom: 1px solid var(--line);
+  padding-top: var(--space-md);
 }
 
 .inner {
   display: flex;
   align-items: center;
+  gap: var(--space-xs);
   overflow-x: auto;
   scrollbar-width: none;
+  padding-block: var(--space-2xs);
 }
 
 .inner::-webkit-scrollbar {
@@ -15,21 +17,29 @@
 }
 
 .inner a {
-  background: none;
-  border: 0;
-  padding: 16px 20px;
-  font: 400 13px/1 var(--sans);
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font: 500 var(--text-sm) / 1 var(--sans);
   color: var(--text-2);
   white-space: nowrap;
-  position: relative;
   text-decoration: none;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
 }
 
-.inner a:first-child {
-  padding-left: 0;
+.inner a:hover {
+  border-color: var(--line-strong);
+  color: var(--heading);
 }
 
 .inner a[aria-current='true'] {
   color: var(--primary);
-  font-weight: 600;
+  background: var(--primary-soft);
+  border-color: transparent;
 }

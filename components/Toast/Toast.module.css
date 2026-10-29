@@ -1,4 +1,4 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · a dark ink pill that rises into place */
 .toast {
   position: fixed;
   left: 50%;
@@ -6,15 +6,15 @@
   transform: translate(-50%, 16px);
   background: var(--toast-bg);
   color: var(--toast-fg);
-  padding: 12px 16px;
-  border-radius: 5px;
-  font-size: 14px;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-cell);
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity 0.2s,
-    transform 0.2s;
-  z-index: 60;
+    opacity var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out);
+  z-index: var(--z-toast);
   max-width: calc(100% - 32px);
   box-shadow: var(--pop-shadow);
 }
@@ -26,12 +26,18 @@
 }
 
 .action {
-  margin-left: 16px;
+  margin-left: var(--space-md);
   background: none;
   border: 0;
   padding: 2px 4px;
-  font: 600 14px/1 var(--sans);
+  font: 600 var(--text-cell)/1 var(--sans);
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }

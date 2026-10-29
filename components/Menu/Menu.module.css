@@ -1,5 +1,4 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · menu inset, menu item padding and the kebab trigger's negative margin · the trigger's hit area grows without moving the row's dots */
+/* Hallmark · redesign: full · theme: Refract · scope: app · a small white popover with soft rows */
 
 /* Built on the popover API so dismissal and top-layer stacking come from the browser. */
 
@@ -7,10 +6,10 @@
   position: fixed;
   margin: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  box-shadow: var(--pop-shadow);
-  padding: 5px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  box-shadow: var(--edge-light), var(--pop-shadow);
+  padding: var(--space-2xs);
   min-width: 200px;
   color: var(--text);
 }
@@ -18,19 +17,26 @@
 .menu button {
   display: block;
   width: 100%;
+  min-height: 36px;
   text-align: left;
   background: none;
   border: 0;
-  padding: 9px 12px;
-  border-radius: 3px;
-  font-size: 14px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--space-xs);
+  font: inherit;
+  font-size: var(--text-cell);
   color: var(--text);
+  cursor: pointer;
 }
 
 .menu button:hover,
 .menu button:focus-visible {
   background: var(--surface-2);
   outline: none;
+}
+
+.menu button:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
 }
 
 .menu button.danger {
@@ -40,17 +46,26 @@
 .trigger {
   background: none;
   border: 0;
-  color: var(--primary);
-  width: 30px;
-  height: 30px;
+  color: var(--text-3);
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
-  margin: -5px 0 -5px auto;
+  border-radius: 50%;
+  margin: -4px 0 -4px auto;
   padding: 0;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
 }
 
 .trigger:hover,
 .trigger[aria-expanded='true'] {
   background: var(--surface-2);
+  color: var(--heading);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  transition: none;
 }

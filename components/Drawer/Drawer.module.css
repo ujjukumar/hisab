@@ -1,17 +1,18 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · a right-hand panel on <dialog>, white with a water-tinted shadow and a soft inner corner */
 /* A right-hand slide-in panel built on <dialog>, so focus trapping, Escape and
    the inert backdrop come from the browser rather than from our own code. */
 
 .drawer {
   position: fixed;
   inset: 0 0 0 auto;
-  width: min(440px, 100%);
+  width: min(460px, 100%);
   max-width: none;
   max-height: none;
   height: 100%;
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-card) 0 0 var(--radius-card);
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--drawer-shadow);
@@ -22,9 +23,9 @@
   overflow: hidden;
   transform: translateX(105%);
   transition:
-    transform 0.22s ease,
-    overlay 0.22s allow-discrete,
-    display 0.22s allow-discrete;
+    transform var(--dur-short) var(--ease-out),
+    overlay var(--dur-short) allow-discrete,
+    display var(--dur-short) allow-discrete;
 }
 
 .drawer[open] {
@@ -42,9 +43,9 @@
   background: var(--backdrop);
   opacity: 0;
   transition:
-    opacity 0.2s,
-    overlay 0.2s allow-discrete,
-    display 0.2s allow-discrete;
+    opacity var(--dur-short),
+    overlay var(--dur-short) allow-discrete,
+    display var(--dur-short) allow-discrete;
 }
 
 .drawer[open]::backdrop {
@@ -61,40 +62,49 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
   border-bottom: 1px solid var(--line);
 }
 
 .title {
   margin: 0;
-  font: 400 24px/1.2 var(--serif);
-  font-variation-settings: 'SOFT' 100, 'WONK' 0;
+  font: 400 var(--text-2xl)/1.2 var(--display);
+  letter-spacing: -0.02em;
   color: var(--heading);
 }
 
 .close {
   background: none;
   border: 0;
-  color: var(--text-2);
+  color: var(--text-3);
   width: 36px;
   height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
+  border-radius: 50%;
   padding: 0;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
 }
 
 .close:hover {
   background: var(--surface-2);
+  color: var(--heading);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  transition: none;
 }
 
 .body {
-  padding: 24px 24px;
+  padding: var(--space-lg);
   overflow-y: auto;
   flex: 1;
   display: grid;
-  gap: 24px;
+  gap: var(--space-lg);
   align-content: start;
   --field-label-bg: var(--surface);
 }
@@ -102,8 +112,8 @@
 .foot {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
   border-top: 1px solid var(--line);
 }
 
@@ -113,31 +123,34 @@
 
 .two {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-md);
 }
 
 .two:has(> [hidden]) {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .total {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding-top: 16px;
+  padding-top: var(--space-md);
   border-top: 1px solid var(--line);
   font-weight: 600;
   color: var(--heading);
 }
 
 .total .num {
-  font-family: var(--mono);
-  font-size: 18px;
+  font-size: var(--text-lg);
 }
 
 @media (max-width: 460px) {
+  .drawer {
+    border-radius: 0;
+  }
+
   .two {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,9 +1,9 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · one container recipe: a clear white panel, light top edge, water-tinted shadow */
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 28px 32px;
+  border-radius: var(--radius-card);
+  box-shadow: var(--edge-light), var(--shadow-card);
+  padding: var(--space-lg) 28px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -14,47 +14,51 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .title {
   margin: 0;
-  font: 400 21px/1.2 var(--serif);
-  font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 24;
+  font: 400 var(--text-xl) / 1.2 var(--display);
+  letter-spacing: -0.016em;
   color: var(--heading);
 }
 
 .sub {
-  margin: 4px 0 0;
-  color: var(--text-2);
-  font-size: 14px;
+  margin: var(--space-2xs) 0 0;
+  color: var(--text-3);
+  font-size: var(--text-sm);
 }
 
 .foot {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: var(--space-lg);
 }
 
 .moreLink {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-weight: 600;
+  gap: var(--space-2xs);
+  min-height: 32px;
+  font-weight: 500;
   color: var(--primary);
   background: none;
   border: 0;
   padding: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   text-decoration: none;
+  border-radius: var(--radius-inner);
 }
 
 .moreLink:hover {
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 @media (max-width: 760px) {
   .card {
-    padding: 24px 20px;
+    padding: var(--space-md);
+    border-radius: 18px;
   }
 }

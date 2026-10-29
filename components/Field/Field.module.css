@@ -1,11 +1,17 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · fields as white wells on a hairline, the label notched into the edge */
 /* Hallmark · waive 24b · input and select padding, .search and .amount icon insets, .range input and .error offsets · they set the 40px field height and clear the search and rupee icons */
 
 .field {
   position: relative;
+  background: var(--surface);
   border: 1px solid var(--field-edge);
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   min-width: 0;
+  transition: border-color var(--dur-micro) var(--ease-out);
+}
+
+.field:hover {
+  border-color: var(--line-strong);
 }
 
 .label {
@@ -13,8 +19,8 @@
   top: -7px;
   left: 10px;
   padding: 0 4px;
-  background: var(--field-label-bg, var(--page));
-  font: 600 11px/1.2 var(--sans);
+  background: linear-gradient(to bottom, var(--field-label-bg, var(--page)) 50%, var(--surface) 50%);
+  font: 500 var(--text-2xs)/1.2 var(--sans);
   color: var(--text-3);
   pointer-events: none;
   white-space: nowrap;
@@ -27,10 +33,11 @@
   border: 0;
   background: transparent;
   padding: 12px 14px 11px;
-  font-size: 14px;
+  font: inherit;
+  font-size: var(--text-cell);
   color: var(--text);
   outline: none;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   min-width: 0;
 }
 
@@ -47,8 +54,8 @@
   top: 50%;
   width: 7px;
   height: 7px;
-  border-right: 1.6px solid var(--text-2);
-  border-bottom: 1.6px solid var(--text-2);
+  border-right: 1.6px solid var(--text-3);
+  border-bottom: 1.6px solid var(--text-3);
   transform: translateY(-70%) rotate(45deg);
   pointer-events: none;
 }
@@ -59,7 +66,8 @@
 }
 
 .field:focus-within {
-  outline: 2px solid var(--primary);
+  border-color: var(--focus);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -79,7 +87,7 @@
 
 .range .sep {
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
   padding: 0 2px;
 }
 
@@ -97,7 +105,9 @@
 }
 
 .amount input {
-  font: 500 30px/1.1 var(--mono);
+  font: 300 var(--text-3xl)/1.1 var(--display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   padding: 16px 14px 13px 42px;
 }
 
@@ -106,13 +116,31 @@
   left: 16px;
   top: 50%;
   transform: translateY(-46%);
-  font: 500 24px/1 var(--mono);
+  font: 300 var(--text-2xl)/1 var(--display);
   color: var(--text-3);
 }
 
 .error {
   margin: -6px 0 0;
   color: var(--loss);
-  font-size: 13px;
+  font-size: var(--text-sm);
   min-height: 1.2em;
+}
+
+/* The native file button, drawn as the secondary pill. */
+.field input[type='file']::file-selector-button {
+  margin-right: var(--space-sm);
+  min-height: 32px;
+  padding: 0 var(--space-md);
+  font: 500 var(--text-sm)/1 var(--sans);
+  color: var(--heading);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+
+.field input[type='file']::file-selector-button:hover {
+  background: var(--surface-2);
 }

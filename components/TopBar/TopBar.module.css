@@ -1,86 +1,97 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · brand gap, nav link padding, the Sample data pill padding and the nav's negative margin · nav links keep a 32px hit area aligned with the wordmark edge */
+/* Hallmark · redesign: full · theme: Refract · scope: app · the shell, kept: wordmark, main nav, actions */
 
 .topbar {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
-  z-index: 30;
-  background: var(--surface);
+  z-index: var(--z-sticky-nav);
+  background: var(--page);
   box-shadow: var(--bar-shadow);
 }
 
 .inner {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: var(--space-lg);
   height: 64px;
 }
 
 .brand {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
-  font: 600 26px/1 var(--serif);
-  font-variation-settings: 'SOFT' 100, 'WONK' 0;
-  color: var(--primary);
+  gap: var(--space-2xs);
+  font: 500 var(--text-2xl) / 1 var(--display);
+  letter-spacing: var(--tracking-display);
+  color: var(--heading);
   text-decoration: none;
-  letter-spacing: -0.01em;
+  border-radius: var(--radius-inner);
 }
 
+/* The wordmark's drop: part of the mark, not a status. */
 .brand i {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--primary);
   display: inline-block;
 }
 
 .nav {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2xs);
   flex: 1;
   justify-content: center;
 }
 
 .nav a {
-  background: none;
-  border: 0;
-  padding: 8px 14px;
-  font-size: 14px;
-  color: var(--text-2);
-  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  font: 500 var(--text-md) / 1 var(--sans);
+  color: var(--text-3);
+  border-radius: var(--radius-pill);
   white-space: nowrap;
   text-decoration: none;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
 }
 
 .nav a:hover {
-  color: var(--primary);
+  color: var(--heading);
+  background: var(--surface-2);
+}
+
+.nav a:active {
+  transform: translateY(1px);
 }
 
 .nav a[aria-current='page'] {
-  color: var(--primary);
-  font-weight: 600;
+  color: var(--heading);
+  background: var(--surface);
+  box-shadow: var(--edge-light), var(--shadow-card);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
 }
 
 .pill {
-  font-size: 11px;
-  color: var(--text-3);
-  border: 1px solid var(--line-strong);
-  border-radius: 150px;
-  padding: 4px 10px;
+  font: 500 var(--text-xs) / 1 var(--sans);
+  color: var(--text-2);
+  background: var(--primary-soft);
+  border-radius: var(--radius-pill);
+  padding: var(--space-xs) var(--space-sm);
   white-space: nowrap;
 }
 
 .roundBtn,
 .avatar {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 0;
   display: grid;
@@ -104,8 +115,8 @@
   .inner {
     flex-wrap: wrap;
     height: auto;
-    gap: 12px 12px;
-    padding-top: 12px;
+    gap: var(--space-xs) var(--space-sm);
+    padding-top: var(--space-sm);
   }
   .brand {
     flex: 1;
@@ -115,12 +126,26 @@
     flex-basis: 100%;
     justify-content: flex-start;
     overflow-x: auto;
-    margin: 0 -10px;
-    padding-bottom: 4px;
+    margin: 0 calc(var(--space-xs) * -1);
+    padding: var(--space-2xs) var(--space-xs) var(--space-xs);
     scrollbar-width: none;
   }
   .nav::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* On a phone the nav row scrolls; its right edge fades so the hidden links read as more. */
+@media (max-width: 560px) {
+  .nav {
+    mask-image: linear-gradient(to right, var(--heading) calc(100% - var(--space-xl)), transparent);
+  }
+}
+
+@media (max-width: 1060px) {
+  .nav a {
+    min-height: 32px;
+    padding: 0 var(--space-sm);
   }
   .pill {
     display: none;

@@ -1,61 +1,84 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · .btn, .secondary and .hideLabel padding · it sets every button's 40px height and the secondary button's 1px border inset */
+/* Hallmark · redesign: full · theme: Refract · scope: app · pills: primary is the accent with a light top edge, secondary is a white pill on a hairline */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 5px;
-  padding: 10px 16px;
-  font: 500 14px/1.2 var(--sans);
+  gap: var(--space-xs);
+  min-height: 40px;
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-md);
+  font: 500 var(--text-sm) / 1.2 var(--sans);
   border: 1px solid transparent;
   white-space: nowrap;
-  transition: box-shadow 0.15s;
   text-decoration: none;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
 }
 
 .primary {
   background: var(--primary-btn);
-  border-color: var(--primary-btn);
   color: var(--on-primary);
+  box-shadow: var(--btn-edge), 0 6px 16px -8px var(--primary-glow);
+}
+
+.primary:hover {
+  background: var(--primary-btn-hi);
+  box-shadow: var(--btn-edge), 0 10px 22px -10px var(--primary-glow);
 }
 
 .secondary {
-  background: transparent;
-  border: 2px solid var(--primary);
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--heading);
+  box-shadow: var(--edge-light);
+}
+
+.secondary:hover {
+  border-color: var(--field-edge);
   color: var(--primary);
-  padding: 9px 15px;
 }
 
-.primary:hover,
-.secondary:hover,
-.icon:hover {
-  box-shadow: 0 3px 16px var(--primary-glow);
+.btn:active,
+.icon:active {
+  transform: translateY(1px);
 }
 
-.btn[disabled] {
-  opacity: 0.55;
+.btn[disabled],
+.icon[disabled] {
+  opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
+  transform: none;
 }
 
 .icon {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
-  border: 2px solid var(--primary);
-  background: transparent;
-  color: var(--primary);
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text-2);
   padding: 0;
   flex: none;
+  box-shadow: var(--edge-light);
+  transition:
+    border-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
+}
+
+.icon:hover {
+  border-color: var(--field-edge);
+  color: var(--primary);
 }
 
 .icon.soft {
-  border-width: 1px;
-  border-color: var(--primary);
+  border-color: var(--line);
 }
 
 .linkish {
@@ -64,6 +87,7 @@
   padding: 0;
   color: var(--primary);
   text-decoration: underline;
+  text-underline-offset: 2px;
   font-size: inherit;
 }
 
@@ -78,6 +102,6 @@
     white-space: nowrap;
   }
   .hideLabel {
-    padding: 10px 12px;
+    padding: 0 var(--space-sm);
   }
 }

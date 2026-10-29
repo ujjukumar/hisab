@@ -1,33 +1,46 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · chip padding and the .count margin · each range chip keeps a 32px height and its count badge sits tight to the label */
+/* Hallmark · redesign: full · theme: Refract · scope: app · range and filter chips as quiet pills, the current one in water blue */
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 16px;
+  gap: var(--space-2xs);
+  margin-top: var(--space-md);
 }
 
 .chips button,
 .chips a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
-  padding: 9px 10px;
-  font: 600 12px/1 var(--sans);
-  color: var(--primary);
+  border-radius: var(--radius-pill);
+  font: 500 var(--text-sm)/1 var(--sans);
+  color: var(--text-2);
   text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
 }
 
 .chips button:hover,
 .chips a:hover {
-  border-color: var(--line-strong);
+  background: var(--surface-2);
+  color: var(--heading);
+}
+
+.chips button:focus-visible,
+.chips a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  transition: none;
 }
 
 .chips button[aria-pressed='true'],
 .chips a[aria-current='true'] {
-  border-color: var(--primary);
-  background: var(--surface);
+  background: var(--primary-soft);
+  border-color: transparent;
+  color: var(--primary);
 }
 
 .links {
@@ -35,8 +48,7 @@
 }
 
 .count {
-  margin-left: 5px;
-  font-family: var(--mono);
+  margin-left: var(--space-2xs);
   color: var(--text-3);
 }
 

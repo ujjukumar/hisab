@@ -1,27 +1,40 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · the 3px track inset and gap, and segment padding · the project's switch, built for income, spending and transfer in the drawer, matches the 40px field height */
+/* Hallmark · redesign: full · theme: Refract · scope: app · a soft track with the chosen segment lifted onto a white pill */
 
 .seg {
   display: flex;
   flex-wrap: wrap;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  padding: 3px;
-  gap: 3px;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs);
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
 }
 
 .seg button {
   flex: 1 1 0;
   min-width: max-content;
+  min-height: 32px;
+  padding: 0 var(--space-md);
   background: none;
   border: 0;
-  border-radius: 3px;
-  padding: 9px 10px;
-  font-weight: 500;
+  border-radius: var(--radius-pill);
+  font: 500 var(--text-sm)/1 var(--sans);
   color: var(--text-2);
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out);
+}
+
+.seg button:hover {
+  color: var(--heading);
+}
+
+.seg button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  transition: none;
 }
 
 .seg button[aria-pressed='true'] {
-  background: var(--primary-btn);
-  color: var(--on-primary);
+  background: var(--surface);
+  color: var(--heading);
+  box-shadow: var(--pop-shadow);
 }
