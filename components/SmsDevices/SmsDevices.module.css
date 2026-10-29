@@ -1,5 +1,4 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · dismissed 3 · the 3px edge on .error marks a pairing or revoke error message, a status callout rather than a card */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS devices list, pairing code */
 /* Hallmark · waive 24b · .codeValue padding · the pairing code chip stays one tight line of spaced characters */
 
 .list {
@@ -14,19 +13,19 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px 20px;
-  padding: 16px 0;
+  gap: var(--space-sm) var(--space-lg);
+  padding: var(--space-md) 0;
   border-top: 1px solid var(--line);
 }
 
 .row:first-child {
   border-top: 0;
-  padding-top: 4px;
+  padding-top: var(--space-2xs);
 }
 
 .info {
   display: grid;
-  gap: 4px;
+  gap: var(--space-2xs);
   min-width: 0;
 }
 
@@ -39,9 +38,9 @@
 .status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text);
 }
 
@@ -61,30 +60,30 @@
 .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 12px;
+  gap: 0 var(--space-sm);
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-3);
 }
 
 .code {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  margin: 8px 0 0;
+  gap: var(--space-sm);
+  margin: var(--space-xs) 0 0;
 }
 
 .codeLabel {
-  font: 600 11px/1 var(--sans);
+  font: 500 var(--text-xs) / 1.2 var(--sans);
   color: var(--text-3);
 }
 
 .codeValue {
-  padding: 4px 10px;
+  padding: var(--space-2xs) var(--space-sm);
   border: 1px solid var(--line-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-inner);
   background: var(--surface-2);
-  font: 600 18px/1.2 var(--mono);
+  font: 600 var(--text-lg) / 1.2 var(--mono);
   letter-spacing: 0.18em;
   color: var(--heading);
 }
@@ -93,32 +92,32 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .confirm {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 12px;
-  font-size: 13px;
+  gap: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
 .error {
   flex-basis: 100%;
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   background: var(--surface-2);
-  border-left: 3px solid var(--primary);
-  font-size: 13px;
+  border-radius: var(--radius-inner);
+  font-size: var(--text-sm);
 }
 
 .empty {
   display: grid;
-  gap: 12px;
+  gap: var(--space-sm);
   justify-items: start;
-  margin-top: 16px;
+  margin-top: var(--space-md);
 }
 
 .empty p {
@@ -127,19 +126,19 @@
 }
 
 .revoked {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--line);
 }
 
 .revoked summary {
   width: fit-content;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-2);
   cursor: pointer;
 }
 
 .revoked .row:first-child {
-  padding-top: 12px;
+  padding-top: var(--space-sm);
 }

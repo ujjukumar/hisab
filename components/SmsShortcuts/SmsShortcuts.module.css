@@ -1,10 +1,10 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS keyboard shortcuts list */
 /* Hallmark · waive 24b · kbd padding · each keyboard shortcut key, such as Shift or Esc, stays a small boxed letter beside its action */
 
 .toggle {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   font-weight: 600;
   color: var(--heading);
 }
@@ -16,9 +16,14 @@
   accent-color: var(--primary-btn);
 }
 
+.toggle input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .note {
-  margin: 8px 0 20px;
-  font-size: 13px;
+  margin: var(--space-xs) 0 var(--space-lg);
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
@@ -35,8 +40,8 @@
 .row {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -52,13 +57,13 @@
 
 .row kbd {
   display: inline-block;
-  min-width: 22px;
+  min-width: 24px;
   padding: 3px 6px;
   border: 1px solid var(--line-strong);
   border-bottom-width: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--surface-2);
-  font: 600 12px/1 var(--mono);
+  font: 600 var(--text-xs) / 1 var(--sans);
   text-align: center;
   color: var(--heading);
 }

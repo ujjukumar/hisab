@@ -1,26 +1,23 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · the month name in the display face between its arrows */
 .picker {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 13px;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
 }
 
 .month {
   margin: 0;
   min-width: 9.5em;
   text-align: center;
-  font: 400 25px/1.2 var(--serif);
-  font-variation-settings:
-    'SOFT' 100,
-    'WONK' 0,
-    'opsz' 30;
+  font: 400 var(--text-2xl)/1.2 var(--display);
+  letter-spacing: -0.02em;
   color: var(--heading);
 }
 
 @media (max-width: 760px) {
   .month {
-    font-size: 21px;
+    font-size: var(--text-xl);
   }
 }

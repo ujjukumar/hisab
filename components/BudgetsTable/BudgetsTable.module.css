@@ -1,10 +1,10 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · budgets table: used bar and inline amount edit */
 
 .used {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) 3.5em;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   min-width: 160px;
 }
 
@@ -15,15 +15,16 @@
 
 .input {
   width: 120px;
-  margin: -4px 0;
-  padding: 4px 8px;
+  margin: calc(var(--space-2xs) * -1) 0;
+  padding: var(--space-2xs) var(--space-xs);
   border: 1px solid var(--field-edge);
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   background: var(--surface);
   color: var(--heading);
-  font: 500 13px var(--mono);
+  font: 500 var(--text-sm) var(--sans);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  transition: border-color var(--dur-micro) var(--ease-out);
 }
 
 .input:hover {
@@ -37,19 +38,20 @@
 /* A control pressed from the table keeps the ring it gets everywhere else. */
 .input:focus-visible,
 .set:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+  transition: none;
 }
 
 .edit p {
-  margin: 8px 0 0;
+  margin: var(--space-xs) 0 0;
   max-width: 200px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 button.set {
-  margin: -4px 0;
-  padding: 4px 12px;
+  margin: calc(var(--space-2xs) * -1) 0;
+  padding: var(--space-2xs) var(--space-sm);
   cursor: pointer;
 }
 

@@ -1,16 +1,15 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · dismissed 3 · the 3px accent edge on .matches marks the This may already be recorded transfer notice, a status callout rather than a card */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS review form */
 
 .form {
   display: grid;
-  gap: 16px;
+  gap: var(--space-md);
   min-width: 0;
   container-type: inline-size;
 }
 
 .fieldset {
   display: grid;
-  gap: 16px;
+  gap: var(--space-md);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -20,39 +19,40 @@
 .flow {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--space-sm);
   margin: 0;
   font-weight: 600;
   color: var(--heading);
 }
 
 .flowLabel {
-  font: 600 11px/1 var(--sans);
+  font: 500 var(--text-xs) / 1.2 var(--sans);
   color: var(--text-3);
 }
 
 .type {
   display: grid;
-  gap: 8px;
+  gap: var(--space-xs);
   max-width: 420px;
 }
 
 .matches {
   display: grid;
-  gap: 8px;
-  padding: 2px 0 2px 16px;
-  border-left: 3px solid var(--accent);
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-inner);
+  background: var(--primary-soft);
 }
 
 .matches h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-cell);
   color: var(--heading);
 }
 
 .matches ul {
   display: grid;
-  gap: 8px;
+  gap: var(--space-xs);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -63,7 +63,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: var(--space-xs) var(--space-sm);
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
@@ -71,7 +71,7 @@
 .fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 16px;
+  gap: var(--space-md) var(--space-md);
 }
 
 .fields > * {
@@ -85,16 +85,16 @@
 .hint,
 .note {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
 .learn {
   display: grid;
-  gap: 4px;
-  padding: 12px 16px;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
 }
 
 .learn .note {
@@ -104,7 +104,7 @@
 .check {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   font-weight: 600;
   color: var(--heading);
 }
@@ -124,9 +124,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px 12px;
+  gap: var(--space-sm) var(--space-sm);
   margin-inline: -2px;
-  padding: 16px 2px;
+  padding: var(--space-md) var(--space-3xs);
   background: var(--surface);
   border-top: 1px solid var(--line);
 }

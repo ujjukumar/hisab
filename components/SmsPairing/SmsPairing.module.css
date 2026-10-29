@@ -1,17 +1,16 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · dismissed 3 · the 3px edges on .connected and .feedback mark the phone connected and pairing status messages, callouts rather than cards */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS pairing steps, QR and link */
 /* Hallmark · waive 24b · .link padding · the read-only pairing link box matches the Copy link button height */
 
 .pairing {
   display: grid;
-  gap: 16px;
+  gap: var(--space-md);
   justify-items: start;
-  margin-top: 20px;
+  margin-top: var(--space-lg);
 }
 
 .steps {
   display: grid;
-  gap: 12px;
+  gap: var(--space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -20,7 +19,7 @@
 .steps li {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-sm);
   color: var(--text-2);
 }
 
@@ -32,7 +31,7 @@
   height: 22px;
   border: 1px solid var(--line-strong);
   border-radius: 50%;
-  font: 600 12px/1 var(--sans);
+  font: 600 var(--text-xs)/1 var(--sans);
   color: var(--heading);
 }
 
@@ -45,11 +44,11 @@
 .connected {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  margin: 20px 0 0;
-  padding: 12px 16px;
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-sm) var(--space-md);
   background: var(--surface-2);
-  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-inner);
 }
 
 .okDot {
@@ -63,7 +62,7 @@
 .waiting {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-sm);
   margin: 0;
   color: var(--text-2);
 }
@@ -93,7 +92,7 @@
   display: block;
   max-width: 100%;
   height: auto;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   /* Keep the fixed QR colours in Windows high contrast mode too. */
   forced-color-adjust: none;
 }
@@ -116,7 +115,7 @@
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-sm);
   width: 100%;
 }
 
@@ -124,27 +123,27 @@
   display: flex;
   flex: 1 1 240px;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-xs);
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
 .link {
   min-width: 0;
   width: 100%;
-  padding: 9px 10px;
+  padding: 9px var(--space-sm);
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  font: 400 13px/1.4 var(--mono);
+  border-radius: var(--radius-inner);
+  font: 400 var(--text-sm) / 1.4 var(--mono);
   color: var(--text);
 }
 
 .feedback {
-  margin: 20px 0 0;
-  padding: 12px 12px;
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-sm) var(--space-sm);
   background: var(--surface-2);
-  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-inner);
   overflow-wrap: anywhere;
 }

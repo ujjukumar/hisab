@@ -134,7 +134,7 @@ export function LineChart({
             { label: 'Accounts', value: formatShortINR(active.invested) },
             { label: 'Investments', value: formatShortINR(active.worth - active.invested) },
           ] : [
-            { color: 'var(--c1)', label: 'Invested', value: formatShortINR(active.invested) },
+            { color: 'var(--text-3)', label: 'Invested', value: formatShortINR(active.invested) },
             { color: 'var(--c2)', label: 'Worth', value: formatShortINR(active.worth) },
             {
               label: 'Gain',
@@ -205,13 +205,13 @@ export function LineChart({
           ) : null,
         )}
 
-        {(mode === 'portfolio' || components) && <path d={path('invested')} fill="none" stroke="var(--c1)" strokeWidth="2" strokeLinejoin="round" />}
+        {(mode === 'portfolio' || components) && <path d={path('invested')} fill="none" stroke={components ? 'var(--c1)' : 'var(--text-3)'} strokeWidth="2" strokeDasharray={components ? undefined : '6 4'} strokeLinejoin="round" />}
         {components && <path d={path('investments')} fill="none" stroke="var(--c4)" strokeWidth="2.2" strokeLinejoin="round" />}
         {!components && <path d={path('worth')} fill="none" stroke={mode === 'netWorth' ? 'var(--c1)' : 'var(--c2)'} strokeWidth="2.2" strokeLinejoin="round" />}
         {n === 1 && (
           // A single point draws no line, so mark it.
           <>
-            {(mode === 'portfolio' || components) && <circle cx={x(0)} cy={y(value(points[0]!, 'invested'))} r="4" fill="var(--c1)" />}
+            {(mode === 'portfolio' || components) && <circle cx={x(0)} cy={y(value(points[0]!, 'invested'))} r="4" fill={components ? 'var(--c1)' : 'var(--text-3)'} />}
             {components && <circle cx={x(0)} cy={y(value(points[0]!, 'investments'))} r="4" fill="var(--c4)" />}
             {!components && <circle cx={x(0)} cy={y(points[0]!.worth)} r="4" fill={mode === 'netWorth' ? 'var(--c1)' : 'var(--c2)'} />}
           </>
@@ -227,7 +227,7 @@ export function LineChart({
               stroke="var(--line-strong)"
               strokeDasharray="3 3"
             />
-            {(mode === 'portfolio' || components) && <circle cx={x(at)} cy={y(value(active, 'invested'))} r="4" fill="var(--c1)" stroke="var(--surface)" strokeWidth="2" />}
+            {(mode === 'portfolio' || components) && <circle cx={x(at)} cy={y(value(active, 'invested'))} r="4" fill={components ? 'var(--c1)' : 'var(--text-3)'} stroke="var(--surface)" strokeWidth="2" />}
             {components && <circle cx={x(at)} cy={y(value(active, 'investments'))} r="4" fill="var(--c4)" stroke="var(--surface)" strokeWidth="2" />}
             {!components && <circle cx={x(at)} cy={y(active.worth)} r="4" fill={mode === 'netWorth' ? 'var(--c1)' : 'var(--c2)'} stroke="var(--surface)" strokeWidth="2" />}
           </>

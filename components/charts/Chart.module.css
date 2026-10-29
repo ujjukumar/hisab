@@ -1,9 +1,8 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · gaps and padding on .rangeTools, .tip, .tipRow, .legendList li, .legendText and .legendInline stay as measured · chart furniture pairs one step off the 4px scale, so every chart's gap rhythm stays even across the app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · charts: figures in the body face with tabular numerals, the tooltip a small white panel */
 
 .chart {
   position: relative;
-  margin-top: 8px;
+  margin-top: var(--space-xs);
   min-height: 250px;
 }
 
@@ -12,19 +11,18 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: var(--space-sm) var(--space-md);
 }
 
 .rangeChange {
   display: flex;
   align-items: baseline;
-  gap: 4px 16px;
-  font: 13px/1.4 var(--sans);
+  gap: var(--space-2xs) var(--space-md);
+  font: var(--text-sm)/1.4 var(--sans);
   color: var(--text-2);
 }
 
 .rangeChange strong {
-  font-family: var(--mono);
   font-weight: 600;
   color: var(--heading);
 }
@@ -35,12 +33,18 @@
 .summary {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
 }
 
 .summary > strong {
-  font: 600 24px/1.2 var(--mono);
+  font: 300 var(--text-4xl)/1 var(--display);
+  letter-spacing: var(--tracking-display);
   color: var(--heading);
+}
+
+@media (max-width: 760px) {
+  .summary > strong { font-size: var(--text-3xl); }
 }
 
 .summary .rangeChange { flex-wrap: wrap; }
@@ -49,13 +53,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 16px;
-  font: 12px/1.4 var(--sans);
+  gap: var(--space-2xs) var(--space-md);
+  font: var(--text-xs)/1.4 var(--sans);
   color: var(--text-3);
 }
 
 .rangeSplit strong {
-  font-family: var(--mono);
   font-weight: 600;
   color: var(--text-2);
 }
@@ -64,7 +67,7 @@
 .rangeSplit strong:global(.neg) { color: var(--loss); }
 
 .rangeFrom {
-  font: 12px/1.4 var(--sans);
+  font: var(--text-xs)/1.4 var(--sans);
   color: var(--text-3);
 }
 
@@ -78,8 +81,8 @@
 }
 
 .dragHint {
-  margin: 4px 0 0;
-  font: 12px/1.4 var(--sans);
+  margin: var(--space-2xs) 0 0;
+  font: var(--text-xs)/1.4 var(--sans);
   color: var(--text-3);
 }
 
@@ -94,12 +97,12 @@
 
 .chart text {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   fill: var(--text-3);
 }
 
 .group {
-  transition: opacity 0.12s;
+  transition: opacity var(--dur-micro) var(--ease-out);
 }
 
 .tip {
@@ -108,15 +111,14 @@
   left: 0;
   pointer-events: none;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  box-shadow: var(--pop-shadow);
-  padding: 9px 11px;
-  font-size: 12px;
+  border-radius: var(--radius-inner);
+  box-shadow: var(--edge-light), var(--pop-shadow);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
   min-width: 170px;
   opacity: 0;
-  transition: opacity 0.12s;
-  z-index: 2;
+  transition: opacity var(--dur-micro) var(--ease-out);
+  z-index: var(--z-raised);
 }
 
 .tip.show {
@@ -126,7 +128,7 @@
 .tip b {
   display: block;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-2xs);
   color: var(--heading);
 }
 
@@ -134,15 +136,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin-top: 3px;
+  gap: var(--space-md);
+  margin-top: var(--space-2xs);
   color: var(--text-2);
 }
 
 .tipRow span:first-child {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 
 .tipRow :global(.dot) {
@@ -151,8 +153,7 @@
 }
 
 .tipRow .v {
-  font-family: var(--mono);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--heading);
 }
 
@@ -169,8 +170,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
 }
 
 .legendList {
@@ -178,34 +179,33 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: var(--space-sm);
   min-width: 0;
 }
 
 .legendList li {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  font-size: 14px;
+  gap: var(--space-xs);
+  font-size: var(--text-cell);
   line-height: 1.2;
 }
 
 .legendText {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-2xs);
   min-width: 0;
 }
 
 .legendList .nm {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--heading);
   overflow-wrap: anywhere;
 }
 
 .legendList .pc {
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
 }
 
 .donut {
@@ -216,17 +216,17 @@
 .legendInline {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: var(--space-xs) var(--space-md);
   justify-content: flex-end;
-  font: 600 12px/1.2 var(--sans);
+  font: 500 var(--text-xs)/1.2 var(--sans);
   color: var(--text-2);
-  margin: 14px 0 2px;
+  margin: var(--space-sm) 0 var(--space-3xs);
 }
 
 .legendInline span {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-xs);
 }
 
 .dash { width: 16px; border-top: 2px dashed; }
@@ -236,7 +236,7 @@
   place-items: center;
   min-height: 250px;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 460px) {

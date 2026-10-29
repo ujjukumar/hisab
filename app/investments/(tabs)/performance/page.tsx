@@ -197,7 +197,7 @@ export default async function PerformancePage({
             : 'Monthly, all time'}
         >
           <LegendInline>
-            <LegendKey color="var(--c1)">Amount invested</LegendKey>
+            <LegendKey color="var(--text-3)" dashed>Amount invested</LegendKey>
             <LegendKey color="var(--c2)">Current worth</LegendKey>
           </LegendInline>
           <LineChart points={shown} />

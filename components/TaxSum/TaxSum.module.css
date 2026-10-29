@@ -1,12 +1,11 @@
-/* Hallmark · built: 2026-10-28 · scope: app · shape: app screen · theme: custom (existing tokens and fonts) · tone: austere
+/* Hallmark · redesign: full · theme: Refract · scope: app · shape: app screen
  * screen: the Tax estimate, one worked column from income to what's left to pay
- * idea: the year's tax worked as one column you can audit
  * signature: the slab lines in the worked sum, each band's fill shown beside its working */
 
 .sum {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--space-lg);
 }
 
 .section {
@@ -14,11 +13,8 @@
 }
 
 .heading {
-  margin: 0 0 4px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  margin: 0 0 var(--space-2xs);
+  font: 500 var(--text-sm) / 1.3 var(--sans);
   color: var(--text-3);
 }
 
@@ -33,8 +29,8 @@
   display: grid;
   grid-template-columns: subgrid;
   align-items: baseline;
-  column-gap: 24px;
-  padding: 9px 0;
+  column-gap: var(--space-lg);
+  padding: var(--space-xs) 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -45,9 +41,9 @@
 
 .note {
   display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--text-2);
+  margin-top: var(--space-3xs);
+  font-size: var(--text-xs);
+  color: var(--text-3);
 }
 
 .note a {
@@ -58,9 +54,9 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-2);
-  font-size: 13px;
+  gap: var(--space-xs);
+  color: var(--text-3);
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -69,7 +65,7 @@
   margin: 0;
   text-align: end;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: var(--heading);
   white-space: nowrap;
 }
 
@@ -88,8 +84,8 @@
 /* The signature: each slab line shows how much of its band the income fills. */
 .meter {
   inline-size: 56px;
-  block-size: 4px;
-  border-radius: 2px;
+  block-size: 6px;
+  border-radius: var(--radius-pill);
   background: var(--track);
   overflow: hidden;
   flex: none;
@@ -98,6 +94,7 @@
 .meter i {
   display: block;
   block-size: 100%;
+  border-radius: inherit;
   background: var(--c1);
 }
 
@@ -110,26 +107,29 @@
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 4px 16px;
+  gap: var(--space-2xs) var(--space-md);
   margin: 0;
-  padding-top: 16px;
-  border-top: 2px solid var(--heading);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-inner);
+  background: var(--surface-2);
 }
 
 .resultLabel {
-  font: 400 21px/1.2 var(--serif);
+  font: 400 var(--text-xl) / 1.2 var(--display);
+  letter-spacing: -0.016em;
   color: var(--heading);
 }
 
 .resultValue {
-  font: 600 32px/1.1 var(--sans);
+  font: 300 var(--text-4xl) / 1.05 var(--display);
+  letter-spacing: var(--tracking-display);
   color: var(--heading);
   font-variant-numeric: tabular-nums;
 }
 
 .missing {
   margin: 0;
-  padding: 16px 0 0;
+  padding: var(--space-md) 0 0;
   border-top: 1px solid var(--line-strong);
   color: var(--text-2);
   max-width: 60ch;
@@ -145,7 +145,7 @@
     grid-template-areas:
       'label amount'
       'working working';
-    row-gap: 2px;
+    row-gap: var(--space-3xs);
   }
 
   .label {
@@ -164,7 +164,11 @@
     display: none;
   }
 
+  .result {
+    padding: var(--space-sm) var(--space-md);
+  }
+
   .resultValue {
-    font-size: 26px;
+    font-size: var(--text-3xl);
   }
 }

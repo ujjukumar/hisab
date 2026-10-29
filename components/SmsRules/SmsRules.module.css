@@ -1,6 +1,6 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS rules: sender and on/off switch */
 .sender {
-  font: 500 13px/1.3 var(--mono);
+  font: 500 var(--text-sm) / 1.3 var(--sans);
   color: var(--heading);
   overflow-wrap: anywhere;
 }
@@ -8,7 +8,7 @@
 .off {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
   color: var(--text-3);
 }
 
@@ -19,15 +19,17 @@
 .switch {
   appearance: none;
   position: relative;
-  width: 34px;
+  width: 36px;
   height: 20px;
   margin: 0;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--track);
   cursor: pointer;
   vertical-align: middle;
-  transition: background 0.15s ease;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out);
 }
 
 .switch::after {
@@ -40,7 +42,7 @@
   border-radius: 50%;
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line-strong);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-short) var(--ease-out);
 }
 
 .switch:checked {
@@ -49,13 +51,14 @@
 }
 
 .switch:checked::after {
-  transform: translateX(14px);
+  transform: translateX(16px);
   box-shadow: none;
 }
 
 .switch:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

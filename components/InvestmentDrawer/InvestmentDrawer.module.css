@@ -1,16 +1,16 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · investment drawer hints and section labels */
 /* Hallmark · dismissed 70 · Amount received is the field label for a dividend or interest amount the owner types in, not a success message, and the form posts to a server action */
 
 /* A short line under a field, e.g. the last price in the Update prices drawer. */
 .hint {
-  margin: -16px 0 0;
-  font-size: 12px;
-  color: var(--text-2);
+  margin: calc(var(--space-md) * -1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-3);
 }
 
 .section {
-  margin: 4px 0 -8px;
-  font-size: 12px;
-  font-weight: 600;
+  margin: var(--space-2xs) 0 calc(var(--space-xs) * -1);
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--text-2);
 }

@@ -1,15 +1,16 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · SMS section head and connection status */
 .head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px 20px;
+  gap: var(--space-sm) var(--space-lg);
 }
 
 .title h2 {
   margin: 0;
-  font: 400 24px/1.2 var(--serif);
+  font: 400 var(--text-2xl) / 1.15 var(--display);
+  letter-spacing: -0.02em;
   color: var(--heading);
   text-wrap: balance;
 }
@@ -17,12 +18,13 @@
 .status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0 0;
-  font-size: 13px;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
+/* connection state, always read beside its words */
 .dot {
   flex: none;
   width: 8px;
@@ -39,5 +41,5 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
 }

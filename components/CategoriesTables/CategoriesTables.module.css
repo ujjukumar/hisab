@@ -1,4 +1,4 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · category colour swatches */
 .colors {
   border: 0;
   margin: 0;
@@ -7,16 +7,16 @@
 }
 
 .colors legend {
-  font: 600 11px/1.2 var(--sans);
+  font: 500 var(--text-xs) / 1.2 var(--sans);
   color: var(--text-3);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-xs);
   padding: 0;
 }
 
 .swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .swatch {
@@ -35,8 +35,8 @@
 }
 
 .swatch span {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 3px solid var(--surface);
   box-shadow: 0 0 0 1px var(--line-strong);
@@ -47,6 +47,6 @@
 }
 
 .swatch input:focus-visible + span {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }

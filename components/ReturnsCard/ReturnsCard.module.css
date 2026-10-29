@@ -1,50 +1,70 @@
-/* Hallmark · polish · built: the project · redesign: polish · scope: app */
-/* Hallmark · waive 24b · custom date input padding and compare button padding · the From and To dates and the benchmark compare buttons stay 32px tall in one row */
+/* Hallmark · redesign: full · theme: Refract · scope: app · the performance card: custom dates as white wells, compare toggles as pills */
 
 .card {
-  margin-bottom: 28px;
+  margin-bottom: var(--space-xl);
 }
 
 .dates {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-sm);
   align-items: end;
-  margin-top: 16px;
+  margin-top: var(--space-md);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .dates label {
   display: grid;
-  gap: 4px;
+  gap: var(--space-2xs);
+  font-weight: 500;
 }
 
 .dates input {
+  min-height: 36px;
+  padding: 0 var(--space-sm);
   font: inherit;
+  font-weight: 400;
   color: var(--heading);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  padding: 7px;
+  border: 1px solid var(--field-edge);
+  border-radius: var(--radius-inner);
 }
 
 .dates button {
+  min-height: 36px;
+  padding: 0 var(--space-md);
   font: inherit;
-  color: var(--surface);
-  background: var(--primary);
-  border: 1px solid var(--primary);
-  border-radius: 3px;
-  padding: 8px 12px;
+  font-weight: 500;
+  color: var(--on-primary);
+  background: var(--primary-btn);
+  border: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--btn-edge);
   cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out);
 }
 
-.dates :is(input, button):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.note { color: var(--text-3); font-size: 12px; margin: 4px 0 0; }
-.error { color: var(--loss); font-size: 13px; }
+.dates button:hover { background: var(--primary-btn-hi); }
 
-.compare { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; font-size: 12px; }
-.compare span { color: var(--text-2); margin-right: 4px; }
-.compare button { color: var(--primary); background: none; border: 1px solid var(--line-strong); border-radius: 3px; padding: 5px 8px; cursor: pointer; font: inherit; }
-.compare button[aria-pressed='true'] { background: var(--surface); border-color: var(--primary); font-weight: 600; }
-.compare button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.dates :is(input, button):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.note { color: var(--text-3); font-size: var(--text-xs); margin: var(--space-2xs) 0 0; }
+.error { color: var(--loss); font-size: var(--text-sm); }
+
+.compare { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); margin-top: var(--space-md); font-size: var(--text-sm); }
+.compare span { color: var(--text-3); margin-right: var(--space-2xs); }
+.compare button {
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  color: var(--text-2);
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 500;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+}
+.compare button:hover { color: var(--heading); background: var(--surface-2); }
+.compare button[aria-pressed='true'] { background: var(--primary-soft); border-color: transparent; color: var(--primary); }
+.compare button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; transition: none; }

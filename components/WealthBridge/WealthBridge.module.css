@@ -1,13 +1,13 @@
-/* Hallmark · polish · built: the project · redesign: full · scope: app */
+/* Hallmark · redesign: full · theme: Refract · scope: app · the net worth bridge: soft rounded bars on a pale water track */
 .bridge {
-  margin: 16px 0 0;
+  margin: var(--space-md) 0 0;
 }
 
 .ends {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  font-size: 12px;
+  gap: var(--space-md);
+  font-size: var(--text-xs);
   color: var(--text-3);
   /* Lines the two ends up with the track below: the label column, then the bar. */
   padding-left: 136px;
@@ -16,37 +16,36 @@
 
 .steps {
   list-style: none;
-  margin: 8px 0 0;
+  margin: var(--space-xs) 0 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .steps li {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr) 96px;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-md);
 }
 
 .label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
 .track {
   position: relative;
   height: 16px;
-  border-left: 1px solid var(--line-strong);
-  border-right: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
   background: var(--track);
 }
 
 .bar {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  border-radius: 2px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: var(--radius-pill);
   background: var(--c-muted);
 }
 
@@ -63,7 +62,7 @@
 }
 
 .value {
-  font: 600 13px/1.3 var(--mono);
+  font: 600 var(--text-sm)/1.3 var(--sans);
   text-align: right;
   color: var(--heading);
 }
@@ -83,7 +82,7 @@
 
   .steps li {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 12px;
+    gap: var(--space-2xs) var(--space-sm);
   }
 
   .track {
