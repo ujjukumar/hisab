@@ -273,6 +273,41 @@ describe('migration history upgrade', () => {
     }
   });
 
+  it('keeps Nifty 50 and Sensex benchmarks as indices and forgets fund NAVs', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hisaab-benchmark-indices-'));
+    const previousPath = process.env.DATABASE_PATH;
+    process.env.DATABASE_PATH = join(directory, 'benchmarks.db');
+    try {
+      const initial = new DatabaseSync(process.env.DATABASE_PATH);
+      migrate(drizzle({ client: initial }), {
+        migrationsFolder: migrationsBefore(directory, 'benchmark_indices'),
+      });
+      initial.exec(`
+        INSERT INTO benchmarks (id, name, isin) VALUES
+          (1, 'UTI Nifty 50', 'INF789F01XA0'), (2, 'Invented fund', 'INF000BM0011'), (3, 'HDFC Sensex', 'INF179K01WN9');
+        INSERT INTO benchmark_prices (benchmark_id, date, price) VALUES (1, '2026-01-02', '170.5'), (2, '2026-01-02', '10');
+      `);
+      initial.close();
+
+      const upgraded = openDatabase();
+      try {
+        expect(upgraded.sqlite.prepare('SELECT id, name, code FROM benchmarks ORDER BY id').all()
+          .map((row) => ({ ...row }))).toEqual([
+          { id: 1, name: 'Nifty 50', code: 'nifty50' },
+          { id: 3, name: 'Sensex', code: 'sensex' },
+        ]);
+        expect(upgraded.sqlite.prepare('SELECT count(*) AS prices FROM benchmark_prices').get())
+          .toEqual({ prices: 0 });
+      } finally {
+        upgraded.sqlite.close();
+      }
+    } finally {
+      if (previousPath === undefined) delete process.env.DATABASE_PATH;
+      else process.env.DATABASE_PATH = previousPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('reports pending migrations without applying them or writing a backup', () => {
     const directory = mkdtempSync(join(tmpdir(), 'hisaab-pending-'));
     const previousPath = process.env.DATABASE_PATH;

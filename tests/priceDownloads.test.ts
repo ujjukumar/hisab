@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyBenchmarkPrices, applyFeedPrices } from '@/lib/actions/applyPrices';
+import { applyFeedPrices } from '@/lib/actions/applyPrices';
 import { fetchAndSave } from '@/lib/actions/priceDownloads';
 import { bseLatest, FeedError, listedPricesOn, nseLatest } from '@/lib/feeds';
 
 vi.mock('@/lib/db/client', () => ({ db: {} }));
 vi.mock('@/lib/actions/applyPrices', () => ({
   applyFeedPrices: vi.fn((_db, rows: unknown[]) => rows.length),
-  applyBenchmarkPrices: vi.fn((_db, rows: unknown[]) => rows.length),
 }));
 vi.mock('@/lib/feeds', () => {
   class FeedError extends Error {}
@@ -28,37 +27,6 @@ const linked = [
 beforeEach(() => vi.clearAllMocks());
 
 describe('listed price fallback', () => {
-  it('shares an AMFI download with benchmarks and records settled missing NAVs', async () => {
-    const benchmark = [{ id: 7, isin: 'INF000BM0011' }, { id: 8, isin: 'INF000BM0029' }];
-    const funds = vi.fn(async () => new Map([
-      ['INF000BM0011', { date: '2024-04-01', price: '12' }],
-    ]));
-    const result = await fetchAndSave([], '2024-04-01', funds, 1, () => true, true, benchmark);
-    expect(funds).toHaveBeenCalledOnce();
-    expect(result.updated).toBe(2);
-    expect(vi.mocked(applyBenchmarkPrices).mock.calls[0]?.[1]).toEqual([
-      { benchmarkId: 7, date: '2024-04-01', price: '12' },
-      { benchmarkId: 8, date: '2024-04-01', price: null },
-    ]);
-  });
-
-  it('marks a pre-launch NAV missing only when the market file exists, ignoring stale NAVs', async () => {
-    const benchmark = [{ id: 7, isin: 'INF000BM0011' }];
-    const published = new Map([
-      ['INF000BM0011', { date: '2024-03-29', price: '10' }],
-      ['INF000MF0012', { date: '2024-04-01', price: '15' }],
-    ]);
-    const result = await fetchAndSave([], '2024-04-01', async () => published, 1,
-      () => true, true, benchmark);
-    expect(result.updated).toBe(1);
-    expect(vi.mocked(applyBenchmarkPrices).mock.calls[0]?.[1]).toEqual([
-      { benchmarkId: 7, date: '2024-04-01', price: null },
-    ]);
-    vi.clearAllMocks();
-    await fetchAndSave([], '2024-04-01', async () => new Map(), 1,
-      () => true, true, benchmark);
-    expect(applyBenchmarkPrices).not.toHaveBeenCalled();
-  });
   it('classifies closed dates only when neither exchange publishes a file', async () => {
     vi.mocked(listedPricesOn).mockResolvedValue({ prices: new Map(), marketFileFound: false });
     const closed = await fetchAndSave(linked, '2024-07-08', async () => new Map(), 1, () => true, true);

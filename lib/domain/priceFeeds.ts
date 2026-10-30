@@ -49,53 +49,36 @@ export function parseAmfiNav(text: string): PriceMap {
   return out;
 }
 
-/** AMFI scheme codes by ISIN, from NAVAll.txt, to look up a fund's NAV history. */
-export function parseAmfiSchemeCodes(text: string): Map<string, string> {
-  const out = new Map<string, string>();
-  let cols: { isins: number[]; code: number } | null = null;
-  for (const line of text.split(/\r?\n/)) {
-    const cells = line.split(';').map((c) => c.trim());
-    if (cells.length < 5) continue;
-    if (!cols) {
-      const isins = cells.flatMap((c, i) => (/^ISIN/i.test(c) ? [i] : []));
-      const code = cells.findIndex((c) => /^Scheme Code$/i.test(c));
-      if (isins.length && code >= 0) cols = { isins, code };
-      continue;
-    }
-    const code = cells[cols.code] ?? '';
-    if (!/^\d+$/.test(code)) continue;
-    for (const i of cols.isins) {
-      const isin = (cells[i] ?? '').toUpperCase();
-      if (ISIN_RE.test(isin) && !out.has(isin)) out.set(isin, code);
-    }
-  }
-  return out;
-}
-
 /**
- * A fund's full NAV history from mfapi.in (`{ meta, data: [{ date: 'dd-mm-yyyy', nav }] }`),
- * oldest first. Null when the answer is for a different fund or can't be read.
+ * An index's daily closes from Yahoo Finance's chart answer
+ * (`{ chart: { result: [{ meta: { gmtoffset }, timestamp, indicators: { quote: [{ close }] } }] } }`),
+ * oldest first, rounded to 2 decimals. Each timestamp is shifted by the exchange's offset to
+ * give its local trading date. Null when the answer can't be read.
  */
-export function parseMfapiHistory(body: unknown, isin: string): FeedPrice[] | null {
-  if (!body || typeof body !== 'object') return null;
-  const { meta, data } = body as { meta?: Record<string, unknown>; data?: unknown };
-  const isins = [meta?.isin_growth, meta?.isin_div_reinvestment]
-    .filter((v): v is string => typeof v === 'string').map((v) => v.toUpperCase());
-  if (!isins.includes(isin.toUpperCase()) || !Array.isArray(data)) return null;
+export function parseYahooChart(body: unknown): FeedPrice[] | null {
+  const result = (body as { chart?: { result?: unknown[] } } | null)?.chart?.result?.[0] as {
+    meta?: { gmtoffset?: unknown };
+    timestamp?: unknown;
+    indicators?: { quote?: { close?: unknown }[] };
+  } | undefined;
+  const stamps = result?.timestamp;
+  const closes = result?.indicators?.quote?.[0]?.close;
+  if (!Array.isArray(stamps) || !Array.isArray(closes)) return null;
+  const offset = typeof result?.meta?.gmtoffset === 'number' ? result.meta.gmtoffset : 0;
   const out = new Map<IsoDate, string>();
-  for (const row of data) {
-    const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(row?.date ?? ''));
-    const p = price(String(row?.nav ?? ''));
-    if (!match || !p) continue;
-    const date = `${match[3]}-${match[2]}-${match[1]}`;
-    if (isValidDate(date) && !out.has(date)) out.set(date, p);
-  }
+  stamps.forEach((stamp, i) => {
+    const close = closes[i];
+    if (typeof stamp !== 'number' || typeof close !== 'number' || !Number.isFinite(close) || close <= 0) return;
+    const date = new Date((stamp + offset) * 1000).toISOString().slice(0, 10);
+    const level = new Decimal(close).toDecimalPlaces(2);
+    if (isValidDate(date) && level.gt(0)) out.set(date, level.toFixed());
+  });
   return [...out].map(([date, p]) => ({ date, price: p })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
- * Whether a benchmark's stored NAVs miss the start of the investments or the last week, so its
- * history should be fetched. A fund launched after `first` keeps a gap; callers try once.
+ * Whether a benchmark's stored index levels miss the start of the investments or the last few
+ * days, so its history should be fetched. An index with no data that far back keeps a gap.
  */
 export function benchmarkNeedsHistory(dates: readonly IsoDate[], first: IsoDate, asOf: IsoDate): boolean {
   if (!dates.length) return true;
@@ -105,7 +88,7 @@ export function benchmarkNeedsHistory(dates: readonly IsoDate[], first: IsoDate,
     if (date < earliest) earliest = date;
     if (date > latest) latest = date;
   }
-  return earliest > addDays(first, 7) || latest < addDays(asOf, -7);
+  return earliest > addDays(first, 7) || latest < addDays(asOf, -4);
 }
 
 /**
@@ -205,8 +188,7 @@ export const PUBLISH_GRACE_DAYS = 3;
 export const NO_MARKET_FILE_DATES_SETTING = 'price_no_market_file_dates';
 export const ABSENT_PRICES_SETTING = 'price_absent_dates';
 
-export type BenchmarkFeed = { id: number; isin: string };
-export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily'; benchmarks?: BenchmarkFeed[] };
+export type PriceNeed = { date: IsoDate; linked: FeedAsset[]; cadence: 'daily' };
 /**
  * Settled gaps the backfill skips: dates when neither exchange published a file (listed
  * investments only), and investment-dates whose published file didn't list the investment.
@@ -225,14 +207,11 @@ export function pastPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   gaps: PriceGaps = {},
-  benchmarks: BenchmarkFeed[] = [],
-  benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
   const linked = feedAssets(data.assets);
   const ids = new Set(linked.map((a) => a.id));
   const txns = data.txns.filter((t) => ids.has(t.assetId));
-  const startTxns = benchmarks.length ? data.txns : txns;
-  const first = startTxns.reduce<IsoDate | null>(
+  const first = txns.reduce<IsoDate | null>(
     (m, t) => (m === null || t.date < m ? t.date : m),
     null,
   );
@@ -244,7 +223,6 @@ export function pastPriceNeeds(
   }
 
   const needs: PriceNeed[] = [];
-  const benchmarkKnown = new Set(benchmarkDates.map((row) => `${row.benchmarkId}:${row.date}`));
   for (let date = first; date < asOf; date = addDays(date, 1)) {
     const weekday = dayOfWeek(date);
     if (weekday === 0 || weekday === 6) continue;
@@ -257,11 +235,7 @@ export function pastPriceNeeds(
       if (own.length === 0 || computeHolding(own).units.lte(0)) return false;
       return !(priceDates.get(a.id) ?? []).includes(date);
     });
-    const missingBenchmarks = benchmarks.filter((item) => !benchmarkKnown.has(`${item.id}:${date}`));
-    if (missing.length || missingBenchmarks.length) needs.push({
-      date, linked: missing, cadence: 'daily',
-      ...(missingBenchmarks.length ? { benchmarks: missingBenchmarks } : {}),
-    });
+    if (missing.length) needs.push({ date, linked: missing, cadence: 'daily' });
   }
   return needs;
 }
@@ -270,22 +244,14 @@ export function priceWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, assetId:
   return `${need.date}:${need.cadence}:${assetId}`;
 }
 
-export function benchmarkWorkKey(need: Pick<PriceNeed, 'date' | 'cadence'>, id: number): string {
-  return `${need.date}:${need.cadence}:benchmark:${id}`;
-}
-
 export function pendingPriceNeeds(
   data: PortfolioData,
   asOf: IsoDate,
   attempted: ReadonlySet<string>,
   gaps: PriceGaps = {},
-  benchmarks: BenchmarkFeed[] = [],
-  benchmarkDates: readonly { benchmarkId: number; date: IsoDate }[] = [],
 ): PriceNeed[] {
-  return pastPriceNeeds(data, asOf, gaps, benchmarks, benchmarkDates).flatMap((need) => {
+  return pastPriceNeeds(data, asOf, gaps).flatMap((need) => {
     const linked = need.linked.filter((asset) => !attempted.has(priceWorkKey(need, asset.id)));
-    const missing = need.benchmarks?.filter((item) => !attempted.has(benchmarkWorkKey(need, item.id))) ?? [];
-    return linked.length || missing.length ? [{ ...need, linked,
-      ...(missing.length ? { benchmarks: missing } : {}) }] : [];
+    return linked.length ? [{ ...need, linked }] : [];
   });
 }

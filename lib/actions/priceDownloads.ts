@@ -1,10 +1,9 @@
-import { applyBenchmarkPrices, applyFeedPrices } from '@/lib/actions/applyPrices';
+import { applyFeedPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
 import {
   LOOK_BACK_DAYS,
   PUBLISH_GRACE_DAYS,
   pricesFor,
-  type BenchmarkFeed,
   type FeedAsset,
   type PriceMap,
 } from '@/lib/domain/priceFeeds';
@@ -44,14 +43,13 @@ export async function fetchAndSave(
   lookBackDays = LOOK_BACK_DAYS,
   canSave: () => boolean = () => true,
   dailyBackfill = false,
-  benchmarkFeed: BenchmarkFeed[] = [],
 ): Promise<FetchResult> {
   const amfi = linked.filter((a) => a.feed === 'amfi');
   const nse = linked.filter((a) => a.feed === 'nse');
   const earliestDates = new Map(
     amfi.flatMap((asset) => asset.navStartDate ? [[asset.isin, asset.navStartDate] as const] : []),
   );
-  const fundIsins = [...new Set([...amfi, ...benchmarkFeed].map((asset) => asset.isin))];
+  const fundIsins = [...new Set(amfi.map((asset) => asset.isin))];
   // In a daily backfill, a file missing after the grace period is final; before it, try again later.
   const settled = dailyBackfill && date <= addDays(today(), -PUBLISH_GRACE_DAYS);
   const none: PriceMap = new Map();
@@ -99,21 +97,6 @@ export async function fetchAndSave(
         `AMFI had no price for ${missing === 1 ? '1 investment' : `${missing} investments`}. Check the ISIN in each one.`,
       );
     }
-  }
-
-  const benchmarkRows = fundResult.status === 'fulfilled' ? benchmarkFeed.flatMap((item): {
-    benchmarkId: number; date: IsoDate; price: string | null;
-  }[] => {
-    const found = fundResult.value.get(item.isin);
-    if (found && (!dailyBackfill || found.date === date))
-      return [{ benchmarkId: item.id, date: found.date, price: found.price }];
-    if (settled && fundResult.value.size)
-      return [{ benchmarkId: item.id, date, price: null }];
-    return [];
-  }) : [];
-  if (benchmarkFeed.length && !dailyBackfill && fundResult.status === 'fulfilled') {
-    const missing = benchmarkFeed.length - benchmarkRows.length;
-    if (missing) problems.push(`AMFI had no NAV for ${missing} benchmark${missing === 1 ? '' : 's'}. Check the ISIN in Settings.`);
   }
 
   const nseResult = got[1]!;
@@ -174,10 +157,7 @@ export async function fetchAndSave(
     });
   }
   return {
-    updated: canSave()
-      ? (rows.length ? applyFeedPrices(db, rows) : 0) +
-        (benchmarkRows.length ? applyBenchmarkPrices(db, benchmarkRows) : 0)
-      : 0,
+    updated: canSave() && rows.length ? applyFeedPrices(db, rows) : 0,
     problems,
     unavailable,
     unreachable,

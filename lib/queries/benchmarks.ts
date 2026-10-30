@@ -16,11 +16,16 @@ export function benchmarkHistory(ids: number[]) {
     .where(inArray(benchmarkPrices.benchmarkId, ids)).all();
 }
 
-/** Benchmarks whose stored NAVs don't reach back to the first investment or up to this week. */
+/** The date of the first investment transaction, where benchmark history has to start. */
+export function firstInvestmentDate(): IsoDate | null {
+  return (db.select({ first: min(investmentTransactions.date) }).from(investmentTransactions)
+    .get()?.first as IsoDate | null | undefined) ?? null;
+}
+
+/** Benchmarks whose stored index levels don't reach back to the first investment or up to this week. */
 export function benchmarksMissingHistory(ids: number[]): number[] {
   if (!ids.length) return [];
-  const first = db.select({ first: min(investmentTransactions.date) }).from(investmentTransactions)
-    .get()?.first as IsoDate | null | undefined;
+  const first = firstInvestmentDate();
   if (!first) return [];
   const rows = db.select({ id: benchmarkPrices.benchmarkId, date: benchmarkPrices.date, price: benchmarkPrices.price })
     .from(benchmarkPrices).where(inArray(benchmarkPrices.benchmarkId, ids)).all();

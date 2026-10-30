@@ -6,45 +6,47 @@ import { z } from 'zod';
 import { applyBenchmarkPrices } from '@/lib/actions/applyPrices';
 import { db } from '@/lib/db/client';
 import { benchmarkPrices, benchmarks } from '@/lib/db/schema';
-import { FeedError, benchmarkNavHistory } from '@/lib/feeds';
-import { benchmarksMissingHistory } from '@/lib/queries/benchmarks';
+import { addDays } from '@/lib/domain/dates';
+import { MAX_BENCHMARKS, benchmarkIndex } from '@/lib/domain/benchmarks';
+import { FeedError, indexHistory } from '@/lib/feeds';
+import { benchmarksMissingHistory, firstInvestmentDate } from '@/lib/queries/benchmarks';
 import { failed, invalid, type ActionResult } from '@/lib/validation/money';
 
 const addSchema = z.object({
-  name: z.string().trim().min(1, 'Enter a benchmark name.').max(40, 'Use 40 characters or fewer.'),
-  isin: z.string().trim().toUpperCase().regex(/^INF[A-Z0-9]{9}$/, 'Enter a fund ISIN starting with INF.'),
+  code: z.string().trim().refine((code) => benchmarkIndex(code) !== undefined, 'Choose an index from the list.'),
 });
 
 export async function addBenchmark(formData: FormData): Promise<ActionResult> {
   const parsed = addSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error);
+  const index = benchmarkIndex(parsed.data.code)!;
   const result = db.transaction((tx) => {
     const existing = tx.select().from(benchmarks).all();
-    if (existing.length >= 8) return failed('You can compare up to 8 benchmarks. Remove one first.');
-    if (existing.some((row) => row.isin === parsed.data.isin))
-      return failed('That ISIN is already a benchmark.', 'isin');
-    tx.insert(benchmarks).values(parsed.data).run();
-    return { ok: true } as const;
+    if (existing.some((row) => row.code === index.code)) return failed(`${index.name} is already a benchmark.`, 'code');
+    if (existing.length >= MAX_BENCHMARKS)
+      return failed(`You can compare up to ${MAX_BENCHMARKS} indices. Remove one first.`);
+    const row = tx.insert(benchmarks).values({ code: index.code, name: index.name }).returning({ id: benchmarks.id }).get();
+    return { ok: true, id: row.id } as const;
   });
-  if (result.ok) {
-    await fillHistory([...ids(parsed.data.isin)]).catch(() => undefined);
-    revalidatePath('/settings');
-    revalidatePath('/investments', 'layout');
-  }
-  return result;
+  if (!result.ok) return result;
+  await fillHistory([result.id]).catch(() => undefined);
+  revalidatePath('/settings');
+  revalidatePath('/investments', 'layout');
+  return { ok: true };
 }
-
-const ids = (isin: string) => db.select({ id: benchmarks.id }).from(benchmarks)
-  .where(eq(benchmarks.isin, isin)).all().map((row) => row.id);
 
 async function fillHistory(benchmarkIds: number[]): Promise<string[]> {
   const missing = benchmarksMissingHistory(benchmarkIds);
-  const list = missing.length
+  const first = firstInvestmentDate();
+  const list = missing.length && first
     ? db.select().from(benchmarks).where(inArray(benchmarks.id, missing)).all() : [];
   const errors: string[] = [];
   for (const item of list) {
+    const index = benchmarkIndex(item.code);
+    if (!index) continue;
     try {
-      const history = await benchmarkNavHistory(item.isin);
+      // A couple of weeks earlier, so the first investment has a close to start from.
+      const history = await indexHistory(index.symbol, addDays(first!, -14));
       applyBenchmarkPrices(db, history.map((row) => ({ benchmarkId: item.id, ...row })));
     } catch (error) {
       if (!(error instanceof FeedError)) throw error;
@@ -54,9 +56,9 @@ async function fillHistory(benchmarkIds: number[]): Promise<string[]> {
   return errors;
 }
 
-const fillSchema = z.array(z.number().int().positive()).max(8);
+const fillSchema = z.array(z.number().int().positive()).max(MAX_BENCHMARKS);
 
-/** Fetches the NAV history of benchmarks being compared, when it isn't stored yet. */
+/** Fetches the index history of benchmarks being compared, when it isn't stored or is stale. */
 export async function fillBenchmarkHistory(benchmarkIds: number[]): Promise<ActionResult> {
   const parsed = fillSchema.safeParse(benchmarkIds);
   if (!parsed.success) return invalid(parsed.error);

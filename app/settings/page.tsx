@@ -3,15 +3,13 @@ import { Card } from '@/components/Card/Card';
 import { PageHead } from '@/components/PageHead/PageHead';
 import { AutoPricesSwitch, PastPrices, UpdatePricesButton } from '@/components/Prices/Prices';
 import {
+  BenchmarkToggles,
   PreferencesForm,
-  BenchmarkForm,
-  RemoveBenchmark,
   RestoreForm,
   SettingRow,
   StartFreshForm,
-  SuggestedBenchmarks,
 } from '@/components/SettingsForms/SettingsForms';
-import { SUGGESTED_BENCHMARKS } from '@/lib/domain/benchmarks';
+import { BENCHMARK_INDICES, MAX_BENCHMARKS } from '@/lib/domain/benchmarks';
 import { absentPriceKeys, pastPriceDates } from '@/lib/queries/investments';
 import { benchmarkList } from '@/lib/queries/benchmarks';
 import {
@@ -40,10 +38,10 @@ export default async function SettingsPage() {
     priceUpdate(),
   ]);
   const info = databaseInfo();
-  const benchmarks = benchmarkList();
-  const suggestions = SUGGESTED_BENCHMARKS.filter(
-    (item) => !benchmarks.some((benchmark) => benchmark.isin === item.isin),
-  );
+  const benchmarks = benchmarkList().map(({ id, code }) => ({ id, code }));
+  const full = benchmarks.length >= MAX_BENCHMARKS;
+  const indian = BENCHMARK_INDICES.filter((index) => index.region === 'india');
+  const world = BENCHMARK_INDICES.filter((index) => index.region === 'world');
 
   return (
     <>
@@ -119,7 +117,7 @@ export default async function SettingsPage() {
           >
             <SettingRow title="Automatic prices" control={<AutoPricesSwitch on={auto} />}>
               <p>
-                Once a day, when the app opens, funds and benchmarks get their latest NAV from AMFI and stocks and
+                Once a day, when the app opens, funds get their latest NAV from AMFI and stocks and
                 ETFs their closing price from NSE, or BSE if NSE has no price. It works for investments whose symbol is an ISIN.
                 Prices you enter or import are never replaced.
               </p>
@@ -130,7 +128,7 @@ export default async function SettingsPage() {
             <SettingRow title="Fetch past prices"
               control={<PastPrices dates={pastPriceDates()} unpublished={absentPriceKeys().size} />}>
               <p>
-                Fetches daily holding and benchmark prices for every trading day back to your first purchase. Existing
+                Fetches daily holding prices for every trading day back to your first purchase. Existing
                 prices, weekends, exchange holidays and pre-NAV NFO dates are skipped. A file that isn&apos;t out yet
                 is tried on a later run; after three days, a missing file or price counts as not published. The
                 estimate appears before starting. Progress and Stop stay available on every page; an unfinished run
@@ -139,18 +137,18 @@ export default async function SettingsPage() {
             </SettingRow>
           </Card>
 
-          <Card title="Benchmarks" sub="Compare your returns with index funds using AMFI NAVs in rupees.">
-            {benchmarks.map((benchmark) => <SettingRow key={benchmark.id} title={benchmark.name}
-              control={<RemoveBenchmark id={benchmark.id} />}>
-              <p>{[SUGGESTED_BENCHMARKS.find((item) => item.isin === benchmark.isin)?.fund, benchmark.isin]
-                .filter(Boolean).join(', ')}</p>
-            </SettingRow>)}
-            {suggestions.length > 0 && <SettingRow title="Suggested index funds"
-              control={<SuggestedBenchmarks items={suggestions} />}>
-              <p>Long-running direct-growth funds that track common Indian indices, so comparisons reach further back. Each is added under its index&rsquo;s name.</p>
-            </SettingRow>}
-            <SettingRow title="Add an index fund" control={<BenchmarkForm />}>
-              <p>Enter the name and ISIN of an AMFI-listed index fund. Benchmarks use the same public NAV files as fund prices; nothing about your holdings is sent.</p>
+          <Card title="Benchmarks"
+            sub={`Compare your gain or loss with stock market indices, each in its own currency. Pick up to ${MAX_BENCHMARKS}.`}>
+            <SettingRow title="Indian indices"
+              control={<BenchmarkToggles indices={indian} chosen={benchmarks} full={full} />}>
+              <p>The main indices of NSE and BSE.</p>
+            </SettingRow>
+            <SettingRow title="World indices"
+              control={<BenchmarkToggles indices={world} chosen={benchmarks} full={full} />}>
+              <p>
+                Large markets elsewhere. Only the index&rsquo;s own rise and fall is compared, without
+                currency changes. Daily closes come from Yahoo Finance; nothing about your holdings is sent.
+              </p>
             </SettingRow>
           </Card>
 

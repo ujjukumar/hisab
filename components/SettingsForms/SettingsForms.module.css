@@ -1,4 +1,4 @@
-/* Hallmark · redesign: full · theme: Refract · scope: app · settings rows and suggestions */
+/* Hallmark · redesign: full · theme: Refract · scope: app · settings rows and index toggles */
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
@@ -55,47 +55,46 @@
   align-self: flex-start;
 }
 
-.suggestions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.indices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
 }
 
-.suggestion {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-xs) var(--space-sm);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--line);
+.indices button {
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: 500 var(--text-sm) / 1 var(--sans);
+  color: var(--text-2);
+  cursor: pointer;
 }
 
-.suggestions li:first-child .suggestion {
-  padding-top: 0;
-}
-
-.suggestions li:last-child .suggestion {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
-.suggestion > p {
-  grid-column: 1 / -1;
-}
-
-.suggestionText {
-  display: grid;
-  min-width: 0;
-}
-
-.suggestionText strong {
-  font-weight: 600;
+.indices button:hover:not(:disabled) {
+  background: var(--surface-2);
   color: var(--heading);
 }
 
-.suggestionText span {
-  font-size: var(--text-xs);
-  color: var(--text-3);
+.indices button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.indices button[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.indices button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.indices button[aria-busy='true'] {
+  cursor: progress;
 }
 
 @media (max-width: 720px) {

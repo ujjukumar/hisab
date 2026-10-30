@@ -7,7 +7,7 @@ import { useToast } from '@/components/Toast/Toast';
 import { restoreBackup, savePreferences, startFresh } from '@/lib/actions/settings';
 import { addBenchmark, removeBenchmark } from '@/lib/actions/benchmarks';
 import { COMPOUNDING, COMPOUNDING_LABELS } from '@/lib/domain/assets';
-import type { SuggestedBenchmark } from '@/lib/domain/benchmarks';
+import type { BenchmarkIndex } from '@/lib/domain/benchmarks';
 import { MONTH_NAMES } from '@/lib/domain/dates';
 import type { ActionResult } from '@/lib/validation/money';
 import styles from './SettingsForms.module.css';
@@ -160,48 +160,46 @@ export function PreferencesForm({
   );
 }
 
-export function BenchmarkForm() {
-  const form = useActionForm(addBenchmark, 'Benchmark added');
-  return <form className={styles.form} onSubmit={form.submit} noValidate aria-busy={form.pending}>
-    <TextField label="Name" name="name" placeholder="Index fund" {...form.describe('name')} />
-    {form.error('name')}
-    <TextField label="Fund ISIN" name="isin" placeholder="INF…" autoComplete="off"
-      {...form.describe('isin')} />
-    {form.error('isin')}
-    {form.summary}
-    <Button type="submit" disabled={form.pending}>Add benchmark</Button>
-  </form>;
-}
+/** Index pills: pressing one starts or stops comparing with it. */
+export function BenchmarkToggles({ indices, chosen, full }: {
+  indices: readonly BenchmarkIndex[];
+  chosen: readonly { id: number; code: string }[];
+  full: boolean;
+}) {
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [, startTransition] = useTransition();
 
-export function SuggestedBenchmarks({ items }: { items: readonly SuggestedBenchmark[] }) {
-  return <ul className={styles.suggestions}>
-    {items.map((item) => <SuggestedBenchmarkItem key={item.isin} {...item} />)}
-  </ul>;
-}
+  function toggle(index: BenchmarkIndex) {
+    const existing = chosen.find((item) => item.code === index.code);
+    const data = new FormData();
+    if (existing) data.set('id', String(existing.id));
+    else data.set('code', index.code);
+    setBusy(index.code);
+    setError('');
+    startTransition(async () => {
+      const result = await (existing ? removeBenchmark(data) : addBenchmark(data));
+      setBusy(null);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      toast(existing ? `Stopped comparing with ${index.name}` : `Comparing with ${index.name}`);
+    });
+  }
 
-function SuggestedBenchmarkItem({ name, fund, isin }: SuggestedBenchmark) {
-  const form = useActionForm(addBenchmark, 'Benchmark added');
-  return <li>
-    <form className={styles.suggestion} onSubmit={form.submit} aria-busy={form.pending}>
-      <input type="hidden" name="name" value={name} />
-      <input type="hidden" name="isin" value={isin} />
-      <span className={styles.suggestionText}>
-        <strong>{name}</strong>
-        <span>{fund}</span>
-      </span>
-      <Button type="submit" variant="secondary" disabled={form.pending}>
-        Add<span className="sr-only"> {name}</span>
-      </Button>
-      {form.summary}
-    </form>
-  </li>;
-}
-
-export function RemoveBenchmark({ id }: { id: number }) {
-  const form = useActionForm(removeBenchmark, 'Benchmark removed');
-  return <form onSubmit={form.submit} aria-busy={form.pending}>
-    <input type="hidden" name="id" value={id} />
-    {form.summary}
-    <Button type="submit" variant="secondary" disabled={form.pending}>Remove</Button>
-  </form>;
+  return <div className={styles.form}>
+    <div className={styles.indices} role="group" aria-label="Indices">
+      {indices.map((index) => {
+        const on = chosen.some((item) => item.code === index.code);
+        return <button key={index.code} type="button" aria-pressed={on} title={index.market}
+          aria-busy={busy === index.code} disabled={busy !== null || (!on && full)}
+          onClick={() => toggle(index)}>
+          {index.name}
+        </button>;
+      })}
+    </div>
+    {error && <FieldError>{error}</FieldError>}
+  </div>;
 }

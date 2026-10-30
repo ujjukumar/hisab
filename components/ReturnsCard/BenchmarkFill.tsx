@@ -5,11 +5,11 @@ import { useEffect, useState, useTransition, type ReactNode } from 'react';
 import { fillBenchmarkHistory } from '@/lib/actions/benchmarks';
 import styles from './ReturnsCard.module.css';
 
-// Each benchmark is fetched once per visit, so a fund launched after the first investment
-// doesn't keep asking for history it can't have.
+// Each benchmark is fetched once per visit, so an index with no closes that far back doesn't
+// keep asking for history it can't have.
 const tried = new Set<number>();
 
-/** Fetches NAV history for the benchmarks being compared, then shows the notices. */
+/** Fetches index history for the benchmarks being compared, then shows the notices. */
 export function BenchmarkFill({ missing, children }: {
   missing: { id: number; name: string }[];
   children: ReactNode;

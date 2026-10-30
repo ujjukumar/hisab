@@ -181,7 +181,7 @@ describe('benchmarkReturns', () => {
       { date: '2025-03-31', price: '13' }, { date: '2025-04-01', price: '13' },
     ];
     expect(benchmarkReturns(own, points, null, history).values.at(-1)).toBeCloseTo(0.21875);
-    expect(benchmarkReturns(own, points, null, []).error).toMatch(/No benchmark NAV/);
+    expect(benchmarkReturns(own, points, null, []).error).toMatch(/No index close/);
   });
 
   it('mirrors a withdrawal, but not a dividend, and requires a NAV at the start', () => {

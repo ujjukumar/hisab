@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { Asset } from '@/lib/db/schema';
 import { openDatabase } from '@/lib/db/connect';
-import { benchmarks } from '@/lib/db/schema';
 import type { PortfolioData } from '@/lib/domain/portfolio';
 
 vi.mock('server-only', () => ({}));
@@ -128,30 +127,6 @@ describe('price backfill worker', () => {
     await vi.waitFor(async () => expect((await priceJobStatus())?.state).toBe('done'));
     expect(fetchAndSave).toHaveBeenCalledTimes(1);
     expect((await priceJobStatus())?.updated).toBe(2);
-  });
-
-  it('checkpoints benchmark dates alongside held-asset prices', async () => {
-    const { freshPortfolioData } = await import('@/lib/queries/investments');
-    const { fetchAndSave } = await import('@/lib/actions/priceDownloads');
-    const { startPriceJob, priceJobStatus } = await import('@/lib/actions/priceJob');
-    const { readPriceJob } = await import('@/lib/actions/priceJobStore');
-    const id = Number(connection.db.insert(benchmarks).values({ name: 'Invented index',
-      isin: 'INF000BM0011' }).run().lastInsertRowid);
-    vi.mocked(freshPortfolioData).mockReturnValue(portfolio);
-    vi.mocked(fetchAndSave).mockClear().mockResolvedValue({
-      updated: 1, problems: [], unavailable: false, noMarketFile: false, unreachable: false, absent: [],
-    });
-    expect((await startPriceJob())?.state).toBe('running');
-    await vi.waitFor(async () => expect((await priceJobStatus())?.state).toBe('done'));
-    expect(vi.mocked(fetchAndSave).mock.calls[0]?.[6]).toEqual([{ id, isin: 'INF000BM0011',
-      name: 'Invented index', createdAt: expect.any(String), updatedAt: expect.any(String) }]);
-    const { amfiOn } = await import('@/lib/feeds');
-    vi.mocked(amfiOn).mockResolvedValue(new Map());
-    const funds = vi.mocked(fetchAndSave).mock.calls[0]?.[2];
-    await funds?.(['INF000BM0011'], new Map());
-    expect(amfiOn).toHaveBeenCalledWith('2024-04-01');
-    expect(readPriceJob(connection.db)?.attempted).toContain(`2024-04-02:daily:benchmark:${id}`);
-    connection.db.delete(benchmarks).run();
   });
 
   it('keeps going past a date that failed and records unpublished prices', async () => {

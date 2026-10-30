@@ -52,7 +52,7 @@ export function ReturnsCard({ dates, lines, value, range, available, from, to, a
       <button type="submit">Show returns</button>
     </form>}
     {benchmarks.length ? <CompareBenchmarks items={benchmarks} /> :
-      <p className={styles.note}>To compare with an index fund, <Link href="/settings">add a benchmark in Settings</Link>.</p>}
+      <p className={styles.note}>To compare with a market index such as the Nifty 50 or S&amp;P 500, <Link href="/settings">choose a benchmark in Settings</Link>.</p>}
     <BenchmarkFill missing={missing}>
       {notices.map((message) => <p className={styles.note} key={message}>{message}</p>)}
     </BenchmarkFill>

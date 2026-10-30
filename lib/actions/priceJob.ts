@@ -11,14 +11,12 @@ import {
   NO_MARKET_FILE_DATES_SETTING,
   PUBLISH_GRACE_DAYS,
   absentPriceKey,
-  benchmarkWorkKey,
   pendingPriceNeeds,
   priceWorkKey,
 } from '@/lib/domain/priceFeeds';
 import { amfiOn } from '@/lib/feeds';
 import { freshPortfolioData, priceGaps } from '@/lib/queries/investments';
 import { failed, type ActionFailure } from '@/lib/validation/money';
-import { benchmarkHistory, benchmarkList } from '@/lib/queries/benchmarks';
 import { fetchAndSave } from './priceDownloads';
 import {
   claimPriceJob,
@@ -63,14 +61,11 @@ async function runJob(id: string, owner: string): Promise<void> {
         return;
       }
       const asOf = today();
-      const benchmarks = benchmarkList();
       const needs = pendingPriceNeeds(
         freshPortfolioData(),
         asOf,
         new Set(job.attempted),
         priceGaps(),
-        benchmarks,
-        benchmarkHistory(benchmarks.map((item) => item.id)),
       );
       const need = needs[0];
       if (!need) {
@@ -101,7 +96,6 @@ async function runJob(id: string, owner: string): Promise<void> {
         1,
         () => current(id, owner)?.state === 'running',
         true,
-        need.benchmarks,
       );
       const latest = current(id, owner);
       if (!latest) return;
@@ -126,7 +120,6 @@ async function runJob(id: string, owner: string): Promise<void> {
         attempted: [
           ...latest.attempted,
           ...need.linked.map((asset) => priceWorkKey(need, asset.id)),
-          ...(need.benchmarks ?? []).map((item) => benchmarkWorkKey(need, item.id)),
         ],
         done: latest.done + 1,
         updated: latest.updated + result.updated,

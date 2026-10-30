@@ -2,7 +2,6 @@ import 'server-only';
 import { and, asc, count, desc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { cache } from 'react';
 import { db } from '@/lib/db/client';
-import { benchmarkHistory, benchmarkList } from './benchmarks';
 import {
   accounts,
   assets,
@@ -406,12 +405,10 @@ export function pastPriceDates(): {
   listed: boolean;
   cadence: 'daily';
 }[] {
-  const benchmarks = benchmarkList();
-  return pastPriceNeeds(portfolioData(), today(), priceGaps(), benchmarks,
-    benchmarkHistory(benchmarks.map((item) => item.id))).map((n) => ({
+  return pastPriceNeeds(portfolioData(), today(), priceGaps()).map((n) => ({
     date: n.date,
     cadence: n.cadence,
-    funds: n.linked.some((a) => a.feed === 'amfi') || Boolean(n.benchmarks?.length),
+    funds: n.linked.some((a) => a.feed === 'amfi'),
     listed: n.linked.some((a) => a.feed === 'nse'),
   }));
 }

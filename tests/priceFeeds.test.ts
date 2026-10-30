@@ -8,9 +8,8 @@ import {
   feedAssets,
   isDue,
   parseAmfiNav,
-  parseAmfiSchemeCodes,
   parseBhavcopy,
-  parseMfapiHistory,
+  parseYahooChart,
   pastPriceNeeds,
   pendingPriceNeeds,
   pricesFor,
@@ -518,18 +517,6 @@ describe('pastPriceNeeds', () => {
     );
   });
 
-  it('schedules benchmarks from the first transaction and skips saved and attempted dates', () => {
-    const unlinked = { ...data, assets: [asset(3, 'mutual_fund', null)],
-      txns: [trade(3, 3, '2024-04-01', 'buy', '1')] };
-    const benchmark = [{ id: 7, isin: 'INF000BM0011' }];
-    const known = [{ benchmarkId: 7, date: '2024-04-01' }];
-    const needs = pastPriceNeeds(unlinked, '2024-04-04', {}, benchmark, known);
-    expect(needs.map((need) => need.date)).toEqual(['2024-04-02', '2024-04-03']);
-    expect(needs[0]?.benchmarks).toEqual(benchmark);
-    expect(pendingPriceNeeds(unlinked, '2024-04-04', new Set(['2024-04-02:daily:benchmark:7']),
-      {}, benchmark, known).map((need) => need.date)).toEqual(['2024-04-03']);
-  });
-
   it('crosses the year end', () => {
     const late: PortfolioData = {
       ...data,
@@ -546,42 +533,29 @@ describe('pastPriceNeeds', () => {
 });
 
 describe('benchmark history', () => {
-  it('reads scheme codes by ISIN from the AMFI list', () => {
-    const text = [
-      'Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Net Asset Value;Date',
-      '',
-      'Open Ended Schemes(Index Funds)',
-      '120716;INF789F01XA0;-;UTI Nifty 50 Index Fund - Direct Plan - Growth;160.6525;21-Oct-2026',
-      '999;INF000000001;inf000000002;Other;N.A.;21-Oct-2026',
-    ].join('\r\n');
-    const codes = parseAmfiSchemeCodes(text);
-    expect(codes.get('INF789F01XA0')).toBe('120716');
-    expect(codes.get('INF000000002')).toBe('999');
-  });
-
-  it('reads mfapi.in history oldest first and checks the fund', () => {
-    const body = {
-      meta: { scheme_code: 120716, isin_growth: 'INF789F01XA0', isin_div_reinvestment: null },
-      data: [
-        { date: '21-10-2026', nav: '160.65250' },
-        { date: '20-10-2026', nav: '159.10000' },
-        { date: '31-02-2026', nav: '1.0' },
-        { date: '19-10-2026', nav: '0.000' },
-      ],
-      status: 'SUCCESS',
-    };
-    expect(parseMfapiHistory(body, 'INF789F01XA0')).toEqual([
-      { date: '2026-10-20', price: '159.1' },
-      { date: '2026-10-21', price: '160.6525' },
+  it('reads Yahoo Finance closes as local trading dates, oldest first', () => {
+    const at = (iso: string) => Date.parse(iso) / 1000;
+    const chart = (gmtoffset: number, timestamp: number[], close: (number | null)[]) =>
+      ({ chart: { result: [{ meta: { gmtoffset }, timestamp, indicators: { quote: [{ close }] } }], error: null } });
+    // New York opens at 09:30, four hours behind UTC in October.
+    expect(parseYahooChart(chart(-14400,
+      [at('2026-10-20T13:30:00Z'), at('2026-10-19T13:30:00Z'), at('2026-10-21T13:30:00Z')],
+      [6712.345678, 6650.5, null]))).toEqual([
+      { date: '2026-10-19', price: '6650.5' },
+      { date: '2026-10-20', price: '6712.35' },
     ]);
-    expect(parseMfapiHistory(body, 'INF000000001')).toBeNull();
-    expect(parseMfapiHistory('nope', 'INF789F01XA0')).toBeNull();
+    // Mumbai opens at 09:15, which is 03:45 UTC.
+    expect(parseYahooChart(chart(19800, [at('2026-10-20T03:45:00Z')], [25123.4]))).toEqual([
+      { date: '2026-10-20', price: '25123.4' },
+    ]);
+    expect(parseYahooChart({ chart: { result: null, error: { code: 'Not Found' } } })).toBeNull();
+    expect(parseYahooChart('nope')).toBeNull();
   });
 
-  it('asks for history until it covers the first investment and this week', () => {
+  it('asks for history until it covers the first investment and the last few days', () => {
     expect(benchmarkNeedsHistory([], '2025-01-10', '2026-10-22')).toBe(true);
-    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-21'], '2025-01-10', '2026-10-22')).toBe(false);
+    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-19'], '2025-01-10', '2026-10-22')).toBe(false);
     expect(benchmarkNeedsHistory(['2025-02-01', '2026-10-21'], '2025-01-10', '2026-10-22')).toBe(true);
-    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-01'], '2025-01-10', '2026-10-22')).toBe(true);
+    expect(benchmarkNeedsHistory(['2025-01-08', '2026-10-15'], '2025-01-10', '2026-10-22')).toBe(true);
   });
 });

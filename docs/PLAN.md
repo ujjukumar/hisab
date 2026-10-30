@@ -219,12 +219,13 @@ for the portfolio and each investment type, with a gap where that is undefined; 
 endpoint matches Change in period. Ranges: calendar YTD, 1/3/6 months, 1/3/5/10
 years, All and Custom (default All for short histories, else 1 year).
 
-Benchmarks are owner-chosen AMFI index fund ISINs (Settings suggests common
-direct-growth index funds). A benchmark hypothetically buys the fund with the
-starting value and mirrors buys, deposits, fees, sales and withdrawals (not
-dividends, interest or intraday P&L). A missing required NAV or an uncovered
-withdrawal makes the comparison unavailable; a missing chart-date NAV leaves a gap.
-Up to eight benchmarks, selected in the URL.
+Benchmarks are owner-chosen market indices from a fixed list (Indian and world
+indices, `lib/domain/benchmarks.ts`), with daily closes from Yahoo Finance in
+each index's own currency. A benchmark hypothetically buys the index at its
+closing level with the starting value and mirrors buys, deposits, fees, sales
+and withdrawals (not dividends, interest or intraday P&L). A missing required
+close or an uncovered withdrawal makes the comparison unavailable; a missing
+chart-date close leaves a gap. Up to eight benchmarks, selected in the URL.
 
 ### Allocation and movers
 

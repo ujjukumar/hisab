@@ -141,7 +141,7 @@ export function returnSeries(data: PortfolioData, to: IsoDate, from: IsoDate | n
   });
 }
 
-/** An index fund bought with the same starting value and on the same capital-flow dates. */
+/** A market index "bought" with the same starting value and on the same capital-flow dates. */
 export function benchmarkReturns(
   data: PortfolioData,
   points: ReturnPoint[],
@@ -167,7 +167,7 @@ export function benchmarkReturns(
   let units = new Decimal(0);
   if (initial) {
     const price = priceOn(from!);
-    if (!price) return fail('No benchmark NAV near the start date. The fund may have started later, so choose a later range.');
+    if (!price) return fail('No index close near the start date. Its history may not reach back that far, so choose a later range.');
     units = new Decimal(initial).div(100).div(price);
   }
   const flows = data.txns.filter((txn) => (!from || txn.date > from) && txn.date <= points.at(-1)!.date)
@@ -186,7 +186,7 @@ export function benchmarkReturns(
         : (txn.amount ?? 0) + txn.fees;
       if (!amount) continue;
       const price = priceOn(txn.date);
-      if (!price) return fail(`No benchmark NAV near ${txn.date}. The fund may have started after this, so choose a later range.`);
+      if (!price) return fail(`No index close near ${txn.date}. Its history may not reach back that far, so choose a later range.`);
       const change = new Decimal(amount).div(100).div(price);
       if (units.plus(change).lt(-0.00000001)) return fail('This benchmark could not cover a withdrawal in this range.');
       units = Decimal.max(0, units.plus(change));

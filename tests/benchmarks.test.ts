@@ -22,19 +22,13 @@ afterAll(() => {
 });
 
 describe('benchmark settings', () => {
-  it('validates, normalises and removes a benchmark with its prices', async () => {
+  it('validates, adds and removes a benchmark with its prices', async () => {
     const { addBenchmark, removeBenchmark } = await import('@/lib/actions/benchmarks');
-    const form = (name: string, isin: string) => {
-      const data = new FormData();
-      data.set('name', name);
-      data.set('isin', isin);
-      return data;
-    };
-    expect((await addBenchmark(form('Index', 'NOT-A-FUND'))).ok).toBe(false);
-    expect(await addBenchmark(form('Invented index fund', 'inf000bm0011'))).toEqual({ ok: true });
-    expect((await addBenchmark(form('Duplicate', 'INF000BM0011'))).ok).toBe(false);
+    expect((await addBenchmark(form('not-an-index'))).ok).toBe(false);
+    expect(await addBenchmark(form('sp500'))).toEqual({ ok: true });
+    expect((await addBenchmark(form('sp500'))).ok).toBe(false);
     const saved = connection.db.select().from(benchmarks).get()!;
-    expect(saved.isin).toBe('INF000BM0011');
+    expect(saved).toMatchObject({ code: 'sp500', name: 'S&P 500' });
     connection.db.insert(benchmarkPrices).values({ benchmarkId: saved.id,
       date: '2026-01-02', price: '10' }).run();
     const remove = new FormData();
@@ -44,17 +38,21 @@ describe('benchmark settings', () => {
     expect(connection.db.select().from(benchmarkPrices).all()).toEqual([]);
   });
 
-  it('accepts every suggested index fund as a benchmark', async () => {
+  it('accepts listed indices up to the limit', async () => {
     const { addBenchmark } = await import('@/lib/actions/benchmarks');
-    const { SUGGESTED_BENCHMARKS } = await import('@/lib/domain/benchmarks');
-    expect(new Set(SUGGESTED_BENCHMARKS.map((item) => item.isin)).size).toBe(SUGGESTED_BENCHMARKS.length);
-    for (const { name, isin } of SUGGESTED_BENCHMARKS) {
-      const data = new FormData();
-      data.set('name', name);
-      data.set('isin', isin);
-      expect(await addBenchmark(data)).toEqual({ ok: true });
-    }
-    expect(connection.db.select().from(benchmarks).all().map((row) => row.isin))
-      .toEqual(SUGGESTED_BENCHMARKS.map((item) => item.isin));
+    const { BENCHMARK_INDICES, MAX_BENCHMARKS } = await import('@/lib/domain/benchmarks');
+    expect(new Set(BENCHMARK_INDICES.map((item) => item.code)).size).toBe(BENCHMARK_INDICES.length);
+    expect(new Set(BENCHMARK_INDICES.map((item) => item.symbol)).size).toBe(BENCHMARK_INDICES.length);
+    const allowed = BENCHMARK_INDICES.slice(0, MAX_BENCHMARKS);
+    for (const { code } of allowed) expect(await addBenchmark(form(code))).toEqual({ ok: true });
+    expect((await addBenchmark(form(BENCHMARK_INDICES[MAX_BENCHMARKS]!.code))).ok).toBe(false);
+    expect(connection.db.select().from(benchmarks).all().map((row) => row.code))
+      .toEqual(allowed.map((item) => item.code));
   });
 });
+
+function form(code: string) {
+  const data = new FormData();
+  data.set('code', code);
+  return data;
+}

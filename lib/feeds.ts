@@ -3,9 +3,8 @@ import { SHORT_MONTHS, addDays, parts, type IsoDate } from '@/lib/domain/dates';
 import {
   LOOK_BACK_DAYS,
   parseAmfiNav,
-  parseAmfiSchemeCodes,
   parseBhavcopy,
-  parseMfapiHistory,
+  parseYahooChart,
   type FeedPrice,
   type PriceMap,
 } from '@/lib/domain/priceFeeds';
@@ -14,8 +13,8 @@ import { unzipFirst } from '@/lib/zip';
 /**
  * The only place Hisaab goes online (PLAN section 11, phase 8). It downloads AMFI's and NSE's
  * public whole-market price files; every request is the same whatever the owner holds. The one
- * exception is a benchmark's NAV history from mfapi.in, which names that benchmark fund (an
- * index fund the owner chose to compare with, not a holding).
+ * exception is a benchmark's history from Yahoo Finance, which names that market index (one the
+ * owner chose to compare with, not a holding) and the date to start from.
  */
 
 const HEADERS = { 'User-Agent': 'Hisaab (personal use)' };
@@ -23,7 +22,7 @@ const TIMEOUT_MS = 20_000;
 const DEBUG_FEEDS = process.env.NODE_ENV === 'development' || process.env.HISAAB_PRICE_DEBUG === '1';
 const AMFI_LATEST = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 const AMFI_HISTORY = 'https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx';
-const MFAPI = 'https://api.mfapi.in/mf';
+const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const NSE = 'https://nsearchives.nseindia.com/content';
 const BSE = 'https://www.bseindia.com/download/BhavCopy/Equity';
 
@@ -34,11 +33,11 @@ export class FeedUnreachableError extends FeedError {}
 export class FeedNotReadyError extends FeedError {}
 
 /** The file, or null when the server says it doesn't exist (a holiday, or not published yet). */
-async function download(url: string, source: string): Promise<Buffer | null> {
+async function download(url: string, source: string, headers = HEADERS): Promise<Buffer | null> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: HEADERS,
+      headers,
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -74,20 +73,21 @@ export async function amfiLatest(): Promise<PriceMap> {
   return map;
 }
 
-/** A benchmark fund's whole NAV history, oldest first: its scheme code from AMFI, then mfapi.in. */
-export async function benchmarkNavHistory(isin: string): Promise<FeedPrice[]> {
-  const list = await download(AMFI_LATEST, 'AMFI');
-  const code = list ? parseAmfiSchemeCodes(list.toString('utf8')).get(isin.toUpperCase()) : undefined;
-  if (!code) throw new FeedError(`AMFI doesn't list a fund with ISIN ${isin}. Check the benchmark in Settings.`);
-  const file = await download(`${MFAPI}/${code}`, 'mfapi.in');
+/** A market index's daily closes from `from` to today, oldest first, from Yahoo Finance. */
+export async function indexHistory(symbol: string, from: IsoDate): Promise<FeedPrice[]> {
+  const start = Math.floor(Date.parse(`${from}T00:00:00Z`) / 1000);
+  const end = Math.floor(Date.now() / 1000) + 86_400;
+  const url = `${YAHOO_CHART}/${encodeURIComponent(symbol)}?period1=${start}&period2=${end}&interval=1d`;
+  // Yahoo turns away requests that don't look like they come from a browser.
+  const file = await download(url, 'Yahoo Finance', { 'User-Agent': 'Mozilla/5.0' });
   let body: unknown = null;
   try {
     body = file ? JSON.parse(file.toString('utf8')) : null;
   } catch {
     body = null;
   }
-  const history = parseMfapiHistory(body, isin);
-  if (!history?.length) throw new FeedError("mfapi.in didn't send this fund's NAV history. Try again later.");
+  const history = parseYahooChart(body);
+  if (!history?.length) throw new FeedError("Yahoo Finance didn't send this index's history. Try again later.");
   return history;
 }
 

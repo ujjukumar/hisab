@@ -11,7 +11,6 @@ import { formatReturn, formatShortINR, formatShortINRSigned, gainClass } from '@
 import { PERIODS, investmentPeriodRows, periodTotals } from '@/lib/domain/performance';
 import { totals } from '@/lib/domain/portfolio';
 import { feedAssets } from '@/lib/domain/priceFeeds';
-import { benchmarkList } from '@/lib/queries/benchmarks';
 import { portfolio, portfolioData } from '@/lib/queries/investments';
 import { financialYearStartMonth, priceStatus, priceUpdate } from '@/lib/queries/settings';
 
@@ -19,10 +18,8 @@ export default async function InvestmentTabsLayout({ children }: { children: Rea
   const date = today();
   const rows = portfolio(date);
   const t = totals(rows, date);
-  // Without an ISIN (or a benchmark) nothing can be fetched, so say how to fix that instead.
-  const priced =
-    feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0 ||
-    benchmarkList().length > 0;
+  // Without an ISIN nothing can be fetched, so say how to fix that instead.
+  const priced = feedAssets(rows.filter((r) => !r.sold).map((r) => r.asset)).length > 0;
   const last = await priceUpdate();
   const yearStart = await financialYearStartMonth();
   const data = portfolioData();

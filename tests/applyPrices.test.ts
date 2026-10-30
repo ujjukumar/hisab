@@ -73,9 +73,9 @@ describe('applyFeedPrices', () => {
 });
 
 describe('applyBenchmarkPrices', () => {
-  it('stores absent days and replaces them when a NAV arrives, without erasing saved NAVs', () => {
-    const id = Number(conn.db.insert(benchmarks).values({ name: 'Invented index fund',
-      isin: 'INF000BM0011' }).run().lastInsertRowid);
+  it('stores absent days and replaces them when a close arrives, without erasing saved closes', () => {
+    const id = Number(conn.db.insert(benchmarks).values({ name: 'Invented index',
+      code: 'invented' }).run().lastInsertRowid);
     const absent = { benchmarkId: id, date: '2026-01-02', price: null };
     expect(applyBenchmarkPrices(conn.db, [absent])).toBe(1);
     expect(applyBenchmarkPrices(conn.db, [{ ...absent, price: '12.5' }])).toBe(1);

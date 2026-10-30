@@ -192,7 +192,8 @@ export const prices = sqliteTable(
 export const benchmarks = sqliteTable('benchmarks', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
-  isin: text('isin').notNull().unique(),
+  /** A code from BENCHMARK_INDICES. */
+  code: text('code').notNull().unique(),
   ...stamps,
 });
 
@@ -201,7 +202,7 @@ export const benchmarkPrices = sqliteTable(
   {
     benchmarkId: integer('benchmark_id').notNull().references(() => benchmarks.id),
     date: text('date').notNull(),
-    /** Null records that a published AMFI file had no NAV for this ISIN on this date. */
+    /** The index's closing level. */
     price: text('price'),
     ...stamps,
   },
